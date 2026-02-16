@@ -1,4 +1,4 @@
-## Tire Shop Management System 🛞
+# Tire Shop Management System 🛞
 
 ![Python](https://img.shields.io/badge/Python-3.x-blue?style=flat&logo=python)
 ![SQL Server](https://img.shields.io/badge/Database-SQL%20Server-red?style=flat&logo=microsoftsqlserver)
@@ -6,21 +6,45 @@
 ---
 
 ## 📘 Overview
-This project is a comprehensive **Database Management System (DBMS)** designed for managing a tire shop’s operations — including customers, sales, purchases, and inventory tracking.
+This project is a comprehensive **Database Management System (DBMS)** designed for managing a tire shop’s operations — including customers, sales, purchases, inventory tracking, and reporting.
 
 ---
 
 ## 📂 Project Structure
-The repository is organized into three phases:
 
-### **Phase 1 & 2 (Documentation):**
-- Includes the **ER Diagram** (`Untitled Diagram.jpg`)
-- Full project documentation and use-case scenarios (`PDF file`)
+The project follows a phased development structure, separating documentation from implementation:
 
-### **Phase 3 (Implementation):**
-- **crud/** → Contains the main application logic for managing data (Insert, Update, Delete, Retrieve)  
-- **report/** → Contains scripts for generating financial and inventory reports  
-- **Queries.txt** → SQL commands used to create tables and views  
+```text
+Tire-Shop-Management/
+│
+├── Phase 1 & 2 (Design & Docs)
+│   ├── Untitled Diagram.jpg        # Entity-Relationship Diagram (ERD)
+│   └── Documentation.pdf           # Full academic report and scenarios
+│
+├── Phase 3 (Implementation)
+│   ├── Queries.txt                 # SQL DDL/DML scripts for Schema creation
+│   │
+│   ├── crud/                       # CORE LOGIC: Data Manipulation
+│   │   ├── main.py                 # CLI Entry point for Admin operations
+│   │   ├── crud_operations.py      # Python functions for SQL execution
+│   │   └── db_config.py            # Database connection settings
+│   │
+│   └── report/                     # ANALYTICS: Business Intelligence
+│       ├── run_reports.py          # Entry point for Report generation
+│       └── report_generator.py     # SQL Aggregation logic for insights
+│
+└── README.md                       # Project Documentation
+```
+
+### Phase Summary:
+- **Phase 1 & 2 (Documentation):**
+  - Includes the **ER Diagram** (`Untitled Diagram.jpg`)
+  - Full project documentation and use-case scenarios (`PDF file`)
+
+- **Phase 3 (Implementation):**
+  - **crud/** → Contains the main application logic for managing data (Insert, Update, Delete, Retrieve)
+  - **report/** → Contains scripts for generating financial and inventory reports
+  - **Queries.txt** → SQL commands used to create tables and views
 
 ---
 
@@ -77,5 +101,9 @@ python run_reports.py
 **Shayan Abdollahi Nami**
 
 ---
+
+
+
+
 
 
