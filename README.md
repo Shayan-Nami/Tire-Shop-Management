@@ -42,7 +42,7 @@ Tire-Shop-Management/
   - Full project documentation and use-case scenarios (`PDF file`)
 
 - **Phase 3 (Implementation):**
-  - **crud/** → Contains the main application logic for managing data (Insert, Update, Delete, Retrieve)
+  - **crud/** → Contains the main application logic for managing data (Create, Read, Update, Delete)
   - **report/** → Contains scripts for generating financial and inventory reports
   - **Queries.txt** → SQL commands used to create tables and views
 
@@ -101,6 +101,7 @@ python run_reports.py
 **Shayan Abdollahi Nami**
 
 ---
+
 
 
 
