@@ -97,10 +97,10 @@ python run_reports.py
 
 ---
 
-## 👤 Author
-**Shayan Abdollahi Nami**
+
 
 ---
+
 
 
 
