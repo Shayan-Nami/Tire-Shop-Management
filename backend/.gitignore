@@ -1,0 +1,13 @@
+# Python & Django
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.sqlite3
+*.db
+staticfiles/
+media/
+.env
+.env.*
+!.env.example
