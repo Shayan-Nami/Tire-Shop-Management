@@ -1,0 +1,4714 @@
+openapi: 3.0.3
+info:
+  title: سامانه مدیریت فروشگاه لاستیک - API Documentation
+  version: 2.0.0
+  description: مستندات تعاملی وب‌سرویس‌های سیستم مدیریت فروشگاه، انبار و خدمات لاستیک
+    برای وب و موبایل
+paths:
+  /api/v1/analytics/dashboard-stats/:
+    get:
+      operationId: v1_analytics_dashboard_stats_retrieve
+      description: آمار کلی و شاخص‌های کلیدی عملکرد (KPI) جهت نمایش در کارت‌های داشبورد
+        اصلی با لحاظ مرجوعی‌ها
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStatsResponse'
+          description: ''
+  /api/v1/analytics/inventory-value/:
+    get:
+      operationId: v1_analytics_inventory_value_retrieve
+      description: گزارش ارزش ریالی موجودی انبار بر اساس قیمت خرید
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryValueResponse'
+          description: ''
+  /api/v1/analytics/profitability/:
+    get:
+      operationId: v1_analytics_profitability_list
+      description: گزارش سودآوری تایرها بر اساس مابه‌التفاوت نرخ خرید و فروش با کسر
+        مرجوعی‌ها و احتساب تخفیف فاکتور
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProfitabilityItem'
+          description: ''
+  /api/v1/analytics/sales-by-brand/:
+    get:
+      operationId: v1_analytics_sales_by_brand_list
+      description: گزارش تفکیکی فروش بر اساس برندهای لاستیک با کسر مرجوعی‌ها
+      parameters:
+      - in: query
+        name: brand_id
+        schema:
+          type: integer
+          nullable: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SalesByBrandItem'
+          description: ''
+  /api/v1/analytics/sales-by-date/:
+    get:
+      operationId: v1_analytics_sales_by_date_retrieve
+      description: 'گزارش فروش بر اساس بازه تاریخ میلادی / شمسی با احتساب مرجوعی‌ها
+        (مبنای مرجوعی: تاریخ ثبت مرجوعی)'
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          nullable: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          nullable: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesByDateRangeResponse'
+          description: ''
+  /api/v1/auth/change-password/:
+    post:
+      operationId: v1_auth_change_password_create
+      description: تغییر رمز عبور توسط کاربر جاری با دریافت رمز قبلی
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/auth/login/:
+    post:
+      operationId: v1_auth_login_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPair'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomTokenObtainPair'
+          description: ''
+  /api/v1/auth/logout/:
+    post:
+      operationId: v1_auth_logout_create
+      description: خروج از حساب کاربری و قرار دادن توکن در لیست سیاه
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Logout'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Logout'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Logout'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/auth/profile/:
+    get:
+      operationId: v1_auth_profile_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: v1_auth_profile_update
+      description: پشتیبانی از متد PUT برای ویرایش مشخصات فردی کاربر جاری
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdate'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: v1_auth_profile_partial_update
+      description: ویرایش مشخصات فردی (نام و شماره تماس) توسط خود کاربر
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileUpdate'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/v1/auth/token/refresh/:
+    post:
+      operationId: v1_auth_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomTokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomTokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomTokenRefresh'
+          description: ''
+  /api/v1/auth/users/:
+    get:
+      operationId: v1_auth_users_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: کدام فیلد باید هنگام مرتب‌سازی نتایج استفاده شود.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+    post:
+      operationId: v1_auth_users_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserCreateUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserCreateUpdate'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCreateUpdate'
+          description: ''
+  /api/v1/auth/users/{id}/:
+    get:
+      operationId: v1_auth_users_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این کاربر را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: v1_auth_users_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این کاربر را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserCreateUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserCreateUpdate'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCreateUpdate'
+          description: ''
+    patch:
+      operationId: v1_auth_users_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این کاربر را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserCreateUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserCreateUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserCreateUpdate'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCreateUpdate'
+          description: ''
+    delete:
+      operationId: v1_auth_users_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این کاربر را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/catalog/brands/:
+    get:
+      operationId: v1_catalog_brands_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBrandList'
+          description: ''
+    post:
+      operationId: v1_catalog_brands_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Brand'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Brand'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Brand'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Brand'
+          description: ''
+  /api/v1/catalog/brands/{brand_id}/:
+    get:
+      operationId: v1_catalog_brands_retrieve
+      parameters:
+      - in: path
+        name: brand_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این برند را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Brand'
+          description: ''
+    put:
+      operationId: v1_catalog_brands_update
+      parameters:
+      - in: path
+        name: brand_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این برند را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Brand'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Brand'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Brand'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Brand'
+          description: ''
+    patch:
+      operationId: v1_catalog_brands_partial_update
+      parameters:
+      - in: path
+        name: brand_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این برند را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBrand'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBrand'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBrand'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Brand'
+          description: ''
+    delete:
+      operationId: v1_catalog_brands_destroy
+      parameters:
+      - in: path
+        name: brand_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این برند را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/catalog/sizes/:
+    get:
+      operationId: v1_catalog_sizes_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSizeList'
+          description: ''
+    post:
+      operationId: v1_catalog_sizes_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Size'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Size'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Size'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+          description: ''
+  /api/v1/catalog/sizes/{size_id}/:
+    get:
+      operationId: v1_catalog_sizes_retrieve
+      parameters:
+      - in: path
+        name: size_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سایز را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+          description: ''
+    put:
+      operationId: v1_catalog_sizes_update
+      parameters:
+      - in: path
+        name: size_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سایز را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Size'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Size'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Size'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+          description: ''
+    patch:
+      operationId: v1_catalog_sizes_partial_update
+      parameters:
+      - in: path
+        name: size_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سایز را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSize'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSize'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSize'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+          description: ''
+    delete:
+      operationId: v1_catalog_sizes_destroy
+      parameters:
+      - in: path
+        name: size_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سایز را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/catalog/stock-movements/:
+    get:
+      operationId: v1_catalog_stock_movements_list
+      description: |-
+        دفتر گردش انبار (کاملاً فقط‌خواندنی بدون امکان ویرایش، حذف یا ایجاد مستقیم)
+        دسترسی منحصراً برای انباردار و مدیر مجاز است؛ تکنسین خطای ۴۰۳ دریافت می‌کند.
+      parameters:
+      - in: query
+        name: movement_type
+        schema:
+          type: string
+          title: نوع گردش انبار
+          enum:
+          - INITIAL_STOCK
+          - MANUAL_ADJUSTMENT
+          - PURCHASE
+          - PURCHASE_CANCEL
+          - SALE
+          - SALE_CANCEL
+          - SALE_RETURN
+        description: |-
+          * `INITIAL_STOCK` - موجودی اولیه
+          * `PURCHASE` - ورود - خرید
+          * `PURCHASE_CANCEL` - خروج - لغو خرید
+          * `SALE` - خروج - فروش
+          * `SALE_CANCEL` - ورود - لغو فروش
+          * `SALE_RETURN` - ورود - مرجوعی از فروش
+          * `MANUAL_ADJUSTMENT` - اصلاح دستی / انبارگردانی
+      - name: ordering
+        required: false
+        in: query
+        description: کدام فیلد باید هنگام مرتب‌سازی نتایج استفاده شود.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - in: query
+        name: purchase_invoice
+        schema:
+          type: integer
+      - in: query
+        name: sales_invoice
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      - in: query
+        name: tire
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStockMovementList'
+          description: ''
+  /api/v1/catalog/stock-movements/{movement_id}/:
+    get:
+      operationId: v1_catalog_stock_movements_retrieve
+      description: |-
+        دفتر گردش انبار (کاملاً فقط‌خواندنی بدون امکان ویرایش، حذف یا ایجاد مستقیم)
+        دسترسی منحصراً برای انباردار و مدیر مجاز است؛ تکنسین خطای ۴۰۳ دریافت می‌کند.
+      parameters:
+      - in: path
+        name: movement_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این گردش انبار را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovement'
+          description: ''
+  /api/v1/catalog/tires/:
+    get:
+      operationId: v1_catalog_tires_list
+      parameters:
+      - in: query
+        name: brand
+        schema:
+          type: integer
+      - name: ordering
+        required: false
+        in: query
+        description: کدام فیلد باید هنگام مرتب‌سازی نتایج استفاده شود.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      - in: query
+        name: size
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTireList'
+          description: ''
+    post:
+      operationId: v1_catalog_tires_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Tire'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Tire'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Tire'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tire'
+          description: ''
+  /api/v1/catalog/tires/{tire_id}/:
+    get:
+      operationId: v1_catalog_tires_retrieve
+      parameters:
+      - in: path
+        name: tire_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این تایر را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tire'
+          description: ''
+    put:
+      operationId: v1_catalog_tires_update
+      parameters:
+      - in: path
+        name: tire_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این تایر را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Tire'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Tire'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Tire'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tire'
+          description: ''
+    patch:
+      operationId: v1_catalog_tires_partial_update
+      parameters:
+      - in: path
+        name: tire_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این تایر را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTire'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTire'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTire'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tire'
+          description: ''
+    delete:
+      operationId: v1_catalog_tires_destroy
+      parameters:
+      - in: path
+        name: tire_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این تایر را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/catalog/tires/{tire_id}/adjust-stock/:
+    post:
+      operationId: v1_catalog_tires_adjust_stock_create
+      description: اصلاح دستی و انبارگردانی موجودی تایر توسط انباردار یا مدیر با ثبت
+        دلیل الزامی
+      parameters:
+      - in: path
+        name: tire_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این تایر را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Tire'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Tire'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Tire'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tire'
+          description: ''
+  /api/v1/catalog/tires/low-stock/:
+    get:
+      operationId: v1_catalog_tires_low_stock_retrieve
+      description: فهرست تایرهایی که موجودی آنها به حداقل یا کمتر از حداقل رسیده است
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tire'
+          description: ''
+  /api/v1/crm/customers/:
+    get:
+      operationId: v1_crm_customers_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: کدام فیلد باید هنگام مرتب‌سازی نتایج استفاده شود.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCustomerList'
+          description: ''
+    post:
+      operationId: v1_crm_customers_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Customer'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+  /api/v1/crm/customers/{customer_id}/:
+    get:
+      operationId: v1_crm_customers_retrieve
+      parameters:
+      - in: path
+        name: customer_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این مشتری را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+    put:
+      operationId: v1_crm_customers_update
+      parameters:
+      - in: path
+        name: customer_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این مشتری را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Customer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Customer'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+    patch:
+      operationId: v1_crm_customers_partial_update
+      parameters:
+      - in: path
+        name: customer_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این مشتری را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCustomer'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+    delete:
+      operationId: v1_crm_customers_destroy
+      parameters:
+      - in: path
+        name: customer_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این مشتری را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/crm/vehicles/:
+    get:
+      operationId: v1_crm_vehicles_list
+      parameters:
+      - in: query
+        name: customer
+        schema:
+          type: integer
+      - name: ordering
+        required: false
+        in: query
+        description: کدام فیلد باید هنگام مرتب‌سازی نتایج استفاده شود.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVehicleList'
+          description: ''
+    post:
+      operationId: v1_crm_vehicles_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Vehicle'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Vehicle'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Vehicle'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+          description: ''
+  /api/v1/crm/vehicles/{vehicle_id}/:
+    get:
+      operationId: v1_crm_vehicles_retrieve
+      parameters:
+      - in: path
+        name: vehicle_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این خودرو را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+          description: ''
+    put:
+      operationId: v1_crm_vehicles_update
+      parameters:
+      - in: path
+        name: vehicle_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این خودرو را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Vehicle'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Vehicle'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Vehicle'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+          description: ''
+    patch:
+      operationId: v1_crm_vehicles_partial_update
+      parameters:
+      - in: path
+        name: vehicle_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این خودرو را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVehicle'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVehicle'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVehicle'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+          description: ''
+    delete:
+      operationId: v1_crm_vehicles_destroy
+      parameters:
+      - in: path
+        name: vehicle_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این خودرو را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/invoices/purchases/:
+    get:
+      operationId: v1_invoices_purchases_list
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: کدام فیلد باید هنگام مرتب‌سازی نتایج استفاده شود.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - in: query
+        name: payment_status
+        schema:
+          type: string
+          title: وضعیت پرداخت
+          enum:
+          - PAID
+          - PARTIAL
+          - UNPAID
+        description: |-
+          * `UNPAID` - پرداخت نشده (نسیه)
+          * `PARTIAL` - پرداخت ناقص (اقساطی)
+          * `PAID` - تسویه کامل
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          title: وضعیت فاکتور خرید
+          enum:
+          - CANCELLED
+          - CONFIRMED
+          - DRAFT
+        description: |-
+          * `DRAFT` - پیش‌نویس
+          * `CONFIRMED` - تایید شده / نهایی
+          * `CANCELLED` - لغو شده
+      - in: query
+        name: supplier
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPurchaseInvoiceList'
+          description: ''
+    post:
+      operationId: v1_invoices_purchases_create
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseInvoiceCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PurchaseInvoiceCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PurchaseInvoiceCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseInvoice'
+          description: ''
+  /api/v1/invoices/purchases/{purchase_invoice_id}/:
+    get:
+      operationId: v1_invoices_purchases_retrieve
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - in: path
+        name: purchase_invoice_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این فاکتور خرید را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseInvoice'
+          description: ''
+  /api/v1/invoices/purchases/{purchase_invoice_id}/cancel/:
+    post:
+      operationId: v1_invoices_purchases_cancel_create
+      description: لغو فاکتور خرید، کسر خودکار اقلام از انبار و اصلاح نرخ خرید تایر
+        (فقط مدیر)
+      parameters:
+      - in: path
+        name: purchase_invoice_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این فاکتور خرید را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseInvoice'
+          description: ''
+  /api/v1/invoices/returns/:
+    get:
+      operationId: v1_invoices_returns_list
+      description: مدیریت اسناد مرجوعی فروش (ایجاد و مشاهده فقط برای مدیر، غیرقابل
+        ویرایش یا حذف)
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: کدام فیلد باید هنگام مرتب‌سازی نتایج استفاده شود.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - in: query
+        name: sales_invoice
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSalesReturnList'
+          description: ''
+    post:
+      operationId: v1_invoices_returns_create
+      description: مدیریت اسناد مرجوعی فروش (ایجاد و مشاهده فقط برای مدیر، غیرقابل
+        ویرایش یا حذف)
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesReturnCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SalesReturnCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SalesReturnCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesReturn'
+          description: ''
+  /api/v1/invoices/returns/{sales_return_id}/:
+    get:
+      operationId: v1_invoices_returns_retrieve
+      description: مدیریت اسناد مرجوعی فروش (ایجاد و مشاهده فقط برای مدیر، غیرقابل
+        ویرایش یا حذف)
+      parameters:
+      - in: path
+        name: sales_return_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این مرجوعی فروش را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesReturn'
+          description: ''
+  /api/v1/invoices/sales/:
+    get:
+      operationId: v1_invoices_sales_list
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - in: query
+        name: customer
+        schema:
+          type: integer
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: invoice_number
+        schema:
+          type: string
+      - name: ordering
+        required: false
+        in: query
+        description: کدام فیلد باید هنگام مرتب‌سازی نتایج استفاده شود.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - in: query
+        name: payment_status
+        schema:
+          type: string
+          title: وضعیت پرداخت
+          enum:
+          - PAID
+          - PARTIAL
+          - UNPAID
+        description: |-
+          * `UNPAID` - پرداخت نشده (نسیه)
+          * `PARTIAL` - پرداخت ناقص (اقساطی)
+          * `PAID` - تسویه کامل
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: status
+        schema:
+          type: string
+          title: وضعیت فاکتور
+          enum:
+          - CANCELLED
+          - CONFIRMED
+          - DRAFT
+        description: |-
+          * `DRAFT` - پیش‌نویس
+          * `CONFIRMED` - تایید شده / نهایی
+          * `CANCELLED` - لغو شده
+      - in: query
+        name: vehicle
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSalesInvoiceList'
+          description: ''
+    post:
+      operationId: v1_invoices_sales_create
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesInvoiceCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SalesInvoiceCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SalesInvoiceCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesInvoice'
+          description: ''
+  /api/v1/invoices/sales/{sales_invoice_id}/:
+    get:
+      operationId: v1_invoices_sales_retrieve
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - in: path
+        name: sales_invoice_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این فاکتور فروش را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesInvoice'
+          description: ''
+  /api/v1/invoices/sales/{sales_invoice_id}/cancel/:
+    post:
+      operationId: v1_invoices_sales_cancel_create
+      description: لغو فاکتور فروش و بازگرداندن خودکار موجودی به انبار
+      parameters:
+      - in: path
+        name: sales_invoice_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این فاکتور فروش را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesInvoice'
+          description: ''
+  /api/v1/invoices/sales/{sales_invoice_id}/confirm/:
+    post:
+      operationId: v1_invoices_sales_confirm_create
+      description: تایید فاکتور فروش در وضعیت پیش‌نویس، کسر موجودی انبار و نهایی‌سازی
+        فاکتور
+      parameters:
+      - in: path
+        name: sales_invoice_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این فاکتور فروش را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesInvoice'
+          description: ''
+  /api/v1/procurement/suppliers/:
+    get:
+      operationId: v1_procurement_suppliers_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSupplierList'
+          description: ''
+    post:
+      operationId: v1_procurement_suppliers_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+  /api/v1/procurement/suppliers/{supplier_id}/:
+    get:
+      operationId: v1_procurement_suppliers_retrieve
+      parameters:
+      - in: path
+        name: supplier_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این تأمین‌کننده را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+    put:
+      operationId: v1_procurement_suppliers_update
+      parameters:
+      - in: path
+        name: supplier_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این تأمین‌کننده را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+    patch:
+      operationId: v1_procurement_suppliers_partial_update
+      parameters:
+      - in: path
+        name: supplier_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این تأمین‌کننده را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSupplier'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSupplier'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSupplier'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          description: ''
+    delete:
+      operationId: v1_procurement_suppliers_destroy
+      parameters:
+      - in: path
+        name: supplier_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این تأمین‌کننده را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/treasury/customer-refunds/:
+    get:
+      operationId: v1_treasury_customer_refunds_list
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - in: query
+        name: is_cancelled
+        schema:
+          type: boolean
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - in: query
+        name: sales_invoice
+        schema:
+          type: integer
+      - in: query
+        name: sales_return
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCustomerRefundVoucherList'
+          description: ''
+    post:
+      operationId: v1_treasury_customer_refunds_create
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerRefundVoucher'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomerRefundVoucher'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomerRefundVoucher'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerRefundVoucher'
+          description: ''
+  /api/v1/treasury/customer-refunds/{refund_id}/:
+    get:
+      operationId: v1_treasury_customer_refunds_retrieve
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - in: path
+        name: refund_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سند استرداد وجه به مشتری را شناسایی
+          میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerRefundVoucher'
+          description: ''
+  /api/v1/treasury/customer-refunds/{refund_id}/cancel/:
+    post:
+      operationId: v1_treasury_customer_refunds_cancel_create
+      description: ابطال سند استرداد وجه به مشتری با ذکر دلیل الزامی
+      parameters:
+      - in: path
+        name: refund_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سند استرداد وجه به مشتری را شناسایی
+          میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerRefundVoucher'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomerRefundVoucher'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomerRefundVoucher'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerRefundVoucher'
+          description: ''
+  /api/v1/treasury/payments/:
+    get:
+      operationId: v1_treasury_payments_list
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - in: query
+        name: is_cancelled
+        schema:
+          type: boolean
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - in: query
+        name: purchase_invoice
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPaymentVoucherList'
+          description: ''
+    post:
+      operationId: v1_treasury_payments_create
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentVoucher'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PaymentVoucher'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PaymentVoucher'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentVoucher'
+          description: ''
+  /api/v1/treasury/payments/{payment_id}/:
+    get:
+      operationId: v1_treasury_payments_retrieve
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سند پرداخت وجه را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentVoucher'
+          description: ''
+  /api/v1/treasury/payments/{payment_id}/cancel/:
+    post:
+      operationId: v1_treasury_payments_cancel_create
+      description: ابطال سند پرداخت وجه با ذکر دلیل الزامی
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سند پرداخت وجه را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentVoucher'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PaymentVoucher'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PaymentVoucher'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentVoucher'
+          description: ''
+  /api/v1/treasury/receipts/:
+    get:
+      operationId: v1_treasury_receipts_list
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - in: query
+        name: is_cancelled
+        schema:
+          type: boolean
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - in: query
+        name: sales_invoice
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReceiptVoucherList'
+          description: ''
+    post:
+      operationId: v1_treasury_receipts_create
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiptVoucher'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReceiptVoucher'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReceiptVoucher'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptVoucher'
+          description: ''
+  /api/v1/treasury/receipts/{receipt_id}/:
+    get:
+      operationId: v1_treasury_receipts_retrieve
+      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
+        اسناد مالی، فاکتورها و مرجوعی‌ها
+      parameters:
+      - in: path
+        name: receipt_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سند دریافت وجه را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptVoucher'
+          description: ''
+  /api/v1/treasury/receipts/{receipt_id}/cancel/:
+    post:
+      operationId: v1_treasury_receipts_cancel_create
+      description: ابطال سند دریافت وجه با ذکر دلیل الزامی
+      parameters:
+      - in: path
+        name: receipt_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این سند دریافت وجه را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiptVoucher'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReceiptVoucher'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReceiptVoucher'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptVoucher'
+          description: ''
+  /api/v1/workshop/services/:
+    get:
+      operationId: v1_workshop_services_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: کدام فیلد باید هنگام مرتب‌سازی نتایج استفاده شود.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: یک شماره صفحه‌ در مجموعه نتایج صفحه‌بندی شده.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: تعداد نتایج برای نمایش در هر صفحه.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: یک عبارت جستجو.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedServiceList'
+          description: ''
+    post:
+      operationId: v1_workshop_services_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Service'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Service'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+          description: ''
+  /api/v1/workshop/services/{service_id}/:
+    get:
+      operationId: v1_workshop_services_retrieve
+      parameters:
+      - in: path
+        name: service_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این خدمت فنی را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+          description: ''
+    put:
+      operationId: v1_workshop_services_update
+      parameters:
+      - in: path
+        name: service_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این خدمت فنی را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Service'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Service'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+          description: ''
+    patch:
+      operationId: v1_workshop_services_partial_update
+      parameters:
+      - in: path
+        name: service_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این خدمت فنی را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedService'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedService'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedService'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+          description: ''
+    delete:
+      operationId: v1_workshop_services_destroy
+      parameters:
+      - in: path
+        name: service_id
+        schema:
+          type: integer
+        description: یک مقداد عدد یکتا که این خدمت فنی را شناسایی میکند.
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+components:
+  schemas:
+    Brand:
+      type: object
+      properties:
+        brand_id:
+          type: integer
+          readOnly: true
+        brand_name:
+          type: string
+          title: نام برند
+          maxLength: 50
+        tires_count:
+          type: integer
+          readOnly: true
+      required:
+      - brand_id
+      - brand_name
+      - tires_count
+    ChangePassword:
+      type: object
+      description: سریالایزر تغییر رمز عبور توسط خود کاربر
+      properties:
+        old_password:
+          type: string
+          writeOnly: true
+        new_password:
+          type: string
+          writeOnly: true
+      required:
+      - new_password
+      - old_password
+    CustomTokenObtainPair:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - password
+      - username
+    CustomTokenRefresh:
+      type: object
+      properties:
+        refresh:
+          type: string
+        access:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - refresh
+    Customer:
+      type: object
+      properties:
+        customer_id:
+          type: integer
+          readOnly: true
+        full_name:
+          type: string
+          title: نام و نام خانوادگی
+          maxLength: 100
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
+        national_code:
+          type: string
+          nullable: true
+          maxLength: 10
+        address:
+          type: string
+          nullable: true
+          title: آدرس
+          maxLength: 255
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: تاریخ ثبت
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: تاریخ آخرین ویرایش
+        vehicles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vehicle'
+          readOnly: true
+      required:
+      - created_at
+      - customer_id
+      - full_name
+      - updated_at
+      - vehicles
+    CustomerRefundVoucher:
+      type: object
+      properties:
+        refund_id:
+          type: integer
+          readOnly: true
+        refund_date:
+          type: string
+          format: date-time
+          title: تاریخ استرداد وجه
+        jalali_date:
+          type: string
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        sales_invoice:
+          type: integer
+          title: فاکتور فروش مربوطه
+        sales_return:
+          type: integer
+          nullable: true
+          title: سند مرجوعی عطف
+        customer_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        payment_method:
+          type: string
+          title: روش استرداد
+          maxLength: 50
+        reference_number:
+          type: string
+          nullable: true
+          title: شماره پیگیری / مرجع
+          maxLength: 100
+        notes:
+          type: string
+          title: توضیحات سند
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: کاربر صادرکننده
+        created_by_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        is_cancelled:
+          type: boolean
+          readOnly: true
+          title: ابطال شده
+        cancelled_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: تاریخ و زمان ابطال
+        cancelled_by:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: کاربر ابطال‌کننده
+        cancelled_by_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        cancellation_reason:
+          type: string
+          readOnly: true
+          title: علت ابطال
+      required:
+      - amount
+      - cancellation_reason
+      - cancelled_at
+      - cancelled_by
+      - cancelled_by_name
+      - created_by
+      - created_by_name
+      - customer_name
+      - is_cancelled
+      - jalali_date
+      - refund_id
+      - sales_invoice
+    DashboardStatsResponse:
+      type: object
+      properties:
+        today_revenue:
+          type: number
+          format: double
+          description: مبلغ فروش امروز به ریال/تومان
+        today_invoices_count:
+          type: integer
+          description: تعداد فاکتورهای امروز
+        total_receivables:
+          type: number
+          format: double
+          description: مجموع مطالبات و فاکتورهای نسیه
+        unpaid_invoices_count:
+          type: integer
+          description: تعداد فاکتورهای تسویه نشده
+        total_inventory_value:
+          type: number
+          format: double
+          description: ارزش ریالی کل انبار
+        total_tires_stock:
+          type: integer
+          description: تعداد کل لاستیک‌های موجود در انبار
+        low_stock_count:
+          type: integer
+          description: تعداد اقلام تایر زیر حد هشدار
+      required:
+      - low_stock_count
+      - today_invoices_count
+      - today_revenue
+      - total_inventory_value
+      - total_receivables
+      - total_tires_stock
+      - unpaid_invoices_count
+    InventoryValueItem:
+      type: object
+      properties:
+        tire_id:
+          type: integer
+        tire_name:
+          type: string
+        brand_name:
+          type: string
+        size_name:
+          type: string
+        stock_quantity:
+          type: integer
+        purchase_price:
+          type: number
+          format: double
+        inventory_value:
+          type: number
+          format: double
+      required:
+      - brand_name
+      - inventory_value
+      - purchase_price
+      - size_name
+      - stock_quantity
+      - tire_id
+      - tire_name
+    InventoryValueResponse:
+      type: object
+      properties:
+        total_inventory_value:
+          type: number
+          format: double
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryValueItem'
+      required:
+      - items
+      - total_inventory_value
+    Logout:
+      type: object
+      description: سریالایزر خروج و ابطال توکن
+      properties:
+        refresh:
+          type: string
+          description: توکن تجدید (Refresh Token) جهت قرارگیری در لیست سیاه
+      required:
+      - refresh
+    MovementTypeEnum:
+      enum:
+      - INITIAL_STOCK
+      - PURCHASE
+      - PURCHASE_CANCEL
+      - SALE
+      - SALE_CANCEL
+      - SALE_RETURN
+      - MANUAL_ADJUSTMENT
+      type: string
+      description: |-
+        * `INITIAL_STOCK` - موجودی اولیه
+        * `PURCHASE` - ورود - خرید
+        * `PURCHASE_CANCEL` - خروج - لغو خرید
+        * `SALE` - خروج - فروش
+        * `SALE_CANCEL` - ورود - لغو فروش
+        * `SALE_RETURN` - ورود - مرجوعی از فروش
+        * `MANUAL_ADJUSTMENT` - اصلاح دستی / انبارگردانی
+    PaginatedBrandList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Brand'
+    PaginatedCustomerList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+    PaginatedCustomerRefundVoucherList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerRefundVoucher'
+    PaginatedPaymentVoucherList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentVoucher'
+    PaginatedPurchaseInvoiceList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseInvoice'
+    PaginatedReceiptVoucherList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceiptVoucher'
+    PaginatedSalesInvoiceList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesInvoice'
+    PaginatedSalesReturnList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesReturn'
+    PaginatedServiceList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Service'
+    PaginatedSizeList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Size'
+    PaginatedStockMovementList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockMovement'
+    PaginatedSupplierList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Supplier'
+    PaginatedTireList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tire'
+    PaginatedUserList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    PaginatedVehicleList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vehicle'
+    PatchedBrand:
+      type: object
+      properties:
+        brand_id:
+          type: integer
+          readOnly: true
+        brand_name:
+          type: string
+          title: نام برند
+          maxLength: 50
+        tires_count:
+          type: integer
+          readOnly: true
+    PatchedCustomer:
+      type: object
+      properties:
+        customer_id:
+          type: integer
+          readOnly: true
+        full_name:
+          type: string
+          title: نام و نام خانوادگی
+          maxLength: 100
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
+        national_code:
+          type: string
+          nullable: true
+          maxLength: 10
+        address:
+          type: string
+          nullable: true
+          title: آدرس
+          maxLength: 255
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: تاریخ ثبت
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: تاریخ آخرین ویرایش
+        vehicles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vehicle'
+          readOnly: true
+    PatchedService:
+      type: object
+      properties:
+        service_id:
+          type: integer
+          readOnly: true
+        service_name:
+          type: string
+          title: نام خدمت فنی
+          maxLength: 150
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        description:
+          type: string
+          title: توضیحات تکمیلی
+    PatchedSize:
+      type: object
+      properties:
+        size_id:
+          type: integer
+          readOnly: true
+        size_name:
+          type: string
+          title: سایز تایر
+          maxLength: 50
+        tires_count:
+          type: integer
+          readOnly: true
+    PatchedSupplier:
+      type: object
+      properties:
+        supplier_id:
+          type: integer
+          readOnly: true
+        supplier_name:
+          type: string
+          title: نام شرکت یا شخص تأمین‌کننده
+          maxLength: 100
+        phone_number:
+          type: string
+          nullable: true
+          title: شماره تلفن
+          maxLength: 20
+        address:
+          type: string
+          nullable: true
+          title: نشانی
+          maxLength: 200
+    PatchedTire:
+      type: object
+      properties:
+        tire_id:
+          type: integer
+          readOnly: true
+        tire_name:
+          type: string
+          title: نام و مدل تایر
+          maxLength: 150
+        brand:
+          type: integer
+          title: برند
+        brand_name:
+          type: string
+          title: نام برند
+          readOnly: true
+        size:
+          type: integer
+          title: سایز
+        size_name:
+          type: string
+          title: سایز تایر
+          readOnly: true
+        stock_quantity:
+          type: integer
+          readOnly: true
+          title: موجودی انبار
+        sale_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        purchase_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        min_stock_alert:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: حداقل موجودی جهت هشدار
+        is_low_stock:
+          type: boolean
+          readOnly: true
+    PatchedUserCreateUpdate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          title: نام کاربری
+          description: الزامی. 150 کاراکتر یا کمتر. فقط شامل حروف، اعداد، و علامات
+            @/./+/-/_
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        password:
+          type: string
+          writeOnly: true
+        full_name:
+          type: string
+          title: نام و نام خانوادگی
+          maxLength: 150
+        phone_number:
+          nullable: true
+          title: شماره موبایل
+          oneOf:
+          - type: string
+            pattern: ^09\d{9}$
+            maxLength: 20
+          - type: string
+            maxLength: 0
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          title: نقش کاربر
+        is_active:
+          type: boolean
+          title: فعال
+          description: نشان می‌دهد که آیا این کاربر اجازهٔ فعالیت دارد یا خیر. به
+            جای حذف کاربر این تیک را بردارید.
+    PatchedUserProfileUpdate:
+      type: object
+      description: سریالایزر ویرایش مشخصات فردی توسط خود کاربر
+      properties:
+        full_name:
+          type: string
+          title: نام و نام خانوادگی
+          maxLength: 150
+        phone_number:
+          nullable: true
+          title: شماره موبایل
+          oneOf:
+          - type: string
+            pattern: ^09\d{9}$
+            maxLength: 20
+          - type: string
+            maxLength: 0
+    PatchedVehicle:
+      type: object
+      properties:
+        vehicle_id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          title: مشتری
+        customer_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        license_plate:
+          type: string
+          maxLength: 20
+        model:
+          type: string
+          title: مدل خودرو
+          maxLength: 100
+        year:
+          type: string
+          title: سال ساخت
+          maxLength: 10
+        tire_size_recommended:
+          type: string
+          title: سایز تایر پیشنهادی
+          maxLength: 50
+        notes:
+          type: string
+          title: توضیحات و سوابق فنی
+    PaymentStatusEnum:
+      enum:
+      - UNPAID
+      - PARTIAL
+      - PAID
+      type: string
+      description: |-
+        * `UNPAID` - پرداخت نشده (نسیه)
+        * `PARTIAL` - پرداخت ناقص (اقساطی)
+        * `PAID` - تسویه کامل
+    PaymentVoucher:
+      type: object
+      properties:
+        payment_id:
+          type: integer
+          readOnly: true
+        payment_date:
+          type: string
+          format: date-time
+          title: تاریخ پرداخت وجه
+        jalali_date:
+          type: string
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        purchase_invoice:
+          type: integer
+          title: فاکتور خرید مربوطه
+        supplier_name:
+          type: string
+          title: نام شرکت یا شخص تأمین‌کننده
+          readOnly: true
+        payment_method:
+          type: string
+          title: روش پرداخت
+          maxLength: 50
+        reference_number:
+          type: string
+          nullable: true
+          title: شماره پیگیری / مرجع
+          maxLength: 100
+        notes:
+          type: string
+          title: توضیحات سند
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: کاربر صادرکننده
+        created_by_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        is_cancelled:
+          type: boolean
+          readOnly: true
+          title: ابطال شده
+        cancelled_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: تاریخ و زمان ابطال
+        cancelled_by:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: کاربر ابطال‌کننده
+        cancelled_by_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        cancellation_reason:
+          type: string
+          readOnly: true
+          title: علت ابطال
+      required:
+      - amount
+      - cancellation_reason
+      - cancelled_at
+      - cancelled_by
+      - cancelled_by_name
+      - created_by
+      - created_by_name
+      - is_cancelled
+      - jalali_date
+      - payment_id
+      - purchase_invoice
+      - supplier_name
+    ProfitabilityItem:
+      type: object
+      properties:
+        tire_id:
+          type: integer
+        tire_name:
+          type: string
+        brand_name:
+          type: string
+        size_name:
+          type: string
+        total_sold:
+          type: integer
+        total_revenue:
+          type: number
+          format: double
+        total_cost:
+          type: number
+          format: double
+        total_profit:
+          type: number
+          format: double
+      required:
+      - brand_name
+      - size_name
+      - tire_id
+      - tire_name
+      - total_cost
+      - total_profit
+      - total_revenue
+      - total_sold
+    PurchaseInvoice:
+      type: object
+      properties:
+        purchase_invoice_id:
+          type: integer
+          readOnly: true
+        invoice_number:
+          type: string
+          readOnly: true
+          title: شماره فاکتور خرید
+        invoice_date:
+          type: string
+          format: date-time
+          title: تاریخ خرید
+        jalali_date:
+          type: string
+          readOnly: true
+        supplier:
+          type: integer
+          title: تأمین‌کننده
+        supplier_name:
+          type: string
+          title: نام شرکت یا شخص تأمین‌کننده
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          title: وضعیت فاکتور خرید
+        status_display:
+          type: string
+          readOnly: true
+        payment_status:
+          allOf:
+          - $ref: '#/components/schemas/PaymentStatusEnum'
+          readOnly: true
+          title: وضعیت پرداخت
+        payment_status_display:
+          type: string
+          readOnly: true
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: مبلغ کل خرید
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: ثبت‌کننده فاکتور
+        created_by_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        tire_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseInvoiceTireItem'
+          readOnly: true
+      required:
+      - created_by
+      - created_by_name
+      - invoice_number
+      - jalali_date
+      - payment_status
+      - payment_status_display
+      - purchase_invoice_id
+      - status_display
+      - supplier
+      - supplier_name
+      - tire_items
+      - total_amount
+    PurchaseInvoiceCreate:
+      type: object
+      properties:
+        purchase_invoice_id:
+          type: integer
+          readOnly: true
+        supplier:
+          type: integer
+          title: تأمین‌کننده
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: مبلغ کل خرید
+        tire_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseInvoiceTireItemInput'
+      required:
+      - purchase_invoice_id
+      - supplier
+      - tire_items
+      - total_amount
+    PurchaseInvoiceTireItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        tire:
+          type: integer
+          title: تایر خریداری شده
+        tire_name:
+          type: string
+          title: نام و مدل تایر
+          readOnly: true
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: تعداد
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          title: قیمت خرید واحد
+      required:
+      - id
+      - tire
+      - tire_name
+      - unit_cost
+    PurchaseInvoiceTireItemInput:
+      type: object
+      properties:
+        tire:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+      required:
+      - tire
+    ReceiptVoucher:
+      type: object
+      properties:
+        receipt_id:
+          type: integer
+          readOnly: true
+        receipt_date:
+          type: string
+          format: date-time
+          title: تاریخ دریافت وجه
+        jalali_date:
+          type: string
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        sales_invoice:
+          type: integer
+          title: فاکتور فروش مربوطه
+        customer_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        payment_method:
+          type: string
+          title: روش تسویه
+          maxLength: 50
+        reference_number:
+          type: string
+          nullable: true
+          title: شماره پیگیری / مرجع
+          maxLength: 100
+        notes:
+          type: string
+          title: توضیحات سند
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: کاربر صادرکننده
+        created_by_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        is_cancelled:
+          type: boolean
+          readOnly: true
+          title: ابطال شده
+        cancelled_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: تاریخ و زمان ابطال
+        cancelled_by:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: کاربر ابطال‌کننده
+        cancelled_by_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        cancellation_reason:
+          type: string
+          readOnly: true
+          title: علت ابطال
+      required:
+      - amount
+      - cancellation_reason
+      - cancelled_at
+      - cancelled_by
+      - cancelled_by_name
+      - created_by
+      - created_by_name
+      - customer_name
+      - is_cancelled
+      - jalali_date
+      - receipt_id
+      - sales_invoice
+    RoleEnum:
+      enum:
+      - MANAGER
+      - TECHNICIAN
+      - WAREHOUSE
+      type: string
+      description: |-
+        * `MANAGER` - مدیر سیستم
+        * `TECHNICIAN` - تکنسین فنی
+        * `WAREHOUSE` - انباردار
+    SalesByBrandItem:
+      type: object
+      properties:
+        brand_name:
+          type: string
+        total_quantity:
+          type: integer
+        total_revenue:
+          type: number
+          format: double
+      required:
+      - brand_name
+      - total_quantity
+      - total_revenue
+    SalesByDateRangeResponse:
+      type: object
+      properties:
+        total_invoices:
+          type: integer
+        total_sales_amount:
+          type: number
+          format: double
+          description: 'Net sales: gross sales less returns recorded in the period;
+            may be negative.'
+        gross_sales_amount:
+          type: number
+          format: double
+          description: Confirmed invoice totals in the period, after invoice discounts
+            and before returns.
+        total_refund_amount:
+          type: number
+          format: double
+          description: Sales return amounts recorded in the period, independently
+            of the original invoice date or cash refunds.
+        start_date:
+          type: string
+          nullable: true
+        end_date:
+          type: string
+          nullable: true
+      required:
+      - end_date
+      - gross_sales_amount
+      - start_date
+      - total_invoices
+      - total_refund_amount
+      - total_sales_amount
+    SalesInvoice:
+      type: object
+      properties:
+        sales_invoice_id:
+          type: integer
+          readOnly: true
+        invoice_number:
+          type: string
+          readOnly: true
+          title: شماره فاکتور
+        invoice_date:
+          type: string
+          format: date-time
+          title: تاریخ فاکتور
+        jalali_date:
+          type: string
+          readOnly: true
+        customer:
+          type: integer
+          title: مشتری
+        customer_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        customer_phone:
+          type: string
+          nullable: true
+          title: شماره تماس
+          readOnly: true
+        vehicle:
+          type: integer
+          nullable: true
+          title: خودرو سرویس‌شده
+        vehicle_plate:
+          type: string
+          title: شماره پلاک
+          readOnly: true
+        vehicle_model:
+          type: string
+          title: مدل خودرو
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          title: وضعیت فاکتور
+        status_display:
+          type: string
+          readOnly: true
+        payment_status:
+          allOf:
+          - $ref: '#/components/schemas/PaymentStatusEnum'
+          title: وضعیت پرداخت
+        payment_status_display:
+          type: string
+          readOnly: true
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          title: مبلغ تخفیف
+        discount_percent:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: درصد تخفیف
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: مبلغ نهایی فاکتور
+        returned_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        net_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        excess_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        paid_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        remaining_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+        notes:
+          type: string
+          title: توضیحات و یادداشت
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: کاربر صادرکننده
+        created_by_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        tire_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesInvoiceTireItem'
+          readOnly: true
+        service_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesInvoiceServiceItem'
+          readOnly: true
+      required:
+      - created_by
+      - created_by_name
+      - customer
+      - customer_name
+      - customer_phone
+      - excess_amount
+      - invoice_number
+      - jalali_date
+      - net_amount
+      - paid_amount
+      - payment_status_display
+      - remaining_amount
+      - returned_amount
+      - sales_invoice_id
+      - service_items
+      - status_display
+      - tire_items
+      - total_amount
+      - vehicle_model
+      - vehicle_plate
+    SalesInvoiceCreate:
+      type: object
+      properties:
+        sales_invoice_id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          title: مشتری
+        vehicle:
+          type: integer
+          nullable: true
+          title: خودرو سرویس‌شده
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          title: وضعیت فاکتور
+        payment_status:
+          allOf:
+          - $ref: '#/components/schemas/PaymentStatusEnum'
+          title: وضعیت پرداخت
+        payment_method:
+          type: string
+          default: کارتخوان / نقدی
+          maxLength: 50
+        reference_number:
+          type: string
+          default: ''
+          maxLength: 100
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          title: مبلغ تخفیف
+        discount_percent:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: درصد تخفیف
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: مبلغ نهایی فاکتور
+        notes:
+          type: string
+          title: توضیحات و یادداشت
+        tire_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesInvoiceTireItemInput'
+        service_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesInvoiceServiceItemInput'
+      required:
+      - customer
+      - sales_invoice_id
+      - total_amount
+    SalesInvoiceServiceItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        service:
+          type: integer
+          title: خدمت
+        service_name:
+          type: string
+          title: نام خدمت فنی
+          readOnly: true
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: تعداد / دفعات
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          title: تعرفه واحد
+        total_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - id
+      - service
+      - service_name
+      - total_price
+      - unit_price
+    SalesInvoiceServiceItemInput:
+      type: object
+      properties:
+        service:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+      required:
+      - service
+    SalesInvoiceTireItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        tire:
+          type: integer
+          title: تایر
+        tire_name:
+          type: string
+          title: نام و مدل تایر
+          readOnly: true
+        brand_name:
+          type: string
+          title: نام برند
+          readOnly: true
+        size_name:
+          type: string
+          title: سایز تایر
+          readOnly: true
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: تعداد
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          title: قیمت واحد
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: بهای تمام‌شده واحد (خرید)
+        total_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - brand_name
+      - id
+      - size_name
+      - tire
+      - tire_name
+      - total_price
+      - unit_cost
+      - unit_price
+    SalesInvoiceTireItemInput:
+      type: object
+      properties:
+        tire:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+      required:
+      - tire
+    SalesReturn:
+      type: object
+      properties:
+        sales_return_id:
+          type: integer
+          readOnly: true
+        sales_invoice:
+          type: integer
+          title: فاکتور فروش
+        customer_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        customer_phone:
+          type: string
+          nullable: true
+          title: شماره تماس
+          readOnly: true
+        return_date:
+          type: string
+          format: date-time
+          title: تاریخ مرجوعی
+        jalali_date:
+          type: string
+          readOnly: true
+        reason:
+          type: string
+          title: علت مرجوعی
+        total_refund_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: مبلغ کل استرداد
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: ثبت‌کننده مرجوعی
+        created_by_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesReturnItem'
+          readOnly: true
+      required:
+      - created_by
+      - created_by_name
+      - customer_name
+      - customer_phone
+      - items
+      - jalali_date
+      - reason
+      - sales_invoice
+      - sales_return_id
+      - total_refund_amount
+    SalesReturnCreate:
+      type: object
+      properties:
+        sales_invoice:
+          type: integer
+        return_date:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesReturnItemInput'
+      required:
+      - items
+      - reason
+      - sales_invoice
+    SalesReturnItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        sales_invoice_tire_item:
+          type: integer
+          readOnly: true
+          title: قلم تایر فاکتور فروش
+        tire:
+          type: integer
+          readOnly: true
+          title: تایر
+        tire_name:
+          type: string
+          title: نام و مدل تایر
+          readOnly: true
+        brand_name:
+          type: string
+          title: نام برند
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+          title: تعداد مرجوعی
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: قیمت واحد فروش در فاکتور
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: بهای تمام‌شده واحد در فاکتور
+        refund_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          title: مبلغ استرداد این قلم پس از سهم تخفیف
+      required:
+      - brand_name
+      - id
+      - quantity
+      - refund_amount
+      - sales_invoice_tire_item
+      - tire
+      - tire_name
+      - unit_cost
+      - unit_price
+    SalesReturnItemInput:
+      type: object
+      properties:
+        sales_invoice_tire_item_id:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+      required:
+      - sales_invoice_tire_item_id
+    Service:
+      type: object
+      properties:
+        service_id:
+          type: integer
+          readOnly: true
+        service_name:
+          type: string
+          title: نام خدمت فنی
+          maxLength: 150
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        description:
+          type: string
+          title: توضیحات تکمیلی
+      required:
+      - price
+      - service_id
+      - service_name
+    Size:
+      type: object
+      properties:
+        size_id:
+          type: integer
+          readOnly: true
+        size_name:
+          type: string
+          title: سایز تایر
+          maxLength: 50
+        tires_count:
+          type: integer
+          readOnly: true
+      required:
+      - size_id
+      - size_name
+      - tires_count
+    StatusEnum:
+      enum:
+      - DRAFT
+      - CONFIRMED
+      - CANCELLED
+      type: string
+      description: |-
+        * `DRAFT` - پیش‌نویس
+        * `CONFIRMED` - تایید شده / نهایی
+        * `CANCELLED` - لغو شده
+    StockMovement:
+      type: object
+      properties:
+        movement_id:
+          type: integer
+          readOnly: true
+        tire:
+          type: integer
+          readOnly: true
+          title: تایر
+        tire_name:
+          type: string
+          title: نام و مدل تایر
+          readOnly: true
+        brand_name:
+          type: string
+          title: نام برند
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+          title: تعداد گردش
+        movement_type:
+          allOf:
+          - $ref: '#/components/schemas/MovementTypeEnum'
+          readOnly: true
+          title: نوع گردش انبار
+        movement_type_display:
+          type: string
+          readOnly: true
+        balance_after:
+          type: integer
+          readOnly: true
+          title: موجودی پس از گردش
+        sales_invoice:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: فاکتور فروش مربوطه
+        purchase_invoice:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: فاکتور خرید مربوطه
+        unit_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          title: بهای تمام‌شده واحد در گردش
+        user:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: کاربر ثبت‌کننده
+        user_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+          title: شرح و دلیل گردش
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: زمان ثبت گردش
+        jalali_date:
+          type: string
+          readOnly: true
+      required:
+      - balance_after
+      - brand_name
+      - created_at
+      - description
+      - jalali_date
+      - movement_id
+      - movement_type
+      - movement_type_display
+      - purchase_invoice
+      - quantity
+      - sales_invoice
+      - tire
+      - tire_name
+      - unit_cost
+      - user
+      - user_name
+    Supplier:
+      type: object
+      properties:
+        supplier_id:
+          type: integer
+          readOnly: true
+        supplier_name:
+          type: string
+          title: نام شرکت یا شخص تأمین‌کننده
+          maxLength: 100
+        phone_number:
+          type: string
+          nullable: true
+          title: شماره تلفن
+          maxLength: 20
+        address:
+          type: string
+          nullable: true
+          title: نشانی
+          maxLength: 200
+      required:
+      - supplier_id
+      - supplier_name
+    Tire:
+      type: object
+      properties:
+        tire_id:
+          type: integer
+          readOnly: true
+        tire_name:
+          type: string
+          title: نام و مدل تایر
+          maxLength: 150
+        brand:
+          type: integer
+          title: برند
+        brand_name:
+          type: string
+          title: نام برند
+          readOnly: true
+        size:
+          type: integer
+          title: سایز
+        size_name:
+          type: string
+          title: سایز تایر
+          readOnly: true
+        stock_quantity:
+          type: integer
+          readOnly: true
+          title: موجودی انبار
+        sale_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        purchase_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        min_stock_alert:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: حداقل موجودی جهت هشدار
+        is_low_stock:
+          type: boolean
+          readOnly: true
+      required:
+      - brand
+      - brand_name
+      - is_low_stock
+      - sale_price
+      - size
+      - size_name
+      - stock_quantity
+      - tire_id
+      - tire_name
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          title: نام کاربری
+          description: الزامی. 150 کاراکتر یا کمتر. فقط شامل حروف، اعداد، و علامات
+            @/./+/-/_
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        full_name:
+          type: string
+          title: نام و نام خانوادگی
+          maxLength: 150
+        phone_number:
+          nullable: true
+          title: شماره موبایل
+          oneOf:
+          - type: string
+            pattern: ^09\d{9}$
+            maxLength: 20
+          - type: string
+            maxLength: 0
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          title: نقش کاربر
+        role_display:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          title: فعال
+          description: نشان می‌دهد که آیا این کاربر اجازهٔ فعالیت دارد یا خیر. به
+            جای حذف کاربر این تیک را بردارید.
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+          title: تاریخ پیوستن
+      required:
+      - date_joined
+      - id
+      - role_display
+      - username
+    UserCreateUpdate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          title: نام کاربری
+          description: الزامی. 150 کاراکتر یا کمتر. فقط شامل حروف، اعداد، و علامات
+            @/./+/-/_
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        password:
+          type: string
+          writeOnly: true
+        full_name:
+          type: string
+          title: نام و نام خانوادگی
+          maxLength: 150
+        phone_number:
+          nullable: true
+          title: شماره موبایل
+          oneOf:
+          - type: string
+            pattern: ^09\d{9}$
+            maxLength: 20
+          - type: string
+            maxLength: 0
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          title: نقش کاربر
+        is_active:
+          type: boolean
+          title: فعال
+          description: نشان می‌دهد که آیا این کاربر اجازهٔ فعالیت دارد یا خیر. به
+            جای حذف کاربر این تیک را بردارید.
+      required:
+      - id
+      - username
+    UserProfileUpdate:
+      type: object
+      description: سریالایزر ویرایش مشخصات فردی توسط خود کاربر
+      properties:
+        full_name:
+          type: string
+          title: نام و نام خانوادگی
+          maxLength: 150
+        phone_number:
+          nullable: true
+          title: شماره موبایل
+          oneOf:
+          - type: string
+            pattern: ^09\d{9}$
+            maxLength: 20
+          - type: string
+            maxLength: 0
+    Vehicle:
+      type: object
+      properties:
+        vehicle_id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          title: مشتری
+        customer_name:
+          type: string
+          title: نام و نام خانوادگی
+          readOnly: true
+        license_plate:
+          type: string
+          maxLength: 20
+        model:
+          type: string
+          title: مدل خودرو
+          maxLength: 100
+        year:
+          type: string
+          title: سال ساخت
+          maxLength: 10
+        tire_size_recommended:
+          type: string
+          title: سایز تایر پیشنهادی
+          maxLength: 50
+        notes:
+          type: string
+          title: توضیحات و سوابق فنی
+      required:
+      - customer
+      - customer_name
+      - license_plate
+      - model
+      - vehicle_id
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
