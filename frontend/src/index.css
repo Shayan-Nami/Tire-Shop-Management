@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+  }
+
+  html[dir="rtl"] body {
+    direction: rtl;
+  }
+
+  html[dir="ltr"] body {
+    direction: ltr;
+  }
+
+  /* کلاس اعداد فارسی با فونت یکدست و تراز */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* اسکرول‌بار شیک و مدرن */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+/* استایل‌های اختصاصی چاپ فاکتور و فیش حرارتی */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    visibility: hidden;
+  }
+
+  header, aside, .no-print, .no-print * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* خنثی‌سازی کامل لایه‌های مدال هنگام پرینت */
+  .invoice-modal-overlay {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  .invoice-modal-card {
+    visibility: visible !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .invoice-modal-card * {
+    visibility: visible;
+  }
+
+  .invoice-modal-card .no-print,
+  .invoice-modal-card .no-print * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* ایزوله‌سازی فیش حرارتی ۸۰ میلی‌متری */
+  .thermal-receipt-mode {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 2mm !important;
+    font-size: 11px !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .thermal-receipt-mode * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+  }
+
+  @page {
+    margin: 8mm;
+  }
+}
