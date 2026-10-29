@@ -1,4 +1,4 @@
-# Tire Shop Management System (سامانه مدیریت فروشگاه و خدمات لاستیک) 🛞
+# Tire Shop Management System  🛞
 
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-5.x%20%7C%206.x-green.svg)](https://www.djangoproject.com/)
