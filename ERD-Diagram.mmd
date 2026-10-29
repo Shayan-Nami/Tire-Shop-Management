@@ -1,0 +1,225 @@
+erDiagram
+    Users ||--o{ Sales_invoice : "issues"
+    Users ||--o{ Purchase_invoice : "registers"
+    Users ||--o{ Sales_return : "records"
+    Users ||--o{ Receipt_voucher : "creates"
+    Users ||--o{ Payment_voucher : "creates"
+    Users ||--o{ Customer_refund_voucher : "creates"
+    Users ||--o{ Stock_movement : "logs"
+
+    Customer ||--o{ Vehicle : "owns"
+    Customer ||--o{ Sales_invoice : "places"
+    Vehicle ||--o{ Sales_invoice : "services"
+
+    Brand ||--o{ Tier : "classifies"
+    Size ||--o{ Tier : "sizes"
+
+    Supplier ||--o{ Purchase_invoice : "supplies_to"
+
+    Tier ||--o{ SalesInvoice_TireItems : "sold_in"
+    Tier ||--o{ PurchaseInvoice_TireItems : "bought_in"
+    Tier ||--o{ SalesReturn_Items : "returned_in"
+    Tier ||--o{ Stock_movement : "tracks_stock"
+
+    Services ||--o{ SalesInvoice_ServiceItems : "rendered_in"
+
+    Sales_invoice ||--|{ SalesInvoice_TireItems : "contains"
+    Sales_invoice ||--o{ SalesInvoice_ServiceItems : "contains"
+    Sales_invoice ||--o{ Sales_return : "has_returns"
+    Sales_invoice ||--o{ Receipt_voucher : "has_receipts"
+    Sales_invoice ||--o{ Customer_refund_voucher : "has_refunds"
+    Sales_invoice ||--o{ Stock_movement : "generates_movement"
+
+    SalesInvoice_TireItems ||--o{ SalesReturn_Items : "referenced_by"
+
+    Purchase_invoice ||--|{ PurchaseInvoice_TireItems : "contains"
+    Purchase_invoice ||--o{ Payment_voucher : "has_payments"
+    Purchase_invoice ||--o{ Stock_movement : "generates_movement"
+
+    Sales_return ||--|{ SalesReturn_Items : "contains"
+    Sales_return ||--o{ Customer_refund_voucher : "linked_to"
+    Sales_return ||--o{ Stock_movement : "restores_stock"
+
+    Users {
+        int id PK
+        string username
+        string role
+        string full_name
+        string phone_number
+        boolean is_active
+    }
+
+    Customer {
+        int customer_id PK
+        string full_name
+        string phone_number
+        string national_code
+        string address
+        datetime created_at
+    }
+
+    Vehicle {
+        int vehicle_id PK
+        int customer_id FK
+        string license_plate
+        string model
+        string year
+        string tire_size_recommended
+    }
+
+    Brand {
+        int brand_id PK
+        string brand_name
+    }
+
+    Size {
+        int size_id PK
+        string size_name
+    }
+
+    Tier {
+        int tire_id PK
+        string tire_name
+        int brand_id FK
+        int size_id FK
+        int stock_quantity
+        decimal sale_price
+        decimal purchase_price
+        int min_stock_alert
+    }
+
+    Services {
+        int service_id PK
+        string service_name
+        decimal price
+        string description
+    }
+
+    Supplier {
+        int supplier_id PK
+        string supplier_name
+        string phone_number
+        string address
+    }
+
+    Invoice_Sequences {
+        int id PK
+        string doc_type
+        int year
+        int last_number
+    }
+
+    Sales_invoice {
+        int sales_invoice_id PK
+        string invoice_number
+        datetime invoice_date
+        int customer_id FK
+        int vehicle_id FK
+        decimal total_amount
+        decimal discount_amount
+        decimal discount_percent
+        string status
+        string payment_status
+        int created_by_id FK
+    }
+
+    SalesInvoice_TireItems {
+        bigint id PK
+        int sales_invoice_id FK
+        int tire_id FK
+        int quantity
+        decimal unit_price
+        decimal unit_cost
+    }
+
+    SalesInvoice_ServiceItems {
+        bigint id PK
+        int sales_invoice_id FK
+        int service_id FK
+        int quantity
+        decimal unit_price
+    }
+
+    Purchase_invoice {
+        int purchase_invoice_id PK
+        string invoice_number
+        datetime invoice_date
+        int supplier_id FK
+        decimal total_amount
+        string status
+        string payment_status
+        int created_by_id FK
+    }
+
+    PurchaseInvoice_TireItems {
+        bigint id PK
+        int purchase_invoice_id FK
+        int tire_id FK
+        int quantity
+        decimal unit_cost
+    }
+
+    Sales_return {
+        int sales_return_id PK
+        int sales_invoice_id FK
+        datetime return_date
+        string reason
+        decimal total_refund_amount
+        int created_by_id FK
+    }
+
+    SalesReturn_Items {
+        bigint id PK
+        int sales_return_id FK
+        bigint sales_invoice_tire_item_id FK
+        int tire_id FK
+        int quantity
+        decimal unit_price
+        decimal unit_cost
+        decimal refund_amount
+    }
+
+    Stock_movement {
+        bigint movement_id PK
+        int tire_id FK
+        int quantity
+        string movement_type
+        int balance_after
+        decimal unit_cost
+        int sales_invoice_id FK
+        int purchase_invoice_id FK
+        int sales_return_id FK
+        int user_id FK
+        datetime created_at
+    }
+
+    Receipt_voucher {
+        int receipt_id PK
+        int sales_invoice_id FK
+        datetime receipt_date
+        decimal amount
+        string payment_method
+        boolean is_cancelled
+        int created_by_id FK
+    }
+
+    Payment_voucher {
+        int payment_id PK
+        int purchase_invoice_id FK
+        datetime payment_date
+        decimal amount
+        string payment_method
+        boolean is_cancelled
+        int created_by_id FK
+    }
+
+    Customer_refund_voucher {
+        int refund_id PK
+        int sales_invoice_id FK
+        int sales_return_id FK
+        datetime refund_date
+        decimal amount
+        string payment_method
+        boolean is_cancelled
+        int created_by_id FK
+    }
