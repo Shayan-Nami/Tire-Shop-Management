@@ -31,7 +31,7 @@ An enterprise-grade, full-stack ERP and Point-of-Sale (POS) management platform 
   - [Backend Test Suite (Pytest)](#backend-test-suite-pytest)
   - [Frontend Test Suite (Node Test Runner)](#frontend-test-suite-node-test-runner)
 - [API Documentation & Swagger](#-api-documentation--swagger)
-- [Database Schema & ERD](#-database-schema--erd)
+- [Database Schema](#-database-schema)
 - [Security Hardening & Best Practices](#-security-hardening--best-practices)
 - [Documentation Directory](#-documentation-directory)
 - [License](#-license)
@@ -227,9 +227,6 @@ Tire-Shop-Management/
 │   ├── API_REFERENCE.md           # REST API endpoints, schemas, error formats
 │   └── DEPLOYMENT_GUIDE.md        # Nginx, Gunicorn, PostgreSQL, production guide
 │
-├── ERD-Diagram.png                # Visual Entity-Relationship Diagram (ERD)
-├── ERD-Diagram.svg                # Vector ERD diagram
-├── ERD-Viewer.html                # Interactive browser-based ERD viewer
 ├── start_project.bat              # One-click Windows development launcher
 ├── .gitignore                     # Git ignore rules (secrets, cache, databases)
 ├── LICENSE                        # MIT License
@@ -402,14 +399,11 @@ Interactive API documentation is generated via `drf-spectacular` adhering to the
 
 ---
 
-## 📊 Database Schema & ERD
+## 📊 Database Schema
 
 The complete relational schema comprises 18 normalized tables with foreign key delete protection (`on_delete=PROTECT`), conditional uniqueness constraints, and non-negative field checks.
 
-- **Interactive Viewer**: Open [`ERD-Viewer.html`](ERD-Viewer.html) in any modern web browser to interactively inspect entities, fields, and relationships.
-- **Mermaid Source**: Available in [`ERD-Diagram.mmd`](ERD-Diagram.mmd).
-- **High-Resolution Visuals**: Available as [`ERD-Diagram.png`](ERD-Diagram.png) and [`ERD-Diagram.svg`](ERD-Diagram.svg).
-- **Schema Deep-Dive**: See [`docs/DATABASE_DESIGN.md`](docs/DATABASE_DESIGN.md).
+For a comprehensive schema breakdown, entity relationships, and indexing strategy, see [`docs/DATABASE_DESIGN.md`](docs/DATABASE_DESIGN.md).
 
 ---
 
