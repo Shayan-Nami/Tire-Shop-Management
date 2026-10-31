@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, AlertCircle } from 'lucide-react';
+import { parseApiError } from '../../utils/errorParser';
 
 interface CancelVoucherModalProps {
   title: string;
@@ -32,8 +33,8 @@ export const CancelVoucherModal: React.FC<CancelVoucherModalProps> = ({
     try {
       await onConfirm(reason.trim());
       onClose();
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.detail || err.response?.data?.reason?.[0] || 'خطا در ابطال سند مالی');
+    } catch (err: unknown) {
+      setErrorMessage(parseApiError(err, 'خطا در ابطال سند مالی'));
     } finally {
       setSubmitting(false);
     }

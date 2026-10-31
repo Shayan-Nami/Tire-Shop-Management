@@ -1,209 +1,147 @@
-# Database Design & Schema Specification
+# Database Design
 
-## 1. Schema Overview
+This guide summarizes the current Django models and migrations, not a dump of a
+verified live database. Use migrations to create/upgrade a database; do not recreate
+it from historical SQL scripts. See the [root README](../README.md) for setup and
+environment variables and the [deployment guide](DEPLOYMENT_GUIDE.md) for checks.
 
-The Tire Shop Management database is designed with strict relational principles, third normal form (3NF) adherence, financial immutability, and transactional data integrity.
+## Backend selection and storage conventions
 
-The system supports:
-- **PostgreSQL 16+**: Recommended for production environments (MVCC, pessimistic row-level locking, rich indexing).
-- **SQLite 3**: Supported for local development and rapid test execution.
-- **Microsoft SQL Server**: Supported via Django MSSQL backend.
+[Settings](../backend/config/settings.py) select:
 
----
+- PostgreSQL for `DB_ENGINE=postgres` or `postgresql`.
+- SQL Server for `DB_ENGINE=mssql` / `sqlserver`, or `USE_SQL_SERVER=True`, unless
+  the PostgreSQL branch was selected first. SQL Server requires a native ODBC
+  driver as well as the Python dependencies.
+- SQLite at `backend/db.sqlite3` otherwise. An unrecognized engine value also falls
+  through to SQLite, so verify the selected backend before deployment.
 
-## 2. Entity Relationship Overview
+The current audit ran on SQLite. PostgreSQL-specific concurrency tests were
+skipped, and live external-database compatibility was not verified.
 
+Business tables often use explicit legacy names and `AutoField` primary keys,
+not Django's default `app_model` names. Exact names and case matter, including
+`Tier` for tires. Django auth/session/permission and SimpleJWT blacklist tables
+also exist; they are not enumerated below. `reports` adds no business tables.
+
+## Model-to-table map
+
+### Users, catalog, customers, and suppliers
+
+| Model | Database table | Primary key | Selected stored fields / relationships |
+| --- | --- | --- | --- |
+| [User](../backend/apps/accounts/models.py) | `Users` | `id` (BigAutoField) | AbstractUser fields plus `role`, blankable `full_name` (150), optional `phone_number` (20) |
+| [Brand](../backend/apps/catalog/models.py) | `Brand` | `brand_id` (AutoField) | Unique `brand_name` (50); no country column |
+| Size | `Size` | `size_id` (AutoField) | Unique `size_name` (50) |
+| Tire | `Tier` | `tire_id` (AutoField) | `tire_name` (150), brand, size, stock, sale/purchase prices, `min_stock_alert` (default 5) |
+| StockMovement | `Stock_movement` | `movement_id` (BigAutoField) | Tire, signed `quantity`, `movement_type`, `balance_after`, optional invoice/return links and `unit_cost`, user, description, `created_at` |
+| StockProjectionRepair | `catalog_stockprojectionrepair` | `id` (BigAutoField) | Tire, `stock_before`, `stock_after`, optional `last_movement`, authorizing user, reason, timestamp |
+| [Customer](../backend/apps/customers/models.py) | `Customer` | `customer_id` (AutoField) | `full_name` (100), optional phone (20), national code (10), address (255), created/updated timestamps |
+| Vehicle | `Vehicle` | `vehicle_id` (AutoField) | Customer, unique `license_plate` (20), model (100), year (10), recommended tire size (50), notes |
+| [Supplier](../backend/apps/suppliers/models.py) | `Supplier` | `supplier_id` (AutoField) | Unique `supplier_name` (100), optional phone (20), address (200) |
+| [Service](../backend/apps/services_app/models.py) | `Services` | `service_id` (AutoField) | `service_name` (150), price, description |
+
+`User.role` has only `MANAGER`, `TECHNICIAN`, and `WAREHOUSE` (default technician).
+Nonempty user phone numbers are conditionally unique. Customer nonempty phone
+numbers and national codes each have conditional unique constraints. Relevant
+model/serializer paths normalize Persian/Arabic digits and blank optional
+identifiers; this is not a guarantee that arbitrary direct SQL writes are normalized.
+
+### Invoices and returns
+
+Source: [invoice models](../backend/apps/invoices/models.py).
+
+| Model | Database table | Primary key | Selected stored fields / relationships |
+| --- | --- | --- | --- |
+| InvoiceSequence | `Invoice_Sequences` | `id` (BigAutoField) | `doc_type`, Jalali `year`, `last_number`; unique `(doc_type, year)` |
+| SalesInvoice | `Sales_invoice` | `sales_invoice_id` (AutoField) | Unique `invoice_number` (32), invoice date, customer, optional vehicle, total, fixed/percentage discounts, status, payment status, notes, creator, updated timestamp |
+| SalesInvoiceTireItem | `SalesInvoice_TireItems` | `id` (BigAutoField) | Sales invoice, tire, quantity, `unit_price`, `unit_cost` snapshot |
+| SalesInvoiceServiceItem | `SalesInvoice_ServiceItems` | `id` (BigAutoField) | Sales invoice, service, quantity, `unit_price` |
+| PurchaseInvoice | `Purchase_invoice` | `purchase_invoice_id` (AutoField) | Unique `invoice_number` (32), invoice date, supplier, total, status, payment status, creator, updated timestamp |
+| PurchaseInvoiceTireItem | `PurchaseInvoice_TireItems` | `id` (BigAutoField) | Purchase invoice, tire, quantity, `unit_cost`, nullable `previous_purchase_price` |
+| SalesReturn | `Sales_return` | `sales_return_id` (AutoField) | Sales invoice, return date, reason, `total_refund_amount`, creator, created timestamp |
+| SalesReturnItem | `SalesReturn_Items` | `id` (BigAutoField) | Return document, original sales tire line, tire, quantity, original price/cost, discounted `refund_amount` |
+
+Invoice states are `DRAFT`, `CONFIRMED`, and `CANCELLED`; model defaults are
+`CONFIRMED`. Payment states are `UNPAID`, `PARTIAL`, and `PAID`, defaulting to
+`UNPAID`. API workflows expose fewer transitions than the model choices: purchases
+are created confirmed, for example. Numbers use `S-1405-00001` / `P-1405-00001`
+formats, not Gregorian `INV-YYYY-XXXXXX` numbers.
+
+Sales `returned_amount`, `net_amount`, `paid_amount`, `remaining_amount`, and
+`excess_amount` are computed properties/query annotations, not stored balance
+columns. Serialized line `total_price` is also computed, not a table column.
+For sales, ignoring optional query annotations:
+
+```text
+returned_amount = sum(return document totals)
+net_amount      = max(total_amount - returned_amount, 0)
+paid_amount     = max(active receipts - active refunds, 0)
+remaining       = max(net_amount - paid_amount, 0)
+excess          = max(active receipts - active refunds - net_amount, 0)
 ```
-                      ┌───────────────┐
-                      │  Custom User  │
-                      │(accounts_user)│
-                      └───────┬───────┘
-                              │
-          ┌───────────────────┼───────────────────┐
-          │                   │                   │
-          ▼                   ▼                   ▼
-┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
-│     Customer     │ │     Supplier     │ │   Tire Catalog   │
-│  (crm_customer)  │ │(suppliers_suppl.)│ │  (catalog_tire)  │
-└─────────┬────────┘ └────────┬─────────┘ └───────┬──────────┘
-          │                   │                   │
-          ▼                   │                   │
-┌──────────────────┐          │                   │
-│     Vehicle      │          │                   │
-│  (crm_vehicle)   │          │                   │
-└─────────┬────────┘          │                   │
-          │                   │                   │
-          ▼                   ▼                   ▼
-┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
-│  Sales Invoice   │ │ Purchase Invoice │ │  Stock Movement  │
-│ (invoices_sales) │ │(invoices_purch.) │ │ (catalog_stock)  │
-└─────────┬────────┘ └────────┬─────────┘ └──────────────────┘
-          │                   │
-          ├───────────────────┤
-          ▼                   ▼
-┌──────────────────┐ ┌──────────────────┐
-│  Receipt Voucher │ │  Payment Voucher │
-│ (finance_receipt)│ │ (finance_payment)│
-└──────────────────┘ └──────────────────┘
-```
 
----
+`payment_status` is stored and synchronized by financial services. Purchase
+payment status is based on non-cancelled supplier-payment vouchers.
 
-## 3. Core Entities & Tables
+### Treasury
 
-### 3.1 Authentication & Authorization (`apps.accounts`)
+Source: [finance models](../backend/apps/finance/models.py).
 
-#### Table: `accounts_user`
-Stores user credentials, organizational roles, and security audit timestamps.
+| Model | Database table | Primary key (AutoField) | Required invoice link / date |
+| --- | --- | --- | --- |
+| ReceiptVoucher | `Receipt_voucher` | `receipt_id` | Sales invoice / `receipt_date` |
+| PaymentVoucher | `Payment_voucher` | `payment_id` | Purchase invoice / `payment_date` |
+| CustomerRefundVoucher | `Customer_refund_voucher` | `refund_id` | Sales invoice / `refund_date`; optional sales-return link |
 
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `id` | BigAutoField | Primary Key | Internal user ID |
-| `username` | CharField(150) | Unique, Indexed | Login handle |
-| `full_name` | CharField(150) | Not Null | Display name (Persian/English) |
-| `role` | CharField(20) | Choices (`MANAGER`, `ACCOUNTANT`, `WAREHOUSE`, `TECHNICIAN`) | RBAC role |
-| `phone_number` | CharField(20) | Nullable, Indexed | Contact mobile number |
-| `is_active` | Boolean | Default True | Account active status |
-| `is_staff` | Boolean | Default False | Admin access flag |
-| `date_joined` | DateTime | Auto now add | Account creation timestamp |
+All three store positive `amount`, `payment_method`, optional `reference_number`,
+notes, creator, and cancellation metadata (`is_cancelled`, `cancelled_at`,
+`cancelled_by`, `cancellation_reason`). These are payment/refund records, not
+paired debit/credit entries. There is no chart of accounts or general-ledger schema.
 
----
+`LegacyInvoiceItem` maps to `Invoice_items` with `managed=False`. Django migrations
+do not create/manage that table; current invoice workflows use the line tables above.
 
-### 3.2 Inventory & Catalog (`apps.catalog`)
+## Integrity and lifecycle rules
 
-#### Table: `catalog_brand`
-Stores manufacturer brands (e.g., Michelin, Bridgestone, Barez, Yazd Tire).
+- **Money:** most business amounts are `DecimalField(14, 2)`, with up to 12 whole
+  digits (`999999999999.99` IRR). Percentage discounts are `(5, 2)`; the unmanaged
+  legacy line price is `(18, 2)`. The configured canonical currency is IRR, even
+  where older field labels mention rial/toman. Report JSON may use floats.
+- **Database constraints:** tires have nonnegative stock/sale-price/purchase-price
+  checks; service price is nonnegative; voucher amounts are positive. Invoice
+  lines have unique invoice/product pairs and selected nonnegative price/cost
+  checks. These are not blanket constraints on every amount or business rule.
+- **Application validation:** positive line quantities, invoice-total limits,
+  mutually exclusive discounts, vehicle ownership, stock availability, return
+  ceilings, and payment ceilings also depend on serializers/services. Do not
+  assume a model validator runs on every ORM save or that direct SQL is safe.
+- **Relationships:** brands/sizes referenced by tires, customers/suppliers
+  referenced by invoices, tires/services referenced by lines, and invoices
+  referenced by movements/vouchers/returns use `PROTECT`. Invoice-to-line and
+  return-to-line links use `CASCADE`. Customer-to-vehicle uses `CASCADE`, while
+  a sales invoice's optional vehicle uses `SET_NULL`. Most creator/canceller
+  references use `SET_NULL`; projection-repair references use `PROTECT`.
+- **API lifecycle:** invoice and voucher APIs prohibit direct editing/deletion;
+  explicit actions handle confirmation/cancellation. This is application-level
+  protection, not a database trigger preventing all historical changes.
+- **Stock:** `stock_quantity` is the current projection. `StockMovement.quantity`
+  is a signed delta with `balance_after`, not a paired ledger posting. Movement
+  codes are `INITIAL_STOCK`, `PURCHASE`, `PURCHASE_CANCEL`, `SALE`, `SALE_CANCEL`,
+  `SALE_RETURN`, and `MANUAL_ADJUSTMENT`.
 
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `id` | BigAutoField | Primary Key | Brand identifier |
-| `name` | CharField(100) | Unique, Indexed | Brand name |
-| `country` | CharField(100) | Nullable | Country of origin |
+## Migration and recovery considerations
 
-#### Table: `catalog_size`
-Stores standardized tire dimension classifications (e.g., `185/65R14`, `205/55R16`).
+Sales tire-line cost is snapshotted for reporting; draft confirmation finalizes it
+at stock-out time. Purchases store the prior catalog cost so cancellation can
+restore an earlier price rather than rewriting sales history. The
+[previous-price migration](../backend/apps/invoices/migrations/0015_purchase_item_previous_purchase_price.py)
+deliberately leaves unknown legacy baselines null. A cancellation needing such a
+missing baseline can fail and requires investigation, not an invented zero cost.
 
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `id` | BigAutoField | Primary Key | Size identifier |
-| `size_name` | CharField(50) | Unique, Indexed | Standard dimension code |
-
-#### Table: `catalog_tire`
-Core tire SKU catalog with pricing, physical stock projection, and alerts.
-
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `id` | BigAutoField | Primary Key | SKU identifier |
-| `brand_id` | ForeignKey -> `catalog_brand` | `on_delete=PROTECT` | Manufacturer brand |
-| `size_id` | ForeignKey -> `catalog_size` | `on_delete=PROTECT` | Dimensional size |
-| `pattern` | CharField(100) | Blankable | Tread pattern model name |
-| `purchase_price` | DecimalField(14, 2) | Check >= 0 | Current baseline purchase cost (IRR) |
-| `sale_price` | DecimalField(14, 2) | Check >= 0 | Retail sale price (IRR) |
-| `stock_quantity` | IntegerField | Check >= 0 | Projected on-hand units |
-| `min_stock_alert`| IntegerField | Default 4 | Low stock threshold alert |
-
-#### Table: `catalog_stockmovement`
-The immutable double-entry stock ledger. Every physical unit entering or exiting inventory is written here.
-
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `id` | BigAutoField | Primary Key | Ledger entry ID |
-| `tire_id` | ForeignKey -> `catalog_tire` | `on_delete=PROTECT` | Affected tire item |
-| `movement_type` | CharField(30) | Indexed | Enum (`INITIAL`, `PURCHASE`, `SALE`, `SALE_RETURN`, `SALE_CANCEL`, `PURCHASE_CANCEL`, `MANUAL_ADJUSTMENT`) |
-| `quantity` | IntegerField | Non-zero | Units changed (signed) |
-| `unit_price` | DecimalField(14, 2) | Check >= 0 | Item cost at transaction time |
-| `reference_number` | CharField(100) | Nullable | External document number |
-| `sales_invoice_id` | ForeignKey -> `invoices_salesinvoice` | Nullable, `PROTECT` | Originating sales invoice |
-| `purchase_invoice_id` | ForeignKey -> `invoices_purchaseinvoice` | Nullable, `PROTECT` | Originating purchase invoice |
-| `created_by_id` | ForeignKey -> `accounts_user` | Nullable, `PROTECT` | User who authorized movement |
-| `created_at` | DateTime | Auto now add | Transaction timestamp |
-
----
-
-### 3.3 Customer Relationship Management (`apps.customers`)
-
-#### Table: `customers_customer`
-Profiles of retail and fleet clients.
-
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `id` | BigAutoField | Primary Key | Customer ID |
-| `full_name` | CharField(150) | Indexed | Customer legal or personal name |
-| `phone_number` | CharField(20) | Conditional Unique | Normalized phone number |
-| `national_code`| CharField(20) | Conditional Unique | Iranian National ID / Tax ID |
-| `address` | TextField | Blankable | Physical or mailing address |
-
-#### Table: `customers_vehicle`
-Vehicles associated with registered customers, tracking Iranian license plates.
-
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `id` | BigAutoField | Primary Key | Vehicle ID |
-| `customer_id` | ForeignKey -> `customers_customer` | `on_delete=CASCADE` | Vehicle owner |
-| `license_plate`| CharField(30) | Unique, Indexed | Normalized Iranian plate |
-| `model` | CharField(100) | Indexed | Vehicle model (e.g. Samand, Pride, Tara) |
-| `tire_size_recommended` | CharField(50) | Blankable | Recommended OEM tire size |
-
----
-
-### 3.4 Invoicing & Sales Operations (`apps.invoices`)
-
-#### Table: `invoices_salesinvoice`
-Header record for customer sales invoices.
-
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `id` | BigAutoField | Primary Key | Internal invoice ID |
-| `invoice_number` | CharField(50) | Unique, Indexed | Sequential number (`INV-2026-000001`) |
-| `customer_id` | ForeignKey -> `customers_customer` | `on_delete=PROTECT` | Bill-to customer |
-| `vehicle_id` | ForeignKey -> `customers_vehicle` | Nullable, `PROTECT` | Service vehicle |
-| `status` | CharField(20) | Indexed | State (`DRAFT`, `CONFIRMED`, `CANCELLED`) |
-| `payment_status` | CharField(20) | Indexed | Payment state (`UNPAID`, `PARTIAL`, `PAID`) |
-| `total_amount` | DecimalField(14, 2) | Check >= 0 | Final payable total after discounts |
-| `discount_amount`| DecimalField(14, 2) | Default 0.00 | Applied cash discount |
-| `created_by_id` | ForeignKey -> `accounts_user` | `on_delete=PROTECT` | Creator/cashier |
-| `created_at` | DateTime | Auto now add, Indexed | Invoice creation timestamp |
-
-#### Table: `invoices_salesinvoicetireitem`
-Line items for tire products sold on a sales invoice.
-
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `id` | BigAutoField | Primary Key | Line item ID |
-| `sales_invoice_id` | ForeignKey -> `invoices_salesinvoice`| `on_delete=CASCADE` | Parent invoice |
-| `tire_id` | ForeignKey -> `catalog_tire` | `on_delete=PROTECT` | Selected tire SKU |
-| `quantity` | IntegerField | Check > 0 | Units sold |
-| `unit_price` | DecimalField(14, 2) | Check >= 0 | Selling unit price |
-| `unit_cost` | DecimalField(14, 2) | Check >= 0 | Snapshot of purchase cost at sale confirmation |
-| `total_price` | DecimalField(14, 2) | Check >= 0 | Line total (`quantity * unit_price`) |
-
----
-
-### 3.5 Treasury & Financial Vouchers (`apps.finance`)
-
-#### Table: `finance_receiptvoucher`
-Tracks incoming payments from customers against sales invoices.
-
-| Column | Type | Constraints | Description |
-|:---|:---|:---|:---|
-| `receipt_id` | BigAutoField | Primary Key | Unique voucher ID |
-| `sales_invoice_id` | ForeignKey -> `invoices_salesinvoice`| `on_delete=PROTECT` | Associated invoice |
-| `amount` | DecimalField(14, 2) | Check > 0 | Amount received (IRR) |
-| `payment_method` | CharField(50) | Required | POS Card, Cash, Bank Transfer |
-| `reference_number`| CharField(100) | Nullable, Indexed | Bank/POS transaction trace code |
-| `is_cancelled` | Boolean | Default False | Cancellation flag |
-| `cancellation_reason` | TextField | Blankable | Reason for cancellation |
-| `created_by_id` | ForeignKey -> `accounts_user` | `on_delete=PROTECT` | Voucher cashier |
-| `created_at` | DateTime | Auto now add | Receipt timestamp |
-
----
-
-## 4. Integrity Constraints & Foreign Key Protection
-
-1. **Deletion Protection (`on_delete=models.PROTECT`)**:
-   - Master data (Customers, Suppliers, Tires, Brands, Sizes) cannot be deleted if historical invoices or stock movements reference them.
-   - Prevents accidental destruction of financial audit trails.
-2. **Zero Negative Inventory Constraint**:
-   - `models.CheckConstraint(check=models.Q(stock_quantity__gte=0))` guarantees the database itself will abort any operation resulting in negative inventory.
-3. **Decimal Precision for Iranian Rial**:
-   - `max_digits=14, decimal_places=2` enables transaction values up to 999 billion Tomans / ~10 trillion Rials with exact decimal precision, preventing floating-point rounding discrepancies.
+`reconcile_stock` compares stock projections with summed movements; its explicit
+repair mode records a [StockProjectionRepair](../backend/apps/catalog/migrations/0009_stock_projection_repair.py)
+and changes the projection without creating fictitious physical movements.
+Physical stocktaking is a separate operation. `reconcile_payments` reports stored
+payment-status discrepancies without changing them. See the
+[operational guide](DEPLOYMENT_GUIDE.md) before using either command.

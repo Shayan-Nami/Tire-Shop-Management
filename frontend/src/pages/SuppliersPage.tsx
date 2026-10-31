@@ -3,6 +3,7 @@ import { Search, PlusCircle, Trash2, Edit2 } from 'lucide-react';
 import { suppliersApi } from '../api/suppliers';
 import { Supplier } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { parseApiError } from '../utils/errorParser';
 
 export const SuppliersPage: React.FC = () => {
   const { user } = useAuth();
@@ -84,8 +85,8 @@ export const SuppliersPage: React.FC = () => {
       }
       setShowModal(false);
       fetchSuppliers();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || 'خطا در ثبت تأمین‌کننده');
+    } catch (err: unknown) {
+      alert(parseApiError(err, 'خطا در ثبت تأمین‌کننده'));
     }
   };
 
@@ -94,8 +95,8 @@ export const SuppliersPage: React.FC = () => {
     try {
       await suppliersApi.deleteSupplier(id);
       fetchSuppliers();
-    } catch {
-      alert('امکان حذف تأمین‌کننده به دلیل وجود فاکتورهای خرید ثبت‌شده وجود ندارد.');
+    } catch (err: unknown) {
+      alert(parseApiError(err, 'امکان حذف تأمین‌کننده به دلیل وجود فاکتورهای خرید ثبت‌شده وجود ندارد.'));
     }
   };
 

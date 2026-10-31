@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { parseApiError } from '../utils/errorParser';
 
-export const API_BASE_URL = '/api/v1';
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL?.trim() || '/api/v1').replace(/\/+$/, '');
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -16,6 +16,11 @@ apiClient.interceptors.request.use(
     const token = localStorage.getItem('access_token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // A 401 retry may have rotated and blacklisted the refresh token in the original logout body.
+    if (config.url === '/auth/logout/') {
+      const refresh = localStorage.getItem('refresh_token');
+      if (refresh) config.data = { refresh };
     }
     return config;
   },
@@ -61,6 +66,8 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      // Queued requests also get only one replay, even if the new access token is rejected.
+      originalRequest._retry = true;
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -73,7 +80,6 @@ apiClient.interceptors.response.use(
           .catch((err) => Promise.reject(err));
       }
 
-      originalRequest._retry = true;
       isRefreshing = true;
 
       try {

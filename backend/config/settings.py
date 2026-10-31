@@ -114,6 +114,16 @@ USE_SQL_SERVER = os.environ.get('USE_SQL_SERVER', 'False').lower() in ('true', '
 # کنترل طول عمر اتصالات پایگاه داده (Connection Pooling) جهت بهبود کارایی
 CONN_MAX_AGE = int(os.environ.get('CONN_MAX_AGE', '60'))
 
+
+def _database_bool_env(name, default):
+    value = os.environ.get(name, str(default)).strip().lower()
+    if value in ('true', '1', 'yes'):
+        return True
+    if value in ('false', '0', 'no'):
+        return False
+    raise ImproperlyConfigured(f'{name} must be true/false, yes/no, or 1/0.')
+
+
 if DB_ENGINE in ('postgres', 'postgresql'):
     DATABASES = {
         'default': {
@@ -127,18 +137,23 @@ if DB_ENGINE in ('postgres', 'postgresql'):
         }
     }
 elif USE_SQL_SERVER or DB_ENGINE in ('mssql', 'sqlserver'):
+    _db_user = os.environ.get('DB_USER', '').strip()
+    _db_trusted_connection = _database_bool_env('DB_TRUSTED_CONNECTION', not bool(_db_user))
+    _db_encrypt = 'yes' if _database_bool_env('DB_ENCRYPT', True) else 'no'
+    _db_trust_certificate = 'yes' if _database_bool_env('DB_TRUST_SERVER_CERTIFICATE', False) else 'no'
     DATABASES = {
         'default': {
             'ENGINE': 'mssql',
             'NAME': os.environ.get('DB_NAME', 'TireShopDB'),
-            'USER': os.environ.get('DB_USER', ''),
-            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'USER': '' if _db_trusted_connection else _db_user,
+            'PASSWORD': os.environ.get('DB_PASSWORD', '') if _db_user and not _db_trusted_connection else '',
+            'Trusted_Connection': 'yes' if _db_trusted_connection else 'no',
             'HOST': os.environ.get('DB_HOST', 'localhost'),
             'PORT': os.environ.get('DB_PORT', '1433'),
             'CONN_MAX_AGE': CONN_MAX_AGE,
             'OPTIONS': {
                 'driver': os.environ.get('DB_DRIVER', 'ODBC Driver 17 for SQL Server'),
-                'extra_params': 'Trusted_Connection=yes;TrustServerCertificate=yes;',
+                'extra_params': f'Encrypt={_db_encrypt};TrustServerCertificate={_db_trust_certificate};',
             },
         }
     }

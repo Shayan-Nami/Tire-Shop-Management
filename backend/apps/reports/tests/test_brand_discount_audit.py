@@ -125,6 +125,42 @@ def test_no_discount_and_fully_discounted_invoices_preserve_brand_contract(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(('discount', 'revenues'), [
+    ({'discount_percent': Decimal('20.00')}, [Decimal('160.00'), Decimal('80.00')]),
+    ({'discount_percent': Decimal('33.33')}, [Decimal('133.34'), Decimal('66.67')]),
+    ({'discount_amount': Decimal('1.00')}, [Decimal('199.60'), Decimal('99.80')]),
+])
+def test_discount_division_preserves_fractional_revenue_and_full_return(
+    auth_client_manager, manager_user, brand_sale_data, discount, revenues,
+):
+    invoice = create_mixed_invoice(brand_sale_data, manager_user, **discount)
+    assert get_brand_rows(auth_client_manager) == [
+        {'brand_name': tire.brand.brand_name, 'total_quantity': quantity, 'total_revenue': float(revenue)}
+        for tire, quantity, revenue in zip(brand_sale_data[1], [2, 1], revenues)
+    ]
+    profitability = auth_client_manager.get(reverse('profitability-report'))
+    assert profitability.status_code == 200
+    by_tire = {row['tire_id']: row for row in profitability.data}
+    for tire, quantity, revenue in zip(brand_sale_data[1], [2, 1], revenues):
+        assert by_tire[tire.pk]['total_revenue'] == float(revenue)
+        assert by_tire[tire.pk]['total_profit'] == float(revenue - quantity * Decimal('40.00'))
+
+    returned = create_sales_return_service(
+        invoice=invoice,
+        items_data=[
+            {'sales_invoice_tire_item_id': item.pk, 'quantity': item.quantity}
+            for item in invoice.tire_items.all()
+        ],
+        reason='Fractional discount full return', user=manager_user,
+    )
+    assert returned.total_refund_amount == sum(revenues)
+    assert all(row['total_revenue'] == 0.0 for row in get_brand_rows(auth_client_manager))
+    profitability = auth_client_manager.get(reverse('profitability-report'))
+    assert profitability.status_code == 200
+    assert all(row['total_revenue'] == 0.0 and row['total_profit'] == 0.0 for row in profitability.data)
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize('status', [InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED])
 def test_nonconfirmed_discounted_sales_and_returns_are_excluded(
     auth_client_manager, manager_user, brand_sale_data, status,

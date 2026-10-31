@@ -9,13 +9,21 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-audit
 dist-ssr
+coverage/
+*.tsbuildinfo
 *.local
 
+# Environment variables (VITE_* values are public, but local files stay private)
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+.vscode/
+.idea/
+.zed/
 .DS_Store
 *.suo
 *.ntvs*

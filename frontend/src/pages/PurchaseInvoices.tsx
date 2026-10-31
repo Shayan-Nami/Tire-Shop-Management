@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Search,
   PackagePlus,
@@ -50,6 +50,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [selectorsLoading, setSelectorsLoading] = useState(true);
   const [selectorsError, setSelectorsError] = useState('');
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const submitBusy = useRef(false);
 
   const fetchPurchases = useCallback(async () => {
     setLoading(true);
@@ -147,6 +148,7 @@ export const PurchaseInvoices: React.FC = () => {
 
   const handleCreatePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitBusy.current) return;
     if (!selectedSupplierId) {
       alert('لطفاً تأمین‌کننده را انتخاب فرمایید.');
       return;
@@ -156,6 +158,7 @@ export const PurchaseInvoices: React.FC = () => {
       return;
     }
 
+    submitBusy.current = true;
     setSubmitting(true);
     try {
       await invoicesApi.createPurchaseInvoice({
@@ -173,6 +176,7 @@ export const PurchaseInvoices: React.FC = () => {
     } catch (err) {
       alert(parseApiError(err, 'خطا در ثبت ورود کالا به انبار'));
     } finally {
+      submitBusy.current = false;
       setSubmitting(false);
     }
   };

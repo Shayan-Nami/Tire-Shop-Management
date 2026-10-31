@@ -1,253 +1,228 @@
-# REST API Reference & Specification
+# API Reference
 
-## 1. Overview & Conventions
+This is a compact guide to the implemented API, not a complete OpenAPI schema.
+See the [root README](../README.md) for setup and environment variables.
+Routing starts in [config/urls.py](../backend/config/urls.py); each app's
+`urls.py`, views, and serializers define the actual contract.
 
-All endpoints in the Tire Shop Management System adhere to RESTful conventions, using standard HTTP methods and JSON request/response bodies.
+## Conventions
 
-- **Base URL**: `/api/v1`
-- **Authentication Scheme**: JWT Bearer Token (`Authorization: Bearer <access_token>`)
-- **Character Encoding**: UTF-8
-- **Date/Time Standard**: ISO 8601 UTC (`2026-10-29T12:00:00Z`) with dual Jalali representation
+- Base path: `/api/v1/`. Use trailing slashes and JSON request bodies.
+- Browser authentication: `Authorization: Bearer <access_token>`. Django session
+  authentication is also enabled; session-authenticated writes require CSRF protection.
+- Most business endpoints require authentication. Permissions and queryset filtering
+  are enforced on the server, independently of frontend route guards.
+- Currency is **IRR (rial)**. Model decimal fields normally serialize as strings;
+  computed fields and analytics can return JSON numbers. Do not assume every
+  monetary response has the same JSON type.
+- Date/time fields use ISO 8601 with timezone support. The application timezone is
+  `Asia/Tehran`; selected serializers also expose a display-only `jalali_date`.
 
----
+### Pagination and errors
 
-## 2. Global Error Envelope
+List viewsets use `page` and `page_size` (default 20, maximum 100), returning:
 
-When a client request fails due to validation errors, business rule violations, or unauthorized access, the API responds with a structured envelope:
+```json
+{
+  "count": 0,
+  "total_pages": 1,
+  "current_page": 1,
+  "next": null,
+  "previous": null,
+  "results": []
+}
+```
+
+Analytics views have their own object or array responses, not this envelope.
+Search/filter/ordering support is endpoint-specific. For example:
+`GET /api/v1/catalog/tires/?brand=1&size=2&search=radial&ordering=sale_price&page=1`.
+
+Exceptions handled by the [custom handler](../backend/utils/exceptions.py) use:
 
 ```json
 {
   "success": false,
   "status_code": 400,
-  "errors": {
-    "field_name": [
-      "Validation message in localized language"
-    ]
-  }
+  "errors": { "field_name": ["Validation message"] }
 }
 ```
 
-Common status codes:
-- `200 OK`: Request succeeded.
-- `201 Created`: Resource successfully created.
-- `400 Bad Request`: Payload validation or domain business invariant failure.
-- `401 Unauthorized`: Missing, expired, or revoked JWT token.
-- `403 Forbidden`: Authenticated user lacks RBAC permissions for the target resource.
-- `404 Not Found`: Resource does not exist.
-- `429 Too Many Requests`: Rate limit threshold exceeded.
+`errors` can also contain a list or `detail`. This is not a universal response
+wrapper: explicitly returned errors, such as an invalid logout token, can be plain
+`{"detail": "..."}`. Expect 400 for validation/business rules, 401 for invalid
+credentials/tokens, 403 for insufficient permissions, 404 for unavailable objects,
+405 for disallowed methods, and 429 for throttling.
 
----
+## Authentication and users
 
-## 3. Authentication Endpoints (`/api/v1/auth`)
+Source: [account routes](../backend/apps/accounts/urls.py),
+[views](../backend/apps/accounts/views.py), and
+[serializers](../backend/apps/accounts/serializers.py).
 
-### 3.1 Obtain JWT Pair
-```http
-POST /api/v1/auth/token/
-Content-Type: application/json
+| Method | Path relative to `/api/v1/` | Contract |
+| --- | --- | --- |
+| POST | `auth/login/` | `username`, `password`; returns `access`, `refresh`, and `user` |
+| POST | `auth/token/refresh/` | `refresh`; returns a new access token and rotated refresh token |
+| POST | `auth/logout/` | Authenticated; `refresh` to blacklist |
+| GET | `auth/profile/` | Current user profile |
+| PATCH / PUT | `auth/profile/` | Updates only `full_name` and `phone_number` |
+| POST | `auth/change-password/` | `old_password`, `new_password` |
+| CRUD | `auth/users/`, `auth/users/{id}/` | Manager user administration, with self-account and superuser protections |
 
-{
-  "username": "admin",
-  "password": "secure_password"
-}
-```
-**Response (200 OK):**
+There is no login endpoint at `auth/token/`. Login's `user` contains `id`,
+`username`, `full_name`, `role`, and `phone_number`. Profile responses additionally
+include `role_display`, `is_active`, and `date_joined`.
+
+The only roles are `MANAGER`, `TECHNICIAN`, and `WAREHOUSE`. Default access-token
+lifetime is 60 minutes; refresh lifetime is 14 days, configurable in settings.
+Refresh rotation blacklists the old refresh token in the database. Password changes
+invalidate password-bound access/refresh tokens and blacklist outstanding refresh
+tokens. Logout blacklists the submitted refresh token; it does **not** revoke an
+already issued access token before expiry.
+
+## Resource routes and permissions
+
+Here, **CRUD** means list/create plus retrieve/update/delete at `{pk}/`, subject
+to permissions and protected relationships. **List/create/retrieve** does not
+include direct PUT, PATCH, or DELETE.
+
+| Path relative to `/api/v1/` | Operations | Access for ordinary role accounts |
+| --- | --- | --- |
+| `crm/customers/` | CRUD | All authenticated users; delete manager-only |
+| `crm/vehicles/` | CRUD; filter by `customer` | All authenticated users; delete manager-only |
+| `catalog/brands/`, `catalog/sizes/`, `catalog/tires/` | CRUD | Read by all; write manager/warehouse |
+| `catalog/tires/low-stock/` | GET | All authenticated users |
+| `catalog/tires/{pk}/adjust-stock/` | POST | Manager/warehouse |
+| `catalog/stock-movements/` | List/retrieve only | Manager/warehouse |
+| `workshop/services/` | CRUD | Read by all; write manager-only |
+| `procurement/suppliers/` | CRUD | Read by all; write manager/warehouse |
+| `invoices/sales/` | List/create/retrieve | Manager/technician create; warehouse can read; technicians see only their own invoices |
+| `invoices/sales/{pk}/confirm/` | POST | Manager/technician, within visible invoices |
+| `invoices/sales/{pk}/cancel/` | POST | Manager-only |
+| `invoices/purchases/` | List/create/retrieve | Manager/warehouse |
+| `invoices/purchases/{pk}/cancel/` | POST | Manager-only |
+| `invoices/returns/` | List/create/retrieve | Manager-only |
+| `treasury/receipts/`, `treasury/payments/`, `treasury/customer-refunds/` | List/create/retrieve; POST `{pk}/cancel/` | Manager-only |
+| `analytics/*` | GET reports listed below | Manager-only |
+
+Most manager permission checks also permit superusers. See the
+[account permissions](../backend/apps/accounts/permissions.py) and
+[invoice views](../backend/apps/invoices/views.py) for action-specific checks.
+
+Resource identifiers are not uniformly named `id`: examples include `customer_id`,
+`vehicle_id`, `brand_id`, `size_id`, `tire_id`, `service_id`, `supplier_id`,
+`sales_invoice_id`, `purchase_invoice_id`, `sales_return_id`, `movement_id`,
+`receipt_id`, `payment_id`, and `refund_id`. Tire catalog fields include
+`tire_name`, not `pattern`. Technicians do not receive catalog `purchase_price`;
+sales tire-line `unit_cost` is omitted for both technicians and warehouse users.
+Warehouse users can still read catalog purchase prices and purchase invoices.
+
+## Inventory and invoice workflows
+
+Source: [catalog serializers](../backend/apps/catalog/serializers.py),
+[invoice serializers](../backend/apps/invoices/serializers.py), and
+[invoice services](../backend/apps/invoices/services.py).
+The following IDs are illustrative; substitute existing records and sufficient stock.
+
+### Stock adjustment
+
+POST `catalog/tires/{pk}/adjust-stock/` with an absolute physical count:
+
 ```json
-{
-  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
+{ "counted_quantity": 12, "reason": "Physical stock count" }
 ```
 
-### 3.2 Refresh Access Token
-```http
-POST /api/v1/auth/token/refresh/
-Content-Type: application/json
+A nonnegative count and nonblank reason are required; an unchanged count is rejected.
+The response contains `message`, `movement_id`, `difference`, and `current_stock`.
+`stock_quantity` is read-only in tire CRUD. Catalog updates do not change
+`purchase_price`; purchase services own later cost changes.
 
-{
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
+### Sales
 
-### 3.3 Current User Profile
-```http
-GET /api/v1/auth/profile/
-Authorization: Bearer <access_token>
-```
-**Response (200 OK):**
+POST `invoices/sales/`:
+
 ```json
-{
-  "id": 1,
-  "username": "admin",
-  "full_name": "مدیر فروشگاه",
-  "role": "MANAGER",
-  "role_display": "مدیر سیستم",
-  "phone_number": "09121112233"
-}
-```
-
-### 3.4 Change Password
-Immediately invalidates all existing JWT access and refresh tokens across all user devices.
-```http
-POST /api/v1/auth/change-password/
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
-{
-  "old_password": "current_password",
-  "new_password": "NewComplexPassword!827"
-}
-```
-
----
-
-## 4. Tire Catalog & Inventory (`/api/v1/catalog`)
-
-### 4.1 List Tires
-Supports search, brand filtering, size filtering, and pagination.
-```http
-GET /api/v1/catalog/tires/?search=Barez&brand=1&size=2&page=1
-Authorization: Bearer <access_token>
-```
-**Response (200 OK):**
-```json
-{
-  "count": 48,
-  "next": "/api/v1/catalog/tires/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 12,
-      "brand_name": "بارز (Barez)",
-      "size_name": "185/65R14",
-      "pattern": "Alborz P648",
-      "sale_price": "28500000.00",
-      "stock_quantity": 24,
-      "min_stock_alert": 4,
-      "is_low_stock": false
-    }
-  ]
-}
-```
-*Note: The `purchase_price` field is automatically hidden from users with the `TECHNICIAN` role.*
-
-### 4.2 Stock Movement Ledger
-```http
-GET /api/v1/catalog/movements/?movement_type=SALE&tire=12
-Authorization: Bearer <access_token>
-```
-
----
-
-## 5. Sales Invoices (`/api/v1/invoices/sales`)
-
-### 5.1 Create Sales Invoice
-```http
-POST /api/v1/invoices/sales/
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
 {
   "customer": 5,
   "vehicle": 3,
   "status": "CONFIRMED",
-  "payment_status": "PAID",
-  "payment_method": "کارتخوان سامان",
-  "reference_number": "POS-TRACE-992817",
+  "payment_status": "UNPAID",
   "discount_amount": "0.00",
-  "tire_items": [
-    {
-      "tire": 12,
-      "quantity": 4,
-      "unit_price": "28500000.00"
-    }
-  ],
-  "service_items": [
-    {
-      "service": 1,
-      "quantity": 4,
-      "unit_price": "1500000.00"
-    }
-  ]
+  "tire_items": [{ "tire": 12, "quantity": 2, "unit_price": "28500000.00" }],
+  "service_items": [{ "service": 1, "quantity": 2 }]
 }
 ```
-**Response (201 Created):**
+
+- At least one tire or service line is required; duplicate products/services must
+  be combined. Quantities must be positive. Omitted line prices use catalog prices.
+- A supplied vehicle must belong to the customer. Use either a fixed discount or
+  a percentage discount, not both positive values.
+- Default status is `CONFIRMED`; `DRAFT` does not consume stock. POST the draft's
+  `confirm/` action without a body to deduct stock and finalize tire cost snapshots.
+- Direct creation as `CANCELLED` or with payment status `PARTIAL` is rejected.
+  `PAID` creation generates a receipt for a positive total; optional
+  `payment_method` and `reference_number` describe that receipt.
+- Create returns the full read representation, including computed `paid_amount`,
+  `remaining_amount`, `returned_amount`, `net_amount`, and `excess_amount`.
+- POST `cancel/` without a body. Unlike voucher cancellation, this action does not
+  accept a cancellation reason contract. Returns or active receipts block cancellation.
+
+Numbers are generated server-side in Jalali-year formats such as `S-1405-00001`
+(sale) and `P-1405-00001` (purchase).
+
+### Purchases and returns
+
+POST `invoices/purchases/` with `supplier` and nonempty `tire_items`, for example:
+
 ```json
-{
-  "sales_invoice_id": 104,
-  "invoice_number": "INV-2026-000104",
-  "customer": 5,
-  "total_amount": "120000000.00",
-  "paid_amount": "120000000.00",
-  "remaining_amount": "0.00",
-  "status": "CONFIRMED",
-  "payment_status": "PAID"
-}
+{ "supplier": 2, "tire_items": [{ "tire": 12, "quantity": 4, "unit_cost": "22000000.00" }] }
 ```
 
-### 5.2 Confirm Draft Invoice
-Atomically locks catalog items, deducts inventory, records ledger movements, and transitions state from `DRAFT` to `CONFIRMED`.
-```http
-POST /api/v1/invoices/sales/104/confirm/
-Authorization: Bearer <access_token>
-```
+Purchases are created confirmed, increase stock, and update the latest purchase
+price. The create serializer does not expose draft/payment-status controls and
+there is no purchase-confirm action. Cancellation can fail for active payments,
+insufficient stock, or missing historical cost information.
 
-### 5.3 Cancel Sales Invoice
-```http
-POST /api/v1/invoices/sales/104/cancel/
-Authorization: Bearer <access_token>
-Content-Type: application/json
+POST `invoices/returns/` with `sales_invoice`, nonblank `reason`, and `items`:
 
-{
-  "reason": "Customer changed mind before tire fitting"
-}
-```
-
----
-
-## 6. Treasury Vouchers (`/api/v1/treasury`)
-
-### 6.1 Issue Receipt Voucher
-```http
-POST /api/v1/treasury/receipts/
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
+```json
 {
   "sales_invoice": 104,
-  "amount": "50000000.00",
-  "payment_method": "کارتخوان پاسارگاد",
-  "reference_number": "POS-554433"
+  "reason": "Customer returned an unused tire",
+  "items": [{ "sales_invoice_tire_item_id": 21, "quantity": 1 }]
 }
 ```
 
-### 6.2 Cancel Voucher
-```http
-POST /api/v1/treasury/receipts/42/cancel/
-Authorization: Bearer <access_token>
-Content-Type: application/json
+Only confirmed invoices and their unreturned tire quantities are eligible. An
+optional `return_date` must not be in the future. The service applies the original
+discount share, restocks tires, and the API enables automatic creation of a refund
+voucher when net receipts exceed the revised invoice value. A return amount is
+not itself evidence of cash refunded.
 
-{
-  "reason": "Duplicate transaction entry"
-}
-```
+## Treasury and analytics
 
----
+[Voucher serializers](../backend/apps/finance/serializers.py) accept positive
+`amount`, the related invoice, and optional date, `payment_method`,
+`reference_number`, and `notes`. Receipts use `sales_invoice`; payments use
+`purchase_invoice`; customer refunds use `sales_invoice` and optionally a matching
+`sales_return`. Amounts are bounded by remaining debt or refundable excess.
+POST a voucher's `cancel/` action with `{"reason": "Duplicate entry"}`.
+These are payment records, not a bank/payment-gateway integration or a double-entry ledger.
 
-## 7. Reports & Analytics (`/api/v1/reports`)
+[Analytics routes](../backend/apps/reports/urls.py):
 
-### 7.1 Executive Dashboard Metrics
-```http
-GET /api/v1/reports/dashboard-stats/
-Authorization: Bearer <access_token>
-```
-**Response (200 OK):**
-```json
-{
-  "total_sales_month": "850000000.00",
-  "total_purchases_month": "620000000.00",
-  "net_profit_month": "180000000.00",
-  "unpaid_invoices_count": 6,
-  "total_receivables": "45000000.00",
-  "low_stock_tires_count": 3
-}
-```
+| GET path under `analytics/` | Response / query |
+| --- | --- |
+| `dashboard-stats/` | `today_revenue`, `today_invoices_count`, `total_receivables`, `unpaid_invoices_count`, `total_inventory_value`, `total_tires_stock`, `low_stock_count` |
+| `sales-by-brand/` | Array of brand quantities/revenue, after discounts and returns; optional `brand_id` |
+| `profitability/` | Array of tire sales, revenue, snapshot cost, and profit after discounts/returns; not company net income |
+| `inventory-value/` | `total_inventory_value` and `items`, using current purchase prices |
+| `sales-by-date/` | `start_date`, `end_date` accept Gregorian or Jalali dates; returns counts, gross sales, return amounts, and net sales |
+
+Date-range sales use invoice dates for sales and return dates for returns,
+independently of cash-refund dates; net sales can be negative in a return-heavy period.
+
+Outside `/api/v1/`, `/api/health/` publicly reports database connection availability
+(200 or 503). `/api/schema/`, `/api/docs/`, and `/api/redoc/` provide generated
+documentation: public with debug enabled or `ENABLE_DOCS_IN_PROD`, otherwise
+manager/superuser-only. Keep that public override off in production.

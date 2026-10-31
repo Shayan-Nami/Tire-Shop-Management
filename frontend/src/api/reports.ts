@@ -3,6 +3,8 @@ import {
   DashboardStats,
   BrandSalesStat,
   ProfitabilityStat,
+  InventoryValueResponse,
+  SalesByDateRangeResponse,
 } from '../types';
 
 export const reportsApi = {
@@ -23,29 +25,13 @@ export const reportsApi = {
     return response.data;
   },
 
-  getInventoryValue: async (): Promise<{
-    total_inventory_value: number;
-    items: Array<{
-      tire_id: number;
-      tire_name: string;
-      brand_name: string;
-      size_name: string;
-      stock_quantity: number;
-      purchase_price: number;
-      inventory_value: number;
-    }>;
-  }> => {
-    const response = await apiClient.get('/analytics/inventory-value/');
+  getInventoryValue: async (): Promise<InventoryValueResponse> => {
+    const response = await apiClient.get<InventoryValueResponse>('/analytics/inventory-value/');
     return response.data;
   },
 
-  getSalesByDateRange: async (startDate?: string, endDate?: string): Promise<{
-    total_invoices: number;
-    total_sales_amount: number;
-    start_date?: string;
-    end_date?: string;
-  }> => {
-    const response = await apiClient.get('/analytics/sales-by-date/', {
+  getSalesByDateRange: async (startDate?: string, endDate?: string): Promise<SalesByDateRangeResponse> => {
+    const response = await apiClient.get<SalesByDateRangeResponse>('/analytics/sales-by-date/', {
       params: { start_date: startDate, end_date: endDate },
     });
     return response.data;

@@ -1,208 +1,144 @@
-# System Architecture & Technical Specifications
+# Architecture
 
-## 1. Architectural Philosophy
+The application is a Django REST backend and a browser-rendered React single-page
+application for tire catalog, stock, customers, invoices, and payment records.
+This guide describes implemented boundaries, not production-readiness guarantees.
+See the [root README](../README.md) for setup and configuration,
+[API reference](API_REFERENCE.md) for routes, and
+[database design](DATABASE_DESIGN.md) for persistence.
 
-The **Tire Shop Management System** is engineered as an enterprise-grade, transactional web platform. It enforces strict separation of concerns, transactional consistency, auditability, and defense-in-depth security.
+## Runtime and request flow
 
-The system addresses the operational and financial challenges of retail and wholesale tire dealerships:
-1. **Accurate Stock Valuation & Double-Entry Inventory**: Stock is tracked through immutable ledgers rather than simple counters.
-2. **Strict Financial Integrity**: Every monetary transfer, invoice payment, and refund creates double-entry financial vouchers.
-3. **High-Concurrency Resilience**: Critical inventory and treasury operations are protected against race conditions and deadlocks using pessimistic row-level locking.
-4. **Role-Based Access Control (RBAC)**: Zero-trust resource access boundaries tailored to distinct organizational roles.
-
----
-
-## 2. High-Level System Topology
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 Client Layer (Browser / Mobile)             │
-│   React 19 + TypeScript + Tailwind CSS + Lucide + Recharts  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ HTTPS / JSON REST API
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                Reverse Proxy & Edge Security                │
-│                 (Nginx / Traefik / Cloudflare)              │
-│       SSL Termination • Rate Throttling • Static Assets     │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ WSGI (Gunicorn) / ASGI
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│               Backend Layer (Django 5.x / 6.x & DRF)         │
-│  ┌───────────────────────┐       ┌───────────────────────┐  │
-│  │   Authentication &    │       │    REST API Views     │  │
-│  │      RBAC Guard       │       │    & ViewSets         │  │
-│  └───────────┬───────────┘       └───────────┬───────────┘  │
-│              │                               │              │
-│              ▼                               ▼              │
-│  ┌───────────────────────┐       ┌───────────────────────┐  │
-│  │   Validation Layer    │       │    Service Layer      │  │
-│  │     (Serializers)     │◄─────►│    (services.py)      │  │
-│  └───────────────────────┘       └───────────┬───────────┘  │
-│                                              │              │
-│                                              ▼              │
-│                                  ┌───────────────────────┐  │
-│                                  │   ORM & Transactions  │  │
-│                                  │  (Row Locks & Atomic) │  │
-│                                  └───────────┬───────────┘  │
-└──────────────────────────────────────────────┼──────────────┘
-                                               │
-               ┌───────────────────────────────┴───────────────────────────────┐
-               ▼                                                               ▼
-┌──────────────────────────────┐                               ┌──────────────────────────────┐
-│  Primary Relational Database │                               │   Shared Cache & Broker      │
-│  PostgreSQL 16+ / SQLite     │                               │      Redis (Production)      │
-│  ACID Transactions & MVCC    │                               │ Rate Limits & Distributed    │
-└──────────────────────────────┘                               └──────────────────────────────┘
+```text
+Browser SPA (React + TypeScript)
+  -> Axios /api/v1 requests with JWT bearer tokens
+  -> Django REST Framework views and permissions
+  -> Serializers and domain services
+  -> Django ORM / configured relational database
 ```
 
----
+During development, Vite proxies `/api` to Django. A production reverse proxy,
+HTTPS termination, static hosting, process supervision, and shared cache must be
+provisioned by the operator; this diagram does not imply installed infrastructure.
+There is no implemented server-side rendering or background task broker.
 
-## 3. Backend Architecture: Clean Service Layer Pattern
+- [Backend requirements](../backend/requirements.txt) allow Django `>=5.2.17,<6.2`
+  with DRF, SimpleJWT, django-filter, drf-spectacular, and database drivers.
+- [Frontend package metadata](../frontend/package.json) specifies React 19,
+  TypeScript 6, Vite 8, Tailwind CSS 3, Axios, React Router, Lucide, and Recharts.
+  Node.js must be at least 22.18.0.
+- [Settings](../backend/config/settings.py) select SQLite by default, PostgreSQL,
+  or SQL Server. WSGI and ASGI entrypoints exist; the selected deployment server
+  and database still need environment-specific verification.
+- Default caching is process-local `LocMemCache`. `REDIS_CACHE_URL` selects
+  Django's Redis cache, including shared throttle counters. Redis is optional,
+  not a queue broker, database replica, or token-blacklist store.
 
-The backend follows a four-tier architecture designed to keep controllers thin and domain logic testable:
+## Eight backend apps
 
-```
-[ HTTP Request ]
-       │
-       ▼
-1. View Layer (views.py)
-   - Route handling & HTTP verb dispatching
-   - Permission verification (IsAuthenticated, HasRole)
-   - Pagination, search, and ordering backend
-       │
-       ▼
-2. Serializer Layer (serializers.py)
-   - Type coercion and field-level validation
-   - Nested schema serialization
-   - Masking sensitive financial metrics (e.g. unit_cost) for unauthorized roles
-       │
-       ▼
-3. Service Layer (services.py)
-   - Core domain business logic execution
-   - Atomic transaction boundaries (`transaction.atomic`)
-   - Pessimistic locking (`select_for_update`)
-   - Cross-domain coordination (Invoicing -> Catalog -> Treasury)
-       │
-       ▼
-4. Persistence Layer (models.py)
-   - Schema definitions, constraints, indexes
-   - Computed properties and domain queries
-```
+All eight are registered in `INSTALLED_APPS` and mounted in
+[config/urls.py](../backend/config/urls.py).
 
-### Why a Dedicated Service Layer?
-In typical Django REST Framework applications, business logic often leaks into `serializers.save()` or `views.perform_create()`. This application enforces a strict rule:
-- **Complex multi-table state transitions MUST reside in `services.py`.**
-- For example:
-  - `create_sales_invoice_service`: Validates stock, calculates sequential invoice numbers, records tire line items, creates service items, snapshots unit costs, issues automatic cash receipts (if paid), and decrements inventory atomically.
-  - `confirm_sales_invoice_service`: Acquires locks on tires in deterministic order, confirms draft state, registers ledger movements, and updates available quantities.
-  - `create_sales_return_service`: Validates item return ceilings, records return vouchers, issues customer refunds, and restocks inventory.
+| App under `backend/apps/` | API prefix under `/api/v1/` | Responsibility |
+| --- | --- | --- |
+| `accounts` | `auth/` | Custom users, roles, login/refresh/logout, profiles, passwords |
+| `customers` | `crm/` | Customers and their vehicles |
+| `catalog` | `catalog/` | Brands, sizes, tires, stock movements and projection recovery |
+| `services_app` | `workshop/` | Service catalog and tariffs |
+| `suppliers` | `procurement/` | Supplier records |
+| `invoices` | `invoices/` | Sales, purchases, sales returns, document numbering |
+| `finance` | `treasury/` | Receipts, supplier payments, customer refunds and cancellations |
+| `reports` | `analytics/` | Read-only operational aggregations; no separate business tables |
 
----
+Views handle HTTP methods, permissions, querysets, filtering, and response shapes.
+Serializers validate input and control representation. Multi-record operations
+live mainly in `services.py` in accounts, catalog, invoices, and finance; ordinary
+master-data CRUD also uses serializer/model persistence directly.
 
-## 4. Concurrency & Deadlock Prevention
+## Transaction and stock boundaries
 
-In a busy automotive dealership, multiple cashiers and warehouse staff may concurrently perform transactions affecting the same inventory items.
+[Catalog services](../backend/apps/catalog/services.py) write signed stock
+movements and update `Tire.stock_quantity` together inside atomic transactions.
+Each movement records the resulting balance, cost snapshot, actor, and applicable
+document references. The public stock-movement API is read-only; there is no
+claim of database-enforced append-only storage or double-entry inventory.
 
-### 4.1 Pessimistic Locking with `select_for_update`
-To avoid lost updates and overselling:
-```python
-# Acquire row-level locks on tire catalog records inside an atomic block
-tires = list(
-    Tire.objects.select_for_update()
-    .filter(pk__in=sorted_tire_ids)
-    .order_by('pk')
-)
-```
+[Invoice services](../backend/apps/invoices/services.py) coordinate:
 
-### 4.2 Deterministic Resource Ordering (Deadlock Elimination)
-When two transactions concurrently attempt to acquire locks on multiple rows in reverse orders, a relational database can deadlock:
-- **Transaction A**: Locks Tire #1, then requests Tire #2.
-- **Transaction B**: Locks Tire #2, then requests Tire #1.
+- **Sales:** confirmed sales reduce stock; drafts do not reserve or consume it.
+  Draft confirmation refreshes tire cost snapshots at stock-out time. Positive
+  paid sales create receipt vouchers in the same transaction.
+- **Purchases:** increase stock and set the latest purchase price. The service
+  retains the prior price for cancellation recovery; it is not FIFO valuation.
+- **Cancellations:** reverse the relevant stock effect and preserve document
+  records. Existing returns/payments and stock/history constraints can prevent
+  cancellation; cancellation is not a general undo operation.
+- **Returns:** validate remaining sold quantities, allocate original discounts,
+  restore stock, and update payment status. The return API also requests an
+  automatic refund voucher when there is refundable excess.
+- **Numbering:** locks a counter keyed by document type and Jalali year, producing
+  `S-1405-00001` / `P-1405-00001`-style identifiers, with unique invoice numbers.
 
-**Our Mitigation**:
-The system enforces sorted ID ordering (`sorted_tire_ids = sorted(tire_ids)`) before executing `select_for_update()`. All concurrent transactions acquire locks in identical numerical sequence, mathematically eliminating cyclic wait conditions and deadlocks.
+The services use `transaction.atomic()` and `select_for_update()`, and tire locks
+are acquired in primary-key order in stock workflows. This reduces conflicting
+lock ordering; it does not prove that every database/operation is deadlock-free.
+SQLite does not validate PostgreSQL/SQL Server row-lock behavior. The audit's
+PostgreSQL-specific tests were skipped; see [validation limits](DEPLOYMENT_GUIDE.md).
 
-### 4.3 Gapless Sequential Invoice Numbering
-Invoice numbers follow an annual sequential format (`INV-YYYY-XXXXXX`). To avoid numbering collisions during concurrent invoice creations:
-- An isolated counter row is locked using `select_for_update()`.
-- The sequence is incremented atomically within the creation transaction.
-- If the transaction rolls back, sequence integrity remains consistent without gaps.
+## Financial records, not general-ledger accounting
 
----
+[Finance services](../backend/apps/finance/services.py) lock invoices when issuing
+vouchers, enforce positive amounts and debt/refund ceilings, and synchronize
+payment status from non-cancelled vouchers. Sales balances subtract refunds from
+receipts and returns from invoice value. Cancellation records actor, time, and
+reason instead of exposing direct voucher editing/deletion through the API.
 
-## 5. Double-Entry Inventory & Financial Ledger
+There is no chart of accounts, paired debit/credit posting, or general ledger.
+Profitability reports use tire cost snapshots and discounts/returns; they do not
+account for all business expenses or establish company net profit. Vouchers record
+payments/refunds; they do not execute external bank transactions.
 
-### 5.1 Immutable Stock Movement Ledger
-Inventory quantity on `Tire.stock_quantity` is not an unverified scalar counter. It is backed by a transactional audit trail in `StockMovement`:
+## Access and session boundaries
 
-| Movement Type | Code | Effect on Stock | Triggering Action |
-|:---|:---|:---:|:---|
-| Initial Inventory | `INITIAL` | `+` | Initial catalog item onboarding |
-| Purchase Inflow | `PURCHASE` | `+` | Purchase invoice confirmation |
-| Sales Outflow | `SALE` | `-` | Sales invoice confirmation |
-| Purchase Cancel | `PURCHASE_CANCEL` | `-` | Purchase invoice cancellation |
-| Sales Cancellation | `SALE_CANCEL` | `+` | Sales invoice cancellation |
-| Customer Return | `SALE_RETURN` | `+` | Sales return voucher execution |
-| Physical Stock Audit | `MANUAL_ADJUSTMENT` | `+/-` | Warehouse manager physical audit |
+The only roles in [the user model](../backend/apps/accounts/models.py) are
+`MANAGER`, `TECHNICIAN`, and `WAREHOUSE`. This is a shop-wide role model, not
+multi-tenant isolation. Manager checks generally also accept superusers.
 
-Every movement records:
-- `quantity`: Exact units moved.
-- `unit_price`: Cost valuation at movement time.
-- `created_by`: Authorized user responsible for the action.
-- `created_at`: Jalali and UTC timestamp of the operation.
+- Technicians can create sales and see only their own sales invoices. They cannot
+  access purchase invoices, stock-movement endpoints, treasury, or analytics.
+- Warehouse users maintain catalog/purchases and can read sales invoices. They
+  can see catalog purchase prices and purchase line costs; sales-line and
+  stock-movement cost snapshots are hidden from them.
+- Managers administer users, treasury, reports, returns, and invoice cancellation.
+  Authenticated users can read/create/update customers and vehicles; only managers
+  can delete them. The [API reference](API_REFERENCE.md) details endpoint differences.
 
-### 5.2 Treasury & Double-Entry Vouchers
-The treasury subsystem maintains financial equilibrium across three voucher types:
-1. **ReceiptVoucher**: Inflows from customer invoice payments (Cash, POS, Bank Transfer).
-2. **PaymentVoucher**: Outflows to suppliers for purchase invoices.
-3. **CustomerRefundVoucher**: Outflows returning funds for returned goods or overpayments.
+SimpleJWT access tokens are password-bound (`CHECK_REVOKE_TOKEN`); the custom
+refresh serializer also checks the live user/password binding. Refresh rotation
+and password-change revocation use database-backed blacklist records. Logout
+blacklists a refresh token, not every outstanding access token. Session
+authentication remains available, including Django admin and CSRF requirements.
 
-Each voucher tracks:
-- Unique voucher ID and optional external POS/bank tracking number (`reference_number`).
-- Invoice association and remaining balance recalculation.
-- Cancellation audit metadata (`is_cancelled`, `cancellation_reason`, `cancelled_at`).
+Default API throttles are 30/minute anonymous and 300/minute authenticated;
+login uses 5/minute per IP and username, and refresh 15/minute. These are
+configurable cache-backed throttles, not a substitute for edge abuse controls.
+Proxy trust and a shared cache require deliberate deployment configuration.
 
----
+## Frontend boundaries
 
-## 6. Security Architecture & Threat Modeling
+[App.tsx](../frontend/src/App.tsx) defines lazy-loaded browser routes and role
+checks. [AuthContext](../frontend/src/context/AuthContext.tsx) stores the session
+and refreshes the profile on startup.
+[LanguageContext](../frontend/src/context/LanguageContext.tsx) switches Persian /
+English and document direction. Currency preference affects rial/toman display;
+backend amounts remain IRR.
 
-### 6.1 Authentication & Password-Bound JWT Invalidation
-Authentication uses JSON Web Tokens (`djangorestframework-simplejwt`) with critical security enhancements:
-1. **Stateless JWTs with Short Lifetimes**: Access tokens expire in 60 minutes; refresh tokens rotate upon use.
-2. **Immediate Password-Change Revocation**:
-   - Standard JWT implementations cannot invalidate active access tokens before expiry when a password is changed.
-   - This system embeds a truncated password hash fingerprint into token claims.
-   - When a user changes their password, all previously issued access and refresh tokens are immediately rejected by middleware, terminating compromised sessions instantly.
-3. **Blacklisting on Logout**: Refresh tokens are blacklisted in Redis / database upon logout.
+The [Axios client](../frontend/src/api/client.ts) adds access tokens, queues
+concurrent 401 failures behind one refresh, stores rotated tokens, and retries a
+request once. `VITE_API_BASE_URL` defaults to `/api/v1`; it is public build-time
+configuration. Access/refresh tokens and user information are in `localStorage`,
+so malicious same-origin JavaScript can read them. Frontend guards and cached
+roles are not authorization controls; server checks remain authoritative.
 
-### 6.2 Broken Object Level Authorization (BOLA/IDOR) Protection
-- Multi-tenant data segregation:
-  - Technicians can only view invoices they personally created.
-  - Managers and Accountants have visibility across the organization.
-  - Warehouse operators have zero access to financial totals, profit margins, or unit purchase costs.
-
-### 6.3 Rate Limiting & Throttling
-Protects against brute force and credential stuffing:
-- `AnonRateThrottle`: 30 requests/minute.
-- `UserRateThrottle`: 300 requests/minute.
-- `LoginIPThrottle`: 5 login attempts/minute per IP address.
-- `LoginUsernameThrottle`: 5 login attempts/minute per username.
-
----
-
-## 7. Frontend Architecture
-
-### 7.1 Single Page Application Structure
-Built on **React 19**, **TypeScript 5.x**, and **Vite 6**:
-- **Tailwind CSS**: Utility-first responsive styling with dark/light theme foundation.
-- **Lucide React**: Modern, consistent iconography.
-- **Recharts**: Responsive SVG charts for revenue, margins, and sales volume analytics.
-
-### 7.2 Context Providers
-- `AuthContext`: Manages active user identity, token lifecycle, local session persistence, and permission queries (`hasRole()`).
-- `LanguageContext`: Manages bilingual state (Persian / English), document direction (`rtl` / `ltr`), and localized application strings.
-
-### 7.3 Resilient HTTP Layer & Error Envelope
-The Axios client interceptor transforms backend validation envelopes (`{ success: false, errors: {...} }`) into human-readable Persian or English notifications, handling network drops, token refreshes, and 401 unauthenticated transitions automatically.
+See the [frontend guide](../frontend/README.md) for scripts and test boundaries,
+and the [deployment guide](DEPLOYMENT_GUIDE.md) for hardening and verification.

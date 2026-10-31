@@ -18,9 +18,9 @@ export const crmApi = {
 
   createCustomer: async (data: {
     full_name: string;
-    phone_number: string;
-    national_code?: string;
-    address?: string;
+    phone_number?: string | null;
+    national_code?: string | null;
+    address?: string | null;
   }): Promise<Customer> => {
     const response = await apiClient.post<Customer>('/crm/customers/', data);
     return response.data;

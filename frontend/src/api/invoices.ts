@@ -14,7 +14,7 @@ export interface CreateSalesInvoicePayload {
   discount_amount?: number | string;
   discount_percent?: number | string;
   status?: 'DRAFT' | 'CONFIRMED';
-  payment_status?: 'UNPAID' | 'PAID' | 'PARTIAL';
+  payment_status?: 'UNPAID' | 'PAID';
   payment_method?: string;
   reference_number?: string;
   notes?: string;
@@ -28,7 +28,7 @@ export interface CreatePurchaseInvoicePayload {
 export interface CreateSalesReturnPayload {
   sales_invoice: number;
   items: Array<{ sales_invoice_tire_item_id: number; quantity: number }>;
-  reason?: string;
+  reason: string;
   return_date?: string;
 }
 

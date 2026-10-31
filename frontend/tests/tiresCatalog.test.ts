@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import * as formatters from '../src/utils/formatters.ts';
+import { parseApiError } from '../src/utils/errorParser.ts';
 import { mountComponent, nodes, page, text } from './componentHarness.ts';
 
 type Harness = ReturnType<typeof mountComponent>;
@@ -39,6 +40,7 @@ async function setup(t: TestContext, purchasePrice: number | undefined = 70000) 
       createTire: async (data: any) => { creations.push(data); return tire; },
     } },
     '../utils/formatters': formatters,
+    '../utils/errorParser': { parseApiError },
     '../context/AuthContext': { useAuth: () => ({ currencyUnit: 'rial', user: { role: 'MANAGER' } }) },
     '../components/catalog/StockAdjustmentModal': { StockAdjustmentModal: 'stock-adjustment-modal' },
   });

@@ -1,0 +1,135 @@
+
+CREATE TABLE Customer (
+    customer_id INT PRIMARY KEY IDENTITY(1,1),
+    full_name NVARCHAR(100) NOT NULL,
+    phone_number NVARCHAR(20) UNIQUE,
+    national_code NCHAR(10) UNIQUE,
+    address NVARCHAR(255)
+);
+GO
+
+CREATE TABLE Brand (
+    brand_id INT PRIMARY KEY IDENTITY(1,1),
+    brand_name NVARCHAR(50) UNIQUE NOT NULL
+);
+GO
+
+CREATE TABLE Size (
+    size_id INT PRIMARY KEY IDENTITY(1,1),
+    size_name NVARCHAR(50) UNIQUE NOT NULL
+);
+GO
+
+CREATE TABLE Supplier (
+    supplier_id INT PRIMARY KEY IDENTITY(1,1),
+    supplier_name NVARCHAR(100) UNIQUE NOT NULL,
+    phone_number NVARCHAR(20),
+    address NVARCHAR(200)
+);
+GO
+
+CREATE TABLE Services (
+    service_id INT PRIMARY KEY IDENTITY(1,1),
+    service_name NVARCHAR(150) NOT NULL,
+    price DECIMAL(18, 2) NOT NULL
+);
+GO
+
+CREATE TABLE Tier (
+    tier_id INT PRIMARY KEY IDENTITY(1,1),
+    tier_name NVARCHAR(150) NOT NULL,
+    stock_quantity INT NOT NULL,
+    sale_price DECIMAL(18, 2) NOT NULL,
+    purchase_price DECIMAL(18, 2) NOT NULL,
+    brand_id INT NOT NULL,
+    size_id INT NOT NULL,
+    FOREIGN KEY (brand_id) REFERENCES Brand(brand_id),
+    FOREIGN KEY (size_id) REFERENCES Size(size_id)
+);
+GO
+
+CREATE TABLE Sales_invoice (
+    sales_invoice_id INT PRIMARY KEY IDENTITY(1,1),
+    invoice_date DATETIME NOT NULL,
+    total_amount DECIMAL(18, 2) NOT NULL,
+    customer_id INT NOT NULL,
+    FOREIGN KEY (customer_id) REFERENCES Customer(customer_id)
+);
+GO
+
+CREATE TABLE Purchase_invoice (
+    purchase_invoice_id INT PRIMARY KEY IDENTITY(1,1),
+    invoice_date DATETIME NOT NULL,
+    total_amount DECIMAL(18, 2) NOT NULL,
+    supplier_id INT NOT NULL,
+    FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id)
+);
+GO
+
+CREATE TABLE Invoice_items (
+    item_id INT PRIMARY KEY IDENTITY(1,1),
+    quantity INT NOT NULL,
+    unit_price DECIMAL(18, 2) NOT NULL,
+    sales_invoice_id INT,
+    purchase_invoice_id INT,
+    tier_id INT,
+    service_id INT,
+    FOREIGN KEY (sales_invoice_id) REFERENCES Sales_invoice(sales_invoice_id),
+    FOREIGN KEY (purchase_invoice_id) REFERENCES Purchase_invoice(purchase_invoice_id),
+    FOREIGN KEY (tier_id) REFERENCES Tier(tier_id),
+    FOREIGN KEY (service_id) REFERENCES Services(service_id)
+);
+GO
+
+CREATE TABLE Receipt_voucher (
+    receipt_id INT PRIMARY KEY IDENTITY(1,1),
+    receipt_date DATETIME NOT NULL,
+    amount DECIMAL(18, 2) NOT NULL,
+    sales_invoice_id INT NOT NULL,
+    FOREIGN KEY (sales_invoice_id) REFERENCES Sales_invoice(sales_invoice_id)
+);
+GO
+
+CREATE TABLE Payment_voucher (
+    payment_id INT PRIMARY KEY IDENTITY(1,1),
+    payment_date DATETIME NOT NULL,
+    amount DECIMAL(18, 2) NOT NULL,
+    purchase_invoice_id INT NOT NULL,
+    FOREIGN KEY (purchase_invoice_id) REFERENCES Purchase_invoice(purchase_invoice_id)
+);
+GO
+
+CREATE TABLE SalesInvoice_ServiceItems (
+    salesinvoice_id INT,
+    service_id INT,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(18, 2) NOT NULL,
+    PRIMARY KEY (salesinvoice_id, service_id),
+    FOREIGN KEY (salesinvoice_id) REFERENCES Sales_invoice(sales_invoice_id),
+    FOREIGN KEY (service_id) REFERENCES Services(service_id)
+);
+GO
+
+CREATE TABLE SalesInvoice_TireItems (
+    salesinvoice_id INT,
+    tire_id INT, -- Note: This should match the PK in Tier table.
+    quantity INT NOT NULL,
+    unit_price DECIMAL(18, 2) NOT NULL,
+    PRIMARY KEY (salesinvoice_id, tire_id),
+    FOREIGN KEY (salesinvoice_id) REFERENCES Sales_invoice(sales_invoice_id),
+    FOREIGN KEY (tire_id) REFERENCES Tier(tier_id)
+);
+GO
+
+CREATE TABLE PurchaseInvoice_TireItems (
+    purchaseinvoice_id INT,
+    tire_id INT,
+    quantity INT NOT NULL,
+    unit_cost DECIMAL(18, 2) NOT NULL,
+    PRIMARY KEY (purchaseinvoice_id, tire_id),
+    FOREIGN KEY (purchaseinvoice_id) REFERENCES Purchase_invoice(purchase_invoice_id),
+    FOREIGN KEY (tire_id) REFERENCES Tier(tier_id)
+);
+GO
+
+PRINT 'All tables created successfully!';

@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { getAllResults } from './pagination';
 import { AuthResponse, User, UpdateProfilePayload, ChangePasswordPayload } from '../types';
 
 export const authApi = {
@@ -30,11 +31,7 @@ export const authApi = {
   },
 
   getUsers: async (): Promise<User[]> => {
-    const response = await apiClient.get<{ results: User[] } | User[]>('/auth/users/');
-    if ('results' in response.data) {
-      return response.data.results;
-    }
-    return response.data;
+    return getAllResults<User>('/auth/users/');
   },
 
   createUser: async (data: Partial<User> & { password?: string }): Promise<User> => {

@@ -13,6 +13,16 @@ from apps.finance.services import create_receipt_voucher_service
 from utils.jalali import get_jalali_year
 
 
+def _validate_invoice_total(invoice):
+    field = invoice._meta.get_field('total_amount')
+    maximum = Decimal(10) ** (field.max_digits - field.decimal_places) - Decimal(1).scaleb(-field.decimal_places)
+    amount = invoice.total_amount
+    if not amount.is_finite() or not Decimal('0.00') <= amount <= maximum:
+        raise ValidationError({
+            'total_amount': f'مبلغ کل فاکتور باید بین صفر و {maximum:,.2f} باشد.'
+        })
+
+
 @transaction.atomic
 def generate_next_invoice_number(doc_type: str, dt=None) -> str:
     """
@@ -193,6 +203,7 @@ def create_sales_invoice_service(customer, vehicle, tire_items_data, service_ite
         total -= discount_amount
 
     invoice.total_amount = max(total, Decimal('0.00'))
+    _validate_invoice_total(invoice)
     if payment_status is not None:
         invoice.payment_status = payment_status
     elif invoice.total_amount == Decimal('0.00'):
@@ -363,6 +374,7 @@ def create_purchase_invoice_service(supplier, tire_items_data, created_by=None):
     record_stock_movements(movements_data, user=created_by)
 
     invoice.total_amount = total
+    _validate_invoice_total(invoice)
     if total == Decimal('0.00'):
         invoice.payment_status = PaymentStatus.PAID
         invoice.save(update_fields=['total_amount', 'payment_status'])

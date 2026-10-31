@@ -9,8 +9,8 @@ export const suppliersApi = {
 
   createSupplier: async (data: {
     supplier_name: string;
-    phone_number?: string;
-    address?: string;
+    phone_number?: string | null;
+    address?: string | null;
   }): Promise<Supplier> => {
     const response = await apiClient.post<Supplier>('/procurement/suppliers/', data);
     return response.data;

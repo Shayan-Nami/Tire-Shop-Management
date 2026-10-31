@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { X, Coins } from 'lucide-react';
 import { financeApi } from '../../api/finance';
 import { SalesInvoice } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
+import { parseApiError } from '../../utils/errorParser';
 
 interface ReceiptModalProps {
   invoice: SalesInvoice | null;
@@ -29,6 +30,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const submitBusy = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -46,12 +48,14 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitBusy.current) return;
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
       setErrorMessage('مبلغ دریافت وجه باید عددی مثبت و بزرگ‌تر از صفر باشد.');
       return;
     }
 
+    submitBusy.current = true;
     setSubmitting(true);
     setErrorMessage(null);
     try {
@@ -64,10 +68,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
       });
       onSuccess();
       onClose();
-    } catch (err: any) {
-      const msg = err.response?.data?.detail || err.response?.data?.amount?.[0] || 'خطا در ثبت سند دریافت وجه';
-      setErrorMessage(msg);
+    } catch (err: unknown) {
+      setErrorMessage(parseApiError(err, 'خطا در ثبت سند دریافت وجه'));
     } finally {
+      submitBusy.current = false;
       setSubmitting(false);
     }
   };

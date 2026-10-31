@@ -47,12 +47,15 @@ venv.bak/
 # Testing & Coverage
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+coverage/
 coverage.xml
 
 # IDE & OS
 .idea/
 .vscode/
+.zed/
 *.swp
 *.swo
 *~
@@ -74,6 +77,14 @@ dist-ssr/
 .nox/
 .venv*/
 
-# Logs
+# Logs and temporary local work
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 /backend/logs/
+/scratch/
+
+# Environment templates are safe to publish
+!**/.env.example

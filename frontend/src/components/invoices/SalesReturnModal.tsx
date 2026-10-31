@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { X, RotateCcw, AlertTriangle } from 'lucide-react';
 import { SalesInvoice } from '../../types';
 import { invoicesApi } from '../../api/invoices';
@@ -21,6 +21,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const [returnItems, setReturnItems] = useState<{ [itemId: number]: number }>({});
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const submitBusy = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!invoice) return null;
@@ -35,6 +36,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitBusy.current) return;
     setErrorMessage(null);
 
     const itemsToReturn = Object.entries(returnItems)
@@ -49,6 +51,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
       return;
     }
 
+    submitBusy.current = true;
     setSubmitting(true);
     try {
       await invoicesApi.createSalesReturn({
@@ -61,6 +64,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
     } catch (err: any) {
       setErrorMessage(parseApiError(err, 'خطا در ثبت سند مرجوعی کالا'));
     } finally {
+      submitBusy.current = false;
       setSubmitting(false);
     }
   };

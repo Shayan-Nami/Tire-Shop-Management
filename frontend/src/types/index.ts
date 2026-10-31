@@ -75,8 +75,8 @@ export interface StockMovement {
   balance_after: number;
   sales_invoice?: number | null;
   purchase_invoice?: number | null;
-  unit_cost?: string | number;
-  user?: number;
+  unit_cost?: string | number | null;
+  user?: number | null;
   user_name?: string;
   description?: string;
   created_at: string;
@@ -86,10 +86,11 @@ export interface StockMovement {
 export interface Customer {
   customer_id: number;
   full_name: string;
-  phone_number: string;
-  national_code?: string;
-  address?: string;
+  phone_number: string | null;
+  national_code?: string | null;
+  address?: string | null;
   created_at?: string;
+  updated_at?: string;
   vehicles?: Vehicle[];
 }
 
@@ -101,6 +102,7 @@ export interface Vehicle {
   model: string;
   year?: string;
   tire_size_recommended?: string;
+  notes?: string;
 }
 
 export interface TechnicalService {
@@ -108,14 +110,13 @@ export interface TechnicalService {
   service_name: string;
   price: string | number;
   description?: string;
-  is_active?: boolean;
 }
 
 export interface Supplier {
   supplier_id: number;
   supplier_name: string;
-  phone_number?: string;
-  address?: string;
+  phone_number?: string | null;
+  address?: string | null;
 }
 
 export interface SalesInvoiceTireItem {
@@ -146,10 +147,10 @@ export interface SalesInvoice {
   jalali_date?: string;
   customer: number;
   customer_name: string;
-  customer_phone: string;
-  vehicle: number;
-  vehicle_plate: string;
-  vehicle_model: string;
+  customer_phone: string | null;
+  vehicle: number | null;
+  vehicle_plate?: string;
+  vehicle_model?: string;
   status: 'DRAFT' | 'CONFIRMED' | 'CANCELLED';
   status_display?: string;
   payment_status: 'UNPAID' | 'PARTIAL' | 'PAID';
@@ -163,7 +164,7 @@ export interface SalesInvoice {
   net_amount?: string | number;
   excess_amount?: string | number;
   notes?: string;
-  created_by?: number;
+  created_by?: number | null;
   created_by_name?: string;
   tire_items: SalesInvoiceTireItem[];
   service_items: SalesInvoiceServiceItem[];
@@ -173,11 +174,8 @@ export interface PurchaseInvoiceTireItem {
   id: number;
   tire: number;
   tire_name: string;
-  brand_name: string;
-  size_name: string;
   quantity: number;
   unit_cost: string | number;
-  total_cost: string | number;
 }
 
 export interface PurchaseInvoice {
@@ -192,8 +190,7 @@ export interface PurchaseInvoice {
   payment_status: 'UNPAID' | 'PARTIAL' | 'PAID';
   payment_status_display?: string;
   total_amount: string | number;
-  notes?: string;
-  created_by?: number;
+  created_by?: number | null;
   created_by_name?: string;
   tire_items: PurchaseInvoiceTireItem[];
 }
@@ -202,12 +199,12 @@ export interface SalesReturn {
   sales_return_id: number;
   sales_invoice: number;
   customer_name?: string;
-  customer_phone?: string;
+  customer_phone?: string | null;
   return_date: string;
   jalali_date?: string;
-  reason?: string;
+  reason: string;
   total_refund_amount: string | number;
-  created_by?: number;
+  created_by?: number | null;
   created_by_name?: string;
   items: SalesReturnItem[];
 }
@@ -232,13 +229,13 @@ export interface ReceiptVoucher {
   amount: string | number;
   payment_method: string;
   payment_method_display?: string;
-  reference_number?: string;
+  reference_number?: string | null;
   receipt_date: string;
   jalali_date?: string;
   is_cancelled: boolean;
   cancellation_reason?: string;
   notes?: string;
-  created_by?: number;
+  created_by?: number | null;
   created_by_name?: string;
   cancelled_at?: string | null;
   cancelled_by?: number | null;
@@ -253,13 +250,13 @@ export interface PaymentVoucher {
   amount: string | number;
   payment_method: string;
   payment_method_display?: string;
-  reference_number?: string;
+  reference_number?: string | null;
   payment_date: string;
   jalali_date?: string;
   is_cancelled: boolean;
   cancellation_reason?: string;
   notes?: string;
-  created_by?: number;
+  created_by?: number | null;
   created_by_name?: string;
   cancelled_at?: string | null;
   cancelled_by?: number | null;
@@ -281,7 +278,7 @@ export interface CustomerRefundVoucher {
   is_cancelled: boolean;
   cancellation_reason?: string;
   notes?: string;
-  created_by?: number;
+  created_by?: number | null;
   created_by_name?: string;
   cancelled_at?: string | null;
   cancelled_by?: number | null;
@@ -302,6 +299,30 @@ export interface BrandSalesStat {
   brand_name: string;
   total_quantity: number;
   total_revenue: number;
+}
+
+export interface InventoryValueItem {
+  tire_id: number;
+  tire_name: string;
+  brand_name: string;
+  size_name: string;
+  stock_quantity: number;
+  purchase_price: number;
+  inventory_value: number;
+}
+
+export interface InventoryValueResponse {
+  total_inventory_value: number;
+  items: InventoryValueItem[];
+}
+
+export interface SalesByDateRangeResponse {
+  total_invoices: number;
+  total_sales_amount: number;
+  gross_sales_amount: number;
+  total_refund_amount: number;
+  start_date: string | null;
+  end_date: string | null;
 }
 
 export interface ProfitabilityStat {

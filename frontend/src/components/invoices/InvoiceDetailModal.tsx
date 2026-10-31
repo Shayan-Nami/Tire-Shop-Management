@@ -16,6 +16,7 @@ import { IranianPlateBadge } from '../plates/IranianPlateBadge';
 import { formatCurrency, formatIsoToJalali } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { invoicesApi } from '../../api/invoices';
+import { parseApiError } from '../../utils/errorParser';
 
 interface InvoiceDetailModalProps {
   invoice: SalesInvoice | null;
@@ -47,8 +48,8 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
       await invoicesApi.confirmSalesInvoice(invoice.sales_invoice_id);
       onUpdated();
       onClose();
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.detail || 'خطا در تایید فاکتور');
+    } catch (err: unknown) {
+      setErrorMessage(parseApiError(err, 'خطا در تایید فاکتور'));
     } finally {
       setLoadingAction(false);
     }
@@ -62,8 +63,8 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
       await invoicesApi.cancelSalesInvoice(invoice.sales_invoice_id);
       onUpdated();
       onClose();
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.detail || 'خطا در لغو فاکتور');
+    } catch (err: unknown) {
+      setErrorMessage(parseApiError(err, 'خطا در لغو فاکتور'));
     } finally {
       setLoadingAction(false);
     }

@@ -14,6 +14,7 @@ from apps.invoices.models import (
 )
 from apps.finance.models import ReceiptVoucher, CustomerRefundVoucher
 from utils.jalali import parse_jalali_or_gregorian_date
+from utils.expressions import DecimalDivision
 from .serializers import (
     DashboardStatsResponseSerializer, SalesByBrandItemSerializer,
     ProfitabilityItemSerializer, InventoryValueResponseSerializer,
@@ -149,7 +150,9 @@ class SalesByBrandReportView(APIView):
                     When(
                         sales_invoice__discount_percent__gt=0,
                         then=ExpressionWrapper(
-                            F('quantity') * F('unit_price') * (Decimal('1.00') - (F('sales_invoice__discount_percent') / Decimal('100.00'))),
+                            F('quantity') * F('unit_price') * (
+                                Decimal('1.00') - DecimalDivision(F('sales_invoice__discount_percent'), Decimal('100.00'))
+                            ),
                             output_field=DecimalField(max_digits=18, decimal_places=2)
                         )
                     ),
@@ -159,8 +162,10 @@ class SalesByBrandReportView(APIView):
                             When(
                                 Q(sales_invoice__total_amount__gt=0) | Q(sales_invoice__discount_amount__gt=0),
                                 then=ExpressionWrapper(
-                                    (F('quantity') * F('unit_price') * F('sales_invoice__total_amount')) /
-                                    (F('sales_invoice__total_amount') + F('sales_invoice__discount_amount')),
+                                    DecimalDivision(
+                                        F('quantity') * F('unit_price') * F('sales_invoice__total_amount'),
+                                        F('sales_invoice__total_amount') + F('sales_invoice__discount_amount'),
+                                    ),
                                     output_field=DecimalField(max_digits=18, decimal_places=2)
                                 )
                             ),
@@ -229,7 +234,9 @@ class ProfitabilityReportView(APIView):
                     When(
                         sales_invoice__discount_percent__gt=0,
                         then=ExpressionWrapper(
-                            F('quantity') * F('unit_price') * (Decimal('1.00') - (F('sales_invoice__discount_percent') / Decimal('100.00'))),
+                            F('quantity') * F('unit_price') * (
+                                Decimal('1.00') - DecimalDivision(F('sales_invoice__discount_percent'), Decimal('100.00'))
+                            ),
                             output_field=DecimalField(max_digits=18, decimal_places=2)
                         )
                     ),
@@ -239,8 +246,10 @@ class ProfitabilityReportView(APIView):
                             When(
                                 Q(sales_invoice__total_amount__gt=0) | Q(sales_invoice__discount_amount__gt=0),
                                 then=ExpressionWrapper(
-                                    (F('quantity') * F('unit_price') * F('sales_invoice__total_amount')) /
-                                    (F('sales_invoice__total_amount') + F('sales_invoice__discount_amount')),
+                                    DecimalDivision(
+                                        F('quantity') * F('unit_price') * F('sales_invoice__total_amount'),
+                                        F('sales_invoice__total_amount') + F('sales_invoice__discount_amount'),
+                                    ),
                                     output_field=DecimalField(max_digits=18, decimal_places=2)
                                 )
                             ),

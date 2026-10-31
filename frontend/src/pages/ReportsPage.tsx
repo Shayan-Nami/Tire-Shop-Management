@@ -5,7 +5,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { reportsApi } from '../api/reports';
-import { ProfitabilityStat } from '../types';
+import { InventoryValueResponse, ProfitabilityStat, SalesByDateRangeResponse } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,18 +18,12 @@ export const ReportsPage: React.FC = () => {
   const [profitabilityData, setProfitabilityData] = useState<ProfitabilityStat[]>([]);
 
   // داده‌های ارزش انبار
-  const [inventoryValueData, setInventoryValueData] = useState<{
-    total_inventory_value: number;
-    items: any[];
-  } | null>(null);
+  const [inventoryValueData, setInventoryValueData] = useState<InventoryValueResponse | null>(null);
 
   // فروش بر اساس تاریخ
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  const [dateSalesResult, setDateSalesResult] = useState<{
-    total_invoices: number;
-    total_sales_amount: number;
-  } | null>(null);
+  const [dateSalesResult, setDateSalesResult] = useState<SalesByDateRangeResponse | null>(null);
 
   const loadReport = async () => {
     setLoading(true);

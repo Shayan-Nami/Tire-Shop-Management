@@ -1,10 +1,10 @@
 import { apiClient } from './client';
+import { getAllResults } from './pagination';
 import { Brand, Size, Tire, StockMovement, PaginatedResponse } from '../types';
 
 export const catalogApi = {
   getBrands: async (): Promise<Brand[]> => {
-    const response = await apiClient.get<PaginatedResponse<Brand> | Brand[]>('/catalog/brands/');
-    return 'results' in response.data ? response.data.results : response.data;
+    return getAllResults<Brand>('/catalog/brands/');
   },
 
   createBrand: async (data: { brand_name: string }): Promise<Brand> => {
@@ -13,8 +13,7 @@ export const catalogApi = {
   },
 
   getSizes: async (): Promise<Size[]> => {
-    const response = await apiClient.get<PaginatedResponse<Size> | Size[]>('/catalog/sizes/');
-    return 'results' in response.data ? response.data.results : response.data;
+    return getAllResults<Size>('/catalog/sizes/');
   },
 
   createSize: async (data: { size_name: string }): Promise<Size> => {
@@ -35,8 +34,7 @@ export const catalogApi = {
   },
 
   getLowStockTires: async (): Promise<Tire[]> => {
-    const response = await apiClient.get<PaginatedResponse<Tire> | Tire[]>('/catalog/tires/low-stock/');
-    return 'results' in response.data ? response.data.results : response.data;
+    return getAllResults<Tire>('/catalog/tires/low-stock/');
   },
 
   createTire: async (data: {

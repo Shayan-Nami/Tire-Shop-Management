@@ -3,6 +3,7 @@ import { Search, PlusCircle, Plus } from 'lucide-react';
 import { crmApi } from '../api/crm';
 import { Customer } from '../types';
 import { IranianPlateBadge } from '../components/plates/IranianPlateBadge';
+import { parseApiError } from '../utils/errorParser';
 
 export const Customers: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -69,8 +70,8 @@ export const Customers: React.FC = () => {
       setNationalCode('');
       setAddress('');
       fetchCustomers();
-    } catch (err: any) {
-      alert(err.response?.data?.phone_number?.[0] || 'خطا در ثبت مشتری');
+    } catch (err: unknown) {
+      alert(parseApiError(err, 'خطا در ثبت مشتری'));
     }
   };
 
@@ -86,8 +87,8 @@ export const Customers: React.FC = () => {
       setSelectedCustomerForVehicle(null);
       setPlate('');
       fetchCustomers();
-    } catch (err: any) {
-      alert(err.response?.data?.license_plate?.[0] || 'خطا در ثبت خودرو');
+    } catch (err: unknown) {
+      alert(parseApiError(err, 'خطا در ثبت خودرو'));
     }
   };
 

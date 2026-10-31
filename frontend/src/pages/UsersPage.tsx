@@ -3,6 +3,7 @@ import { UserPlus, Trash2, Edit2, ShieldAlert } from 'lucide-react';
 import { authApi } from '../api/auth';
 import { User, UserRole } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { parseApiError } from '../utils/errorParser';
 
 export const UsersPage: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -94,13 +95,8 @@ export const UsersPage: React.FC = () => {
       }
       setShowModal(false);
       fetchUsers();
-    } catch (err: any) {
-      const msg =
-        err.response?.data?.username?.[0] ||
-        err.response?.data?.phone_number?.[0] ||
-        err.response?.data?.detail ||
-        'خطا در ثبت کاربر';
-      setErrorMessage(msg);
+    } catch (err: unknown) {
+      setErrorMessage(parseApiError(err, 'خطا در ثبت کاربر'));
     } finally {
       setSubmitting(false);
     }
@@ -116,8 +112,8 @@ export const UsersPage: React.FC = () => {
     try {
       await authApi.deleteUser(u.id);
       fetchUsers();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || 'خطا در حذف کاربر');
+    } catch (err: unknown) {
+      alert(parseApiError(err, 'خطا در حذف کاربر'));
     }
   };
 

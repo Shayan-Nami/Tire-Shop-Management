@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, SlidersHorizontal, AlertCircle } from 'lucide-react';
 import { Tire } from '../../types';
 import { catalogApi } from '../../api/catalog';
+import { parseApiError } from '../../utils/errorParser';
 
 interface StockAdjustmentModalProps {
   tire: Tire | null;
@@ -39,8 +40,8 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
       });
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.detail || err.response?.data?.reason?.[0] || 'خطا در ثبت اصلاحیه موجودی انبار');
+    } catch (err: unknown) {
+      setErrorMessage(parseApiError(err, 'خطا در ثبت اصلاحیه موجودی انبار'));
     } finally {
       setSubmitting(false);
     }

@@ -1,245 +1,149 @@
-# Production Deployment & Hardening Guide
+# Deployment and Operations
 
-## 1. Production Topology & Architecture
+Use the [root README](../README.md) for local setup, dependency installation, and
+environment-variable tables. This guide covers release checks and operational
+risks; it is not evidence of a deployed or production-ready installation.
+The repository's WSGI/ASGI entrypoints and Vite build are application components,
+not an installed CI pipeline, container platform, reverse proxy, or managed service.
 
-For production deployments, the system is designed to run behind a high-performance reverse proxy (e.g. Nginx, Caddy, or Cloudflare) with Gunicorn WSGI workers, PostgreSQL as the primary ACID relational database, and Redis for distributed caching and rate-limiting counters.
+## Runtime and topology
 
-```
-       [ Client HTTPS Requests ]
-                   │
-                   ▼
-         ┌───────────────────┐
-         │       Nginx       │ (SSL / Static Assets / Gzip)
-         └─────────┬─────────┘
-                   │
-         ┌─────────┴─────────┐
-         │                   │
-         ▼                   ▼
-┌─────────────────┐ ┌─────────────────┐
-│ /api, /admin    │ │ / (Frontend SPA)│
-│ Proxy to        │ │ Serve static    │
-│ Gunicorn:8000   │ │ /var/www/dist   │
-└────────┬────────┘ └─────────────────┘
-         │
-         ▼
-┌─────────────────┐       ┌─────────────────┐
-│  PostgreSQL 16  │◄─────►│      Redis      │
-│  (ACID MVCC)    │       │ (Throttling)    │
-└─────────────────┘       └─────────────────┘
-```
+- Backend dependencies allow Django `>=5.2.17,<6.2`. The current audit exercised
+  Python **3.14.6** with Django **5.2.17** and **6.1.2**; this is a tested snapshot,
+  not a claim about every Python/Django combination.
+- [frontend/package.json](../frontend/package.json) requires **Node.js >=22.18.0**
+  (Node 24 LTS is a suitable choice). Node 20 is not the documented baseline.
+- SQLite is the default. PostgreSQL and SQL Server have settings/driver support,
+  but their live server behavior must be verified separately. SQL Server also
+  requires a compatible native ODBC driver and trusted server certificate.
+- Redis is optional caching for shared throttle state, enabled by `REDIS_CACHE_URL`.
+  Without it, cache/throttle state is process-local. There is no task broker.
 
----
+A possible deployment is HTTPS static hosting for `frontend/dist/`, with `/api/`
+and `/admin/` forwarded to a supervised Django application server and Django
+`/static/` assets served from `backend/staticfiles/`. This is an operator-provided
+topology, not a bundled deployment. Gunicorn is included only on non-Windows
+platforms; choose and verify a platform-appropriate server for
+`config.wsgi:application` or `config.asgi:application`. Do not use Django's dev
+server or Vite's dev/preview server as the production service.
 
-## 2. Infrastructure Prerequisites
+React uses browser-history routing. Static hosting must return `index.html` for
+frontend routes, while preserving real `/api/`, `/admin/`, and static-file responses.
 
-| Component | Minimum Version | Recommended |
-|:---|:---|:---|
-| **Operating System** | Ubuntu 22.04 LTS / Debian 12 / Windows Server 2022 | Ubuntu 24.04 LTS |
-| **Python** | 3.12+ | 3.14 / 3.13 |
-| **Node.js** | 20 LTS | 22 LTS |
-| **Database** | PostgreSQL 15 | PostgreSQL 16+ |
-| **Cache Broker** | Redis 7.0 | Redis 7.2 |
-| **Reverse Proxy**| Nginx 1.22+ | Nginx 1.24+ |
+## Configuration checks before exposure
 
----
+Configuration is read in [settings.py](../backend/config/settings.py), including
+`backend/.env` if present. Keep environment files/secrets out of version control
+and restrict their filesystem access. Use the root README's configuration tables
+rather than copying an unverified production template.
 
-## 3. Environment Security & Secret Management
+1. Set `DJANGO_DEBUG=False`, a unique random `DJANGO_SECRET_KEY`, and explicit
+   production `ALLOWED_HOSTS`. Settings reject a missing secret or the known
+   fallback secret outside debug mode; that guard does not validate overall readiness.
+2. Replace development CORS/CSRF origin defaults with the actual trusted origins.
+   Review admin/session access, cookie security, HTTPS redirect, and HSTS settings.
+   Enable HSTS only after confirming HTTPS and the intended subdomain policy.
+3. Trust `X-Forwarded-Proto` only when a trusted proxy controls it. Set
+   `SECURE_PROXY_SSL_HEADER` and `NUM_PROXIES` to match the real proxy chain;
+   prevent clients from reaching the backend with forged forwarded headers.
+4. Verify the intended database was selected, credentials have least privilege,
+   TLS works, migrations apply, and backups can be restored. An unrecognized
+   `DB_ENGINE` falls back to SQLite; do not mistake that for a working external DB.
+5. For SQL Server, `DB_TRUSTED_CONNECTION` defaults to true **only when trimmed
+   `DB_USER` is empty**; otherwise it defaults to false. An explicit true value
+   uses integrated authentication and omits SQL username/password. Defaults are
+   `DB_ENCRYPT=yes` and `DB_TRUST_SERVER_CERTIFICATE=no`. These three controls
+   accept trimmed, case-insensitive `true/false`, `yes/no`, or `1/0`; invalid values
+   fail configuration in the SQL Server branch. Do not disable encryption or
+   certificate validation merely to hide connection failures. The default driver
+   name is `ODBC Driver 17 for SQL Server`; install/configure the actual driver.
+6. With multiple workers/instances, provision and test a shared cache if throttle
+   counters must be shared. The dependency test mocks Redis reads; it does not
+   prove live Redis availability. Add edge-level abuse controls as needed.
+7. Keep `ALLOW_DEMO_SEED=False` and the public `ENABLE_DOCS_IN_PROD` override off.
+   Schema/Swagger/Redoc are public in debug mode or with that override, otherwise
+   manager/superuser-only. Restrict administration and monitor authentication failures.
 
-Create a production `.env` file in `backend/` owned strictly by the application user (`chmod 600 .env`).
+### Demo accounts and browser tokens
 
-### 3.1 Generating a Cryptographically Secure Secret Key
-Never use default or shared keys in production. Generate a random key:
-```bash
-python3 -c 'import secrets; print(secrets.token_urlsafe(50))'
-```
+The [demo seed command](../backend/apps/catalog/management/commands/seed_tire_shop.py)
+requires both debug mode (`DJANGO_DEBUG=True`) and `ALLOW_DEMO_SEED=True`. It creates known-password
+accounts only when absent: `admin` / `admin123`, `technician` / `tech123`, and
+`warehouse` / `warehouse123`. Existing passwords are left unchanged. Use this
+only with disposable local data. Rotate all seeded passwords or remove the demo
+accounts before any exposure; disabling the seed flag does not remove accounts.
 
-### 3.2 Production `.env` Template
-```ini
-# Django Core Settings
-DJANGO_SECRET_KEY=paste-your-generated-50-character-secret-key-here
-DJANGO_DEBUG=False
-ALLOWED_HOSTS=tireshop.yourdomain.com,127.0.0.1
+The browser stores JWT access/refresh tokens in `localStorage`, not HttpOnly
+cookies. Same-origin malicious JavaScript can steal them. Treat XSS prevention,
+third-party script review, and appropriate host security headers as deployment
+concerns; HTTPS alone does not address that threat. Logout blacklists the refresh
+token but does not revoke an existing access token. Password changes revoke
+password-bound tokens; verify that workflow and force credential rotation when needed.
 
-# Database Configuration (PostgreSQL)
-DB_ENGINE=postgres
-DB_NAME=tire_shop_production
-DB_USER=tire_admin
-DB_PASSWORD=your_strong_postgres_password_here
-DB_HOST=127.0.0.1
-DB_PORT=5432
-CONN_MAX_AGE=60
+## Release checklist
 
-# Redis Cache for Multi-Worker Rate Limiting
-REDIS_CACHE_URL=redis://127.0.0.1:6379/1
-NUM_PROXIES=1
+After configuring the target environment and taking a recoverable backup, run
+from `backend/` using its virtual environment:
 
-# CORS & CSRF Whitelist
-CORS_ALLOWED_ORIGINS=https://tireshop.yourdomain.com
-CSRF_TRUSTED_ORIGINS=https://tireshop.yourdomain.com
-
-# Production Security & SSL Headers
-SECURE_PROXY_SSL_HEADER=True
-SESSION_COOKIE_SECURE=True
-CSRF_COOKIE_SECURE=True
-SECURE_SSL_REDIRECT=True
-SECURE_HSTS_SECONDS=31536000
-SECURE_HSTS_INCLUDE_SUBDOMAINS=True
-SECURE_HSTS_PRELOAD=True
-
-# Rate Limiting Thresholds
-THROTTLE_ANON_RATE=30/minute
-THROTTLE_USER_RATE=300/minute
-THROTTLE_LOGIN_IP_RATE=5/minute
-THROTTLE_LOGIN_USER_RATE=5/minute
-THROTTLE_TOKEN_REFRESH_RATE=15/minute
-
-# JWT Lifetimes
-JWT_ACCESS_MINUTES=60
-JWT_REFRESH_DAYS=14
-```
-
----
-
-## 4. Step-by-Step Installation
-
-### Step 1: Clone Repository & Create Virtual Environment
-```bash
-cd /opt
-git clone https://github.com/Shayan-Nami/Tire-Shop-Management.git
-cd Tire-Shop-Management/backend
-
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install psycopg[binary] gunicorn
-```
-
-### Step 2: Database Initialization & Migrations
-```bash
-# Verify database connection and apply migrations
+```sh
+python manage.py check --deploy
+python manage.py migrate --plan
 python manage.py migrate
-
-# Collect static files for Django admin and Swagger UI
 python manage.py collectstatic --noinput
-
-# Create the initial system administrator
-python manage.py createsuperuser
 ```
 
-### Step 3: Frontend Production Build
-```bash
-cd ../frontend
-npm ci
-npm run build
+Investigate deployment-check warnings rather than assuming defaults are hardened.
+Create a non-demo administrator with `python manage.py createsuperuser` when
+needed, and verify its application role as well as Django admin access.
 
-# Verify dist/ output contains index.html and assets/
-ls -la dist/
-```
+From `frontend/`, use `npm ci`, run the validation scripts in the
+[frontend guide](../frontend/README.md), then `npm run build` and deploy `dist/`.
+`VITE_API_BASE_URL` defaults to `/api/v1` and is public **build-time** configuration;
+rebuild after changing it. All `VITE_*` values must be treated as public, never
+secrets. `VITE_API_PROXY_TARGET` defaults to `http://127.0.0.1:8000` and configures
+the Vite development `/api` proxy, not a production reverse proxy. For a separate
+API origin, configure CORS/CSRF deliberately and test the deployed URL.
 
----
+Before serving users, smoke-test login, refresh rotation, password change,
+role restrictions, sales/drafts/confirmation, purchases, returns, voucher
+cancellation, and reconciliation on the intended database. Exercise concurrent
+stock/payment updates there; passing SQLite tests does not establish row-lock safety.
+Verify frontend deep links, API failures, and admin/static routing in a real browser.
 
-## 5. Systemd Service Configuration
+## Monitoring and recovery
 
-### Gunicorn Service (`/etc/systemd/system/tire-shop-backend.service`)
-```ini
-[Unit]
-Description=Tire Shop Management Django Backend
-After=network.target postgresql.service redis.service
+- `/api/health/` is public and returns 200/503 based on opening a database
+  connection. It does not check migrations, Redis, frontend assets, or business integrity.
+- Logging writes to the console and `backend/logs/backend_errors.log` and
+  `backend/logs/security.log`. Provision write permissions, rotation, retention,
+  access restrictions, and alerts; a file handler is not an installed monitoring service.
+- Back up the configured database and protect secrets. Schedule backups and test
+  restoration using database-specific tooling; no automated backup service is implied.
+- From `backend/`, `python manage.py reconcile_stock` and
+  `python manage.py reconcile_payments` report discrepancies and fail when found.
+  Payment reconciliation is read-only. Investigate before changing financial data.
+- Stock repair is explicitly opt-in: `reconcile_stock --repair` requires `--user`
+  naming an active manager and `--reason`; optional repeatable `--tire-id` limits
+  the repair. It rebuilds the stock projection from verified movement history and
+  writes a repair audit record. It does not repair corrupted movement history.
+  Physical `adjust-stock` creates a real movement and is not projection recovery.
+- Rehearse rollback with migration compatibility and data recovery in mind;
+  reverting frontend/backend files alone cannot undo database changes.
 
-[Service]
-User=www-data
-Group=www-data
-WorkingDirectory=/opt/Tire-Shop-Management/backend
-ExecStart=/opt/Tire-Shop-Management/backend/.venv/bin/gunicorn \
-    --workers 4 \
-    --bind 127.0.0.1:8000 \
-    --timeout 60 \
-    --access-logfile /var/log/tireshop/gunicorn_access.log \
-    --error-logfile /var/log/tireshop/gunicorn_error.log \
-    config.wsgi:application
+## Audit snapshot and limits
 
-Restart=always
-RestartSec=5
+The current audit reported the following on **2026-10-31**:
 
-[Install]
-WantedBy=multi-user.target
-```
+| Check | Result |
+| --- | --- |
+| Python 3.14.6 + Django 5.2.17 | 342 passed; 9 PostgreSQL-specific tests skipped |
+| Python 3.14.6 + Django 6.1.2 | 342 passed; 9 PostgreSQL-specific tests skipped |
+| Frontend | 106 tests passed; typecheck, Oxlint, and production build passed |
+| Dependency audits | npm/pip audits clean for the resolved dependency sets tested |
 
-Enable and start the service:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now tire-shop-backend
-```
-
----
-
-## 6. Nginx Web Server Configuration
-
-`/etc/nginx/sites-available/tireshop`:
-```nginx
-server {
-    listen 80;
-    server_name tireshop.yourdomain.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name tireshop.yourdomain.com;
-
-    ssl_certificate /etc/letsencrypt/live/tireshop.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/tireshop.yourdomain.com/privkey.pem;
-
-    # Frontend Single Page Application
-    root /opt/Tire-Shop-Management/frontend/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Django Static Files
-    location /static/ {
-        alias /opt/Tire-Shop-Management/backend/staticfiles/;
-        expires 30d;
-        add_header Cache-Control "public, max-age=2592000, immutable";
-    }
-
-    # API and Admin Reverse Proxy
-    location ~ ^/(api|admin)/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 60s;
-        proxy_connect_timeout 60s;
-    }
-}
-```
-
----
-
-## 7. Operational Maintenance & Backups
-
-### Automated PostgreSQL Backup (Daily Cron Job)
-```bash
-# Add to /etc/cron.daily/backup-tireshop-db
-#!/bin/bash
-BACKUP_DIR="/var/backups/tireshop"
-mkdir -p $BACKUP_DIR
-DATE=$(date +\%Y\%m\%d_\%H\%M\%S)
-pg_dump -U tire_admin tire_shop_production | gzip > "$BACKUP_DIR/db_$DATE.sql.gz"
-find $BACKUP_DIR -type f -mtime +14 -delete
-```
-
-### Stock & Financial Reconciliation Verification
-The system provides built-in management commands to audit data integrity at any time without downtime:
-```bash
-# Verify ledger balance against tire catalog projections
-python manage.py reconcile_stock
-
-# Verify payment vouchers against sales invoices
-python manage.py reconcile_payments
-```
+These results are a point-in-time validation record, not a security certification
+or a guarantee for future dependency resolution. There was no browser end-to-end
+or live external-database verification. The frontend is a client-rendered SPA,
+not SSR. Native ODBC connectivity, production database locking/load behavior,
+Redis connectivity, infrastructure, backups, and actual deployed behavior still
+require environment-specific validation.

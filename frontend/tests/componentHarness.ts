@@ -6,8 +6,9 @@ import ts from 'typescript';
 
 
 /** Compile TSX with the already-installed TypeScript; no browser/test dependencies. */
-export function loadComponent(path: string, mocks: Record<string, unknown>) {
-  const source = readFileSync(new URL(path, import.meta.url), 'utf8');
+export function loadComponent(path: string, mocks: Record<string, unknown>, env?: Record<string, string>) {
+  const source = readFileSync(new URL(path, import.meta.url), 'utf8')
+    .replaceAll('import.meta.env', JSON.stringify(env ?? {}));
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true },
   });

@@ -1,13 +1,42 @@
-# Python & Django
+# Python environments and generated files
 __pycache__/
 *.py[cod]
+venv/
+.venv*/
+env/
+ENV/
+*.egg-info/
+build/
+dist/
+
+# Tests, static analysis, and coverage
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
 .coverage
+.coverage.*
 htmlcov/
+coverage.xml
+
+# Local data, collected assets, and logs
 *.sqlite3
+*.sqlite3-*
 *.db
+*.db-wal
+*.db-shm
 staticfiles/
 media/
+logs/
+*.log
+
+# Secrets (keep the dummy template)
 .env
 .env.*
 !.env.example
+
+# Local editor configuration
+.vscode/
+.idea/
+.zed/

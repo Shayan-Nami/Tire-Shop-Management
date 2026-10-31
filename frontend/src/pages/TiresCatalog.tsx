@@ -13,6 +13,7 @@ import { Tire, Brand, Size } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 import { StockAdjustmentModal } from '../components/catalog/StockAdjustmentModal';
+import { parseApiError } from '../utils/errorParser';
 
 export const TiresCatalog: React.FC = () => {
   const { currencyUnit, user } = useAuth();
@@ -109,14 +110,14 @@ export const TiresCatalog: React.FC = () => {
             const createdBrand = await catalogApi.createBrand({ brand_name: trimmedBrand });
             finalBrandId = createdBrand.brand_id;
             setBrands((prev) => [...prev, createdBrand]);
-          } catch (err: any) {
+          } catch (err: unknown) {
             const refreshed = await catalogApi.getBrands();
             setBrands(refreshed);
             const match = refreshed.find((b) => b.brand_name.toLowerCase() === trimmedBrand.toLowerCase());
             if (match) {
               finalBrandId = match.brand_id;
             } else {
-              alert(err.response?.data?.brand_name?.[0] || 'خطا در ثبت برند جدید');
+              alert(parseApiError(err, 'خطا در ثبت برند جدید'));
               setSubmittingNew(false);
               return;
             }
@@ -140,14 +141,14 @@ export const TiresCatalog: React.FC = () => {
             const createdSize = await catalogApi.createSize({ size_name: trimmedSize });
             finalSizeId = createdSize.size_id;
             setSizes((prev) => [...prev, createdSize]);
-          } catch (err: any) {
+          } catch (err: unknown) {
             const refreshed = await catalogApi.getSizes();
             setSizes(refreshed);
             const match = refreshed.find((s) => s.size_name.toLowerCase() === trimmedSize.toLowerCase());
             if (match) {
               finalSizeId = match.size_id;
             } else {
-              alert(err.response?.data?.size_name?.[0] || 'خطا در ثبت سایز جدید');
+              alert(parseApiError(err, 'خطا در ثبت سایز جدید'));
               setSubmittingNew(false);
               return;
             }
@@ -175,8 +176,8 @@ export const TiresCatalog: React.FC = () => {
       setNewSalePrice('');
       setNewPurchasePrice('');
       fetchTires();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || err.response?.data?.tire_name?.[0] || 'خطا در ثبت تایر جدید');
+    } catch (err: unknown) {
+      alert(parseApiError(err, 'خطا در ثبت تایر جدید'));
     } finally {
       setSubmittingNew(false);
     }
@@ -204,8 +205,8 @@ export const TiresCatalog: React.FC = () => {
       });
       setEditingTire(null);
       fetchTires();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || 'خطا در ویرایش اطلاعات تایر');
+    } catch (err: unknown) {
+      alert(parseApiError(err, 'خطا در ویرایش اطلاعات تایر'));
     } finally {
       setSubmittingEdit(false);
     }

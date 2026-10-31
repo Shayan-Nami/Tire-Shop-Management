@@ -4,6 +4,7 @@ import { servicesApi } from '../api/services';
 import { TechnicalService } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
+import { parseApiError } from '../utils/errorParser';
 
 export const ServicesPage: React.FC = () => {
   const { currencyUnit, user } = useAuth();
@@ -85,8 +86,8 @@ export const ServicesPage: React.FC = () => {
       }
       setShowModal(false);
       fetchServices();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || 'خطا در ثبت خدمت فنی');
+    } catch (err: unknown) {
+      alert(parseApiError(err, 'خطا در ثبت خدمت فنی'));
     }
   };
 
@@ -95,8 +96,8 @@ export const ServicesPage: React.FC = () => {
     try {
       await servicesApi.deleteService(id);
       fetchServices();
-    } catch {
-      alert('امکان حذف این خدمت به دلیل استفاده در فاکتورهای صادرشده وجود ندارد.');
+    } catch (err: unknown) {
+      alert(parseApiError(err, 'امکان حذف این خدمت به دلیل استفاده در فاکتورهای صادرشده وجود ندارد.'));
     }
   };
 

@@ -1,442 +1,528 @@
-# Tire Shop Management System  🛞
+# Tire Shop Management System 🛞
 
-[![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/)
-[![Django](https://img.shields.io/badge/Django-5.x%20%7C%206.x-green.svg)](https://www.djangoproject.com/)
-[![React](https://img.shields.io/badge/React-19.x-61dafb.svg)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.x-646cff.svg)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38bdf8.svg)](https://tailwindcss.com/)
-[![Pytest](https://img.shields.io/badge/Pytest-323%20passed-brightgreen.svg)](https://docs.pytest.org/)
-[![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
+**Inventory, workshop sales, purchasing, and payment tracking for tire retailers.**
 
-An enterprise-grade, full-stack ERP and Point-of-Sale (POS) management platform engineered for automotive tire dealerships, warehouses, and mechanical workshops. Built with **Django REST Framework** on the backend and **React 19 + TypeScript + Tailwind CSS** on the frontend, the system delivers high-concurrency transactional consistency, double-entry inventory auditability, strict financial controls, and seamless bilingual support (Persian RTL & English LTR).
+[![Python](https://img.shields.io/badge/Python-3.13%20%7C%203.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Django](https://img.shields.io/badge/Django-5.2%20%7C%206.x-092E20?logo=django&logoColor=white)](https://www.djangoproject.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
----
+A Django REST API and React/TypeScript application that connects customer and vehicle records with stock movements, sales and purchase documents, returns, and treasury vouchers. Designed around Persian-language shop workflows, with role-specific screens, Iranian license-plate handling, Jalali display dates, and rial/toman display preferences.
 
-## 📑 Table of Contents
+> **Validation, not a production certification:** the October 31, 2026 audit passed 342 backend tests on each of Django 5.2.17 and 6.1.2, and 106 frontend tests. Nine PostgreSQL-specific tests were skipped on SQLite. Live PostgreSQL, SQL Server, Redis, and browser end-to-end verification remain deployment prerequisites. See the [audit report](docs/AUDIT_REPORT.md).
 
-- [Executive Summary](#-executive-summary)
-- [System Architecture](#-system-architecture)
-- [Key Enterprise Features](#-key-enterprise-features)
-- [Role-Based Access Control (RBAC)](#-role-based-access-control-rbac)
-- [Technology Stack](#-technology-stack)
-- [Repository Structure](#-repository-structure)
-- [Getting Started & Local Setup](#-getting-started--local-setup)
-  - [Prerequisites](#prerequisites)
-  - [Backend Setup (Django)](#backend-setup-django)
-  - [Frontend Setup (React + Vite)](#frontend-setup-react--vite)
-  - [One-Click Launcher (Windows)](#one-click-launcher-windows)
-- [Configuration & Environment Variables](#-configuration--environment-variables)
-- [Testing & Quality Assurance](#-testing--quality-assurance)
-  - [Backend Test Suite (Pytest)](#backend-test-suite-pytest)
-  - [Frontend Test Suite (Node Test Runner)](#frontend-test-suite-node-test-runner)
-- [API Documentation & Swagger](#-api-documentation--swagger)
-- [Database Schema](#-database-schema)
-- [Security Hardening & Best Practices](#-security-hardening--best-practices)
-- [Documentation Directory](#-documentation-directory)
-- [License](#-license)
+## Contents
 
----
+- [Overview and features](#overview-and-features)
+- [Architecture and technology](#architecture-and-technology)
+- [Backend architecture](#backend-architecture)
+- [Authentication and authorization](#authentication-and-authorization)
+- [REST API](#rest-api)
+- [Frontend architecture](#frontend-architecture)
+- [Getting started](#getting-started)
+- [Environment variables](#environment-variables)
+- [Testing and quality assurance](#testing-and-quality-assurance)
+- [Deployment and operations](#deployment-and-operations)
+- [Repository structure](#repository-structure)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
 
-## 🌟 Executive Summary
+## Overview and features
 
-Retail and wholesale tire operations involve complex logistical and financial challenges: fluctuating purchase costs, bulk stock inflows, multi-line sales with workshop labor, warranty returns, and card-present POS settlements.
+The application is intended for independent tire shops, tire retailers, and workshop teams that need a connected operational view instead of separate stock spreadsheets, customer notebooks, and payment logs. It is a **single-shop application**, not a multi-tenant SaaS platform.
 
-This platform replaces fragmented, error-prone manual spreadsheets with an audited, high-throughput management system:
-- **Zero Inventory Drift**: Physical stock is derived from an immutable double-entry ledger (`StockMovement`) rather than untracked scalar counters.
-- **Race Condition & Deadlock Immunity**: Critical sales confirmation and inventory deduction flows use deterministic pessimistic row-level locking (`select_for_update`) to prevent overselling under concurrent load.
-- **Strict Financial Safeguards**: Overpayment rejections, automated cash receipt voucher issuance, and real-time ledger reconciliation.
-- **Localized Experience**: Native support for Iranian vehicle license plates, Persian/Arabic digit normalization, Jalali calendar dates, and dynamic RTL/LTR switching.
+| Business area | Implemented capabilities |
+| --- | --- |
+| Tire catalog | Brands, sizes, prices, stock levels, low-stock alerts, physical stock adjustments |
+| Inventory history | Signed stock movements with resulting balances, source-document links, cost snapshots, and actors |
+| Customer management | Customers, vehicles, Iranian license plates, normalized Persian/Arabic digits, customer-specific vehicle selection |
+| Sales and workshop | Tire and service lines, fixed or percentage discounts, drafts and confirmation, server-generated invoice numbers |
+| Procurement | Supplier records, purchase invoices, stock intake, purchase-cost updates, controlled cancellation |
+| Returns | Returns linked to original sale lines, quantity ceilings, discount-aware refunds, stock restoration |
+| Treasury | Receipts, supplier payments, customer refunds, payment references, partial settlement, cancellation reasons |
+| Reporting | Daily KPIs, receivables, low-stock counts, brand sales, tire profitability, inventory value, date-range sales |
+| Administration | Three application roles, manager-controlled user administration, Django admin, profile and password changes |
+| Presentation | Responsive dashboard layout, dark/light theme, Persian/RTL default, partial English/LTR support, rial/toman display |
 
----
+**Scope boundaries:** vouchers record money received/paid; they do not execute bank transactions. There is no chart of accounts, double-entry general ledger, payroll, tax-compliance engine, FIFO costing, or full business net-income calculation. Stock movements are signed changes, not paired accounting entries.
 
-## 🏛 System Architecture
+## Architecture and technology
 
-The application adopts a **Clean Architecture / Service Layer pattern**, isolating business invariants from HTTP controllers and serialization logic:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 Client Layer (Browser / Mobile)             │
-│   React 19 + TypeScript + Tailwind CSS + Lucide + Recharts  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ HTTPS / JSON REST API
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                Reverse Proxy & Edge Security                │
-│                 (Nginx / Traefik / Cloudflare)              │
-│       SSL Termination • Rate Throttling • Static Assets     │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ WSGI (Gunicorn) / ASGI
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│               Backend Layer (Django 5.x / 6.x & DRF)         │
-│  ┌───────────────────────┐       ┌───────────────────────┐  │
-│  │   Authentication &    │       │    REST API Views     │  │
-│  │      RBAC Guard       │       │    & ViewSets         │  │
-│  └───────────┬───────────┘       └───────────┬───────────┘  │
-│              │                               │              │
-│              ▼                               ▼              │
-│  ┌───────────────────────┐       ┌───────────────────────┐  │
-│  │   Validation Layer    │       │    Service Layer      │  │
-│  │     (Serializers)     │◄─────►│    (services.py)      │  │
-│  └───────────────────────┘       └───────────┬───────────┘  │
-│                                              │              │
-│                                              ▼              │
-│                                  ┌───────────────────────┐  │
-│                                  │   ORM & Transactions  │  │
-│                                  │  (Row Locks & Atomic) │  │
-│                                  └───────────┬───────────┘  │
-└──────────────────────────────────────────────┼──────────────┘
-                                               │
-               ┌───────────────────────────────┴───────────────────────────────┐
-               ▼                                                               ▼
-┌──────────────────────────────┐                               ┌──────────────────────────────┐
-│  Primary Relational Database │                               │   Shared Cache & Broker      │
-│  PostgreSQL 16+ / SQLite     │                               │      Redis (Production)      │
-│  ACID Transactions & MVCC    │                               │ Rate Limits & Distributed    │
-└──────────────────────────────┘                               └──────────────────────────────┘
+```mermaid
+flowchart TD
+    Browser[Browser: React and TypeScript SPA]
+    Edge[Development proxy or production HTTPS reverse proxy]
+    API[Django REST API: authentication and permissions]
+    Validation[Serializers and domain services]
+    ORM[Django ORM and atomic transactions]
+    DB[(SQLite locally; PostgreSQL or SQL Server by configuration)]
+    Cache[Local-memory cache or shared Redis]
+    Browser -->|JSON and Bearer JWT| Edge
+    Edge -->|API requests| API
+    API --> Validation
+    Validation --> ORM
+    ORM --> DB
+    API -->|Throttle counters| Cache
 ```
 
-For an in-depth architectural breakdown, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The production reverse proxy, database server, Redis service, TLS, and process supervision are operator-provided infrastructure—not bundled services.
 
----
+| Layer | Technology and responsibility |
+| --- | --- |
+| Backend runtime | Python; Django `>=5.2.17,<6.2` |
+| API | Django REST Framework, django-filter, custom pagination/error handling |
+| Persistence | Django ORM; SQLite default; PostgreSQL via psycopg; SQL Server via mssql-django/pyodbc |
+| Identity | Custom Django user, SimpleJWT rotation/blacklisting, session authentication, application RBAC |
+| API documentation | drf-spectacular OpenAPI, Swagger UI, Redoc |
+| Caching | Django local-memory cache; optional Redis for shared cache/throttle state |
+| Frontend | React 19, TypeScript 6, Vite 8, React Router 7 |
+| State and HTTP | React Context/hooks and Axios; no Redux, Zustand, or query-cache framework |
+| Styling and UI | Tailwind CSS 3, custom components, Lucide icons, Recharts, clsx/tailwind-merge |
+| Quality tools | pytest/pytest-django, Node test runner, TypeScript compiler, Oxlint |
 
-## 🚀 Key Enterprise Features
+Frontend versions are resolved in [`frontend/package-lock.json`](frontend/package-lock.json). Python dependencies use bounded/minimum requirements rather than a fully locked, hash-pinned environment; resolve, audit, and freeze the deployment environment according to your release process.
 
-### 1. Catalog & Double-Entry Stock Ledger
-- Categorization across manufacturer **Brands**, standardized **Sizes** (e.g., `185/65R14`, `205/55R16`), and tread patterns.
-- Every inventory modification produces an auditable `StockMovement` entry (`INITIAL`, `PURCHASE`, `SALE`, `SALE_RETURN`, `SALE_CANCEL`, `PURCHASE_CANCEL`, `MANUAL_ADJUSTMENT`).
-- Low-stock threshold alerts (`min_stock_alert`) highlighted automatically across dashboards.
+## Backend architecture
 
-### 2. Sequential Invoicing & POS Sales Workflow
-- Annual gapless invoice numbering format (`INV-YYYY-XXXXXX`) powered by row-locked counters.
-- Multi-line support combining physical tires and workshop mechanical services (mounting, balancing, tire repair).
-- Draft vs. Confirmed states: draft invoices hold provisional costs, while confirmation locks catalog items and snapshots historical purchase costs at the moment of stock-out.
-- Automatic creation of cash `ReceiptVoucher` records when a sale is confirmed with `payment_status=PAID`.
+### Domain modules
 
-### 3. Purchasing & Supplier Management
-- Inflow management linking purchases to registered suppliers.
-- Cost-basis tracking: purchase invoices record acquisition prices that inform weighted historical margins.
-- Protected cancellation: purchase invoices can only be cancelled if on-hand stock is sufficient to deduct, preventing negative inventory states.
+The backend is a modular Django application. HTTP views and serializers define transport contracts; service modules own multi-record inventory and financial workflows.
 
-### 4. Treasury & Double-Entry Financial Vouchers
-- Three dedicated voucher instruments: `ReceiptVoucher`, `PaymentVoucher`, and `CustomerRefundVoucher`.
-- Preservation of POS bank trace codes via `reference_number`.
-- Enforced overpayment protection: receipt amounts exceeding remaining invoice balances are strictly rejected at both service and API levels.
-- Full voucher cancellation lifecycle with mandatory audit reason logging.
+| App under `backend/apps/` | Responsibility |
+| --- | --- |
+| `accounts` | Custom user, roles, JWT endpoints, profiles, password changes, user administration |
+| `customers` | Customers, vehicles, contact/plate validation and normalization |
+| `catalog` | Brands, sizes, tires, stock movements, stock projection reconciliation |
+| `services_app` | Workshop services and prices |
+| `suppliers` | Supplier directory |
+| `invoices` | Sales, purchases, line items, returns, document numbering and lifecycle services |
+| `finance` | Receipt/payment/refund vouchers, settlement rules, payment reconciliation |
+| `reports` | Read-only KPI and analytical queries; no business tables |
 
-### 5. Iranian Vehicle & Plate Management
-- Vehicle registry tracking Iranian license plate schemas (e.g. `12ب345-ایران11`).
-- Custom SVG/CSS badge component rendering authentic national plates with the flag of Iran and regional code identifiers.
-- Automatic normalization of Persian/Arabic digits (`۱۲۳` -> `123`) before validation.
+`backend/config/` contains settings, routing, and WSGI/ASGI entrypoints. `backend/utils/` contains shared exception handling, pagination, date/digit helpers, document protections, and database expressions.
 
-### 6. Executive BI & Reporting
-- Real-time dashboard KPI metrics: Monthly gross revenue, net profit margins, outstanding customer receivables, and inventory valuations.
-- Comprehensive date-range sales analytics and brand profitability breakdowns.
-- Automated reconciliation commands: `python manage.py reconcile_stock` and `python manage.py reconcile_payments`.
+### Data model and ORM patterns
 
----
+- Customers own vehicles; sales reference a customer and optionally one of that customer's vehicles.
+- Tires reference a brand and size. Sales and purchase documents own separate tire-line tables; sales also have service lines.
+- Sales-return items reference the **original sales tire line**, not just a tire identifier.
+- Receipts and refunds reference sales invoices; supplier payments reference purchase invoices.
+- `InvoiceSequence` provides a per-document-type, per-Jalali-year counter. Example numbers are `S-1405-00001` and `P-1405-00001`.
+- Most monetary columns are `DecimalField(14, 2)` in **IRR**, with a maximum of `999999999999.99`. Computed invoice totals are checked before committing.
+- Sales tire lines retain unit-cost snapshots. Purchases retain the previous purchase price for eligible cancellation recovery; this is not FIFO accounting.
+- Unique/check constraints, protected foreign keys, service validation, `transaction.atomic()`, and row locks protect relevant workflows. Related-object loading and aggregate/subquery annotations are used for list/report efficiency.
+- `stock_quantity` is a current projection backed by stock-movement history. Projection repair has its own audit model; it is distinct from a physical stock adjustment.
+- Invoice/voucher APIs prohibit direct editing/deletion and expose explicit lifecycle actions instead. These are application rules, not database-enforced append-only storage.
 
-## 🛡 Role-Based Access Control (RBAC)
+There is one configured `default` database connection, not a multi-database router. Some tables retain legacy explicit names, including `Tier` for tires. An unmanaged legacy invoice-item model is not used for current invoice workflows. See [database design](docs/DATABASE_DESIGN.md) for actual table names, relationships, and constraints.
 
-The system enforces least-privilege access across four distinct roles:
+### Important transactional flows
 
-| Module / Operation | Manager (`MANAGER`) | Accountant (`ACCOUNTANT`) | Warehouse (`WAREHOUSE`) | Technician (`TECHNICIAN`) |
-|:---|:---:|:---:|:---:|:---:|
-| **Create Sales Invoices** | ✅ | ❌ | ❌ | ✅ |
-| **View Sales Invoices** | All Invoices | All Invoices | All (Read-Only) | **Own Invoices Only (BOLA)** |
-| **Confirm Draft Invoices** | ✅ | ❌ | ❌ | ✅ |
-| **Cancel Sales Invoices** | ✅ | ❌ | ❌ | ❌ |
-| **View Unit Purchase Costs** | ✅ | ✅ | ❌ (Masked) | ❌ (Masked) |
-| **Create Purchase Invoices** | ✅ | ❌ | ✅ | ❌ (403 Forbidden) |
-| **Cancel Purchase Invoices** | ✅ | ❌ | ❌ | ❌ |
-| **Stock Movement Ledger** | ✅ | ✅ | ✅ (Masked Costs) | ❌ (403 Forbidden) |
-| **Issue Receipt / Payment Vouchers** | ✅ | ✅ | ❌ | ❌ |
-| **Issue Customer Refunds** | ✅ | ❌ | ❌ | ❌ |
-| **Financial & Profitability Reports** | ✅ | ✅ | ❌ | ❌ |
-| **User & Role Administration** | ✅ | ❌ | ❌ | ❌ |
+1. **Confirmed sale:** validate lines/ownership/discounts, lock tires, generate a number, create lines with cost snapshots, deduct stock, and record movements atomically. Drafts do not consume or reserve stock; confirmation performs stock-out.
+2. **Purchase:** create document and lines, add stock, record movements, and update current purchase costs in one transaction.
+3. **Settlement:** lock the invoice, enforce positive amounts and debt/refund ceilings, create a voucher, and synchronize payment status. Creating a positive `PAID` sale also creates its receipt atomically.
+4. **Return:** enforce unreturned quantities, allocate original discounts, restore stock, and update balances. The API can create the resulting excess-payment refund voucher in the same workflow.
+5. **Cancellation:** preserve the document and reverse the appropriate effects only when business constraints allow it. Active payments, existing returns, missing history, or insufficient stock can block cancellation.
 
----
+SQLite is useful for local development but does not exercise production row-lock behavior or provide native fixed-point decimal arithmetic. Verify financial calculations and concurrent operations on the intended production database.
 
-## 💻 Technology Stack
+## Authentication and authorization
 
-### Backend
-- **Core**: Python 3.12–3.14, Django 5.x / 6.x
-- **API**: Django REST Framework (DRF) 3.15+
-- **Authentication**: `djangorestframework-simplejwt` with token rotation and blacklist
-- **Database**: PostgreSQL 16+ (production), SQLite 3 (development)
-- **API Documentation**: OpenAPI 3.0 via `drf-spectacular`
-- **Testing**: `pytest`, `pytest-django`, `pytest-cov`
+- `POST /api/v1/auth/login/` returns an access token, refresh token, and user identity.
+- Requests send `Authorization: Bearer <access_token>`. Default token lifetimes are **60 minutes** and **14 days**.
+- Refresh tokens rotate; the old refresh token is blacklisted. Concurrent browser 401 responses share one refresh, and each failed request is replayed at most once.
+- Logout blacklists the supplied refresh token and clears the browser session. **An already issued access token remains valid until expiry** unless separately revoked by the password-binding checks.
+- Password changes invalidate password-bound tokens and blacklist outstanding refresh tokens.
+- Django session authentication is also enabled. Session-authenticated writes require CSRF protection; Django admin uses the session flow.
+
+| Role | Intended workflow |
+| --- | --- |
+| `MANAGER` | User administration, full shop operations, treasury, analytics, returns, cancellation |
+| `WAREHOUSE` | Catalog maintenance, purchases, inventory history; read access to sales |
+| `TECHNICIAN` | Customer/vehicle operations and sales creation; sales visibility limited to invoices they created |
+
+Backend permissions and querysets enforce actual access; frontend guards are navigation aids. Permissions vary by endpoint, and most manager checks also allow Django superusers. There is **no `ACCOUNTANT` role**. For predictable SPA navigation, give administrators the `MANAGER` application role in addition to Django superuser status.
+
+**Browser token security:** access and refresh tokens are stored in `localStorage`, not HttpOnly cookies. Malicious same-origin JavaScript can read them. Review XSS controls, scripts, and hosting security headers before exposure.
+
+## REST API
+
+Paths below include the `/api/v1/` prefix. Resource detail routes use their resource-specific primary key, which is not always named `id` in JSON.
+
+| Method | Endpoint | Description | Auth required |
+| --- | --- | --- | --- |
+| POST | `/api/v1/auth/login/` | Obtain JWT pair and identity | No; login throttles apply |
+| POST | `/api/v1/auth/token/refresh/` | Rotate refresh token and obtain access token | Valid refresh token |
+| POST | `/api/v1/auth/logout/` | Blacklist submitted refresh token | Yes |
+| GET / PATCH | `/api/v1/auth/profile/` | Read/update own permitted profile fields | Yes |
+| POST | `/api/v1/auth/change-password/` | Change own password | Yes |
+| GET / POST | `/api/v1/auth/users/` | List/create users | Manager |
+| GET / POST | `/api/v1/crm/customers/` | List/create customers | Yes |
+| GET / POST | `/api/v1/crm/vehicles/` | List/create vehicles; supports `?customer={id}` | Yes |
+| GET / POST | `/api/v1/catalog/brands/`, `/sizes/`, `/tires/` | Catalog resources | Read: any user; write: manager/warehouse |
+| GET | `/api/v1/catalog/tires/low-stock/` | Tires at/below alert threshold | Yes |
+| POST | `/api/v1/catalog/tires/{id}/adjust-stock/` | Record a physical count and reason | Manager/warehouse |
+| GET | `/api/v1/catalog/stock-movements/` | Read inventory movement history | Manager/warehouse |
+| GET / POST | `/api/v1/workshop/services/` | Workshop service catalog | Read: any user; write: manager |
+| GET / POST | `/api/v1/procurement/suppliers/` | Supplier directory | Read: any user; write: manager/warehouse |
+| GET / POST | `/api/v1/invoices/sales/` | Sales list/creation | Read: visible invoices; create: manager/technician |
+| POST | `/api/v1/invoices/sales/{id}/confirm/` | Confirm a visible draft | Manager/technician |
+| POST | `/api/v1/invoices/sales/{id}/cancel/` | Cancel an eligible sale | Manager |
+| GET / POST | `/api/v1/invoices/purchases/` | Purchase list/creation | Manager/warehouse |
+| POST | `/api/v1/invoices/purchases/{id}/cancel/` | Cancel an eligible purchase | Manager |
+| GET / POST | `/api/v1/invoices/returns/` | Sales-return documents | Manager |
+| GET / POST | `/api/v1/treasury/receipts/`, `/payments/`, `/customer-refunds/` | Financial vouchers | Manager |
+| POST | `/api/v1/treasury/{resource}/{id}/cancel/` | Cancel a voucher with a reason | Manager |
+| GET | `/api/v1/analytics/dashboard-stats/` | Daily revenue, receivables, stock KPIs | Manager |
+| GET | `/api/v1/analytics/sales-by-brand/`, `/profitability/`, `/inventory-value/`, `/sales-by-date/` | Analytical reports | Manager |
+
+For grouped endpoints, abbreviated entries such as `/sizes/` and `/payments/` share the first entry's domain prefix. See the [API reference](docs/API_REFERENCE.md) for exact routes, detail operations, payload examples, permissions, and response shapes.
+
+Additional routes:
+
+| Route | Purpose | Access |
+| --- | --- | --- |
+| `/api/health/` | Database-connection health; HTTP 200 or 503 | Public |
+| `/admin/` | Django administration | Staff login and Django permissions |
+| `/api/schema/` | Generated OpenAPI schema | Public in debug; manager/superuser otherwise, unless explicitly overridden |
+| `/api/docs/`, `/api/redoc/` | Swagger UI and Redoc | Same documentation policy |
+
+Most list viewsets return `count`, `total_pages`, `current_page`, `next`, `previous`, and `results`. The default page size is 20; `?page_size=100` is the maximum request size. Selectors that need a complete dataset fetch every page. Analytics responses are not generally paginated.
+
+Handled DRF exceptions use the following structure; explicit responses may instead contain `detail`:
+
+```json
+{
+  "success": false,
+  "status_code": 400,
+  "errors": { "field_name": ["Validation message"] }
+}
+```
+
+Model-backed decimal values usually serialize as strings; some computed monetary/report fields are JSON numbers. Follow field-specific contracts rather than assuming one representation for every amount.
+
+## Frontend architecture
+
+The frontend is a **client-rendered SPA**, with lazy-loaded route pages and no SSR implementation. Its UI prioritizes operational tables, searchable selectors, status labels, focused dialogs, and a persistent navigation/header layout.
+
+```text
+LanguageProvider
+└── AuthProvider
+    └── BrowserRouter / Suspense
+        ├── Login
+        └── RoleGuard
+            └── MainLayout
+                ├── Sidebar and header
+                ├── Lazy-loaded pages
+                └── Domain dialogs and shared controls
+```
+
+| Area | Implementation |
+| --- | --- |
+| Routing | `src/App.tsx`; nested authentication and role guards; role-specific landing pages |
+| Session state | `AuthContext`; identity/profile validation, token storage, sign-in/out |
+| Locale | `LanguageContext`; Persian/English preferences and RTL/LTR direction |
+| Screen state | Local hooks for forms, filters, lists, dialogs, and loading/error states |
+| API boundary | Domain modules under `src/api/`; shared Axios client, refresh queue, pagination helpers |
+| Shared contracts | `src/types/`; nullable backend fields and distinct creation/read contracts |
+| Utilities | Error-envelope parsing, request sequencing, plate/date/currency formatting, session helpers |
+
+### Main routes and workflows
+
+- **Manager:** `/dashboard`, `/reports`, `/treasury`, `/users`, plus operational screens.
+- **Sales:** `/invoices/create` and `/invoices/sales`; choose a customer and vehicle, add tire/service lines, apply a discount, then create/confirm and settle an invoice.
+- **Warehouse:** `/catalog/tires`, `/catalog/movements`, `/invoices/purchases`, `/suppliers`; receive stock, maintain catalog data, and investigate movement history.
+- **Shared:** `/customers`; `/services` is exposed in the UI to managers/technicians, though API read access is broader.
+- **Returns and receipts:** domain dialogs launched from invoice workflows; in-flight guards prevent repeated submissions while a request is pending. These guards are not server-side idempotency keys.
+
+Persian/RTL is the default; English translation is partial. Backend values remain IRR: the currency preference changes display to rial/toman, not stored amounts. Vazirmatn is loaded through Google Fonts, which requires network access unless self-hosted. See the [frontend guide](frontend/README.md) for implementation and test boundaries.
+
+## Getting started
+
+### Prerequisites
+
+- **Python 3.13 or 3.14**, latest patch recommended. The audit used Python 3.14.6; supported combinations also depend on the Django version selected by pip.
+- **Node.js 22.18+**, with Node 24 LTS recommended, and npm. The audit used Node 24.19.0 / npm 11.17.0. Native TypeScript test execution is why the project requires more than Vite's minimum Node version.
+- Git and a terminal. SQLite needs no separate server.
+- Optional: PostgreSQL or SQL Server for deployment testing, and Redis for shared cache state. SQL Server requires a native Microsoft ODBC driver; pip does not install it.
+
+```bash
+git clone https://github.com/Shayan-Nami/Tire-Shop-Management.git
+cd Tire-Shop-Management
+```
+
+### Backend installation
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+# Windows PowerShell: .\venv\Scripts\Activate.ps1
+# Windows cmd.exe: venv\Scripts\activate.bat
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+cp .env.example .env
+# Windows PowerShell/cmd.exe: copy .env.example .env
+```
+
+Review the copied file against the [environment reference](#environment-variables). A minimal **local-only** `backend/.env` is:
+
+```dotenv
+DJANGO_DEBUG=True
+DJANGO_SECRET_KEY=development-only-replace-with-a-random-key
+ALLOWED_HOSTS=localhost,127.0.0.1
+DB_ENGINE=sqlite
+USE_SQL_SERVER=False
+ALLOW_DEMO_SEED=False
+```
+
+Then initialize and start Django:
+
+```bash
+python manage.py check
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver 127.0.0.1:8000
+```
+
+Sign in to `http://127.0.0.1:8000/admin/` with the new superuser, open that user record, and set its application role to **MANAGER** before using the SPA as a manager. The user model otherwise defaults to `TECHNICIAN`; Django superuser status alone does not change frontend role-based navigation.
+
+### Frontend installation
+
+In a second terminal, from the repository root:
+
+```bash
+cd frontend
+cp .env.example .env
+# Windows PowerShell/cmd.exe: copy .env.example .env
+npm ci
+npm run dev
+```
+
+`npm ci` is recommended for reproducible installation from the committed lockfile. Use `npm install` when intentionally updating dependencies.
+
+Open `http://localhost:5173`. Vite proxies `/api` to Django at `http://127.0.0.1:8000` by default. The dev server binds to `0.0.0.0`; restrict network access when using local/demo data. Sign in with the account created above.
+
+On Windows, [`start_project.bat`](start_project.bat) can open both development servers after installation/configuration. It uses `python` from the launching environment, so activate the backend virtual environment first. It does not install dependencies, migrate databases, or configure secrets.
+
+### Optional demo data — disposable local databases only
+
+Set **both** `DJANGO_DEBUG=True` and `ALLOW_DEMO_SEED=True` in `backend/.env`, then run:
+
+```bash
+python manage.py seed_tire_shop
+```
+
+The command creates sample records and known-password accounts if absent: `admin` / `admin123`, `technician` / `tech123`, and `warehouse` / `warehouse123`. Existing account passwords are preserved. **Never expose these credentials.** Disable demo seeding after use and rotate/delete seeded accounts before promoting any database; disabling the flag does not remove accounts.
+
+## Environment variables
+
+Backend settings load `backend/.env` through python-dotenv; existing process environment variables take precedence. Frontend configuration is loaded by Vite from `frontend/`.
+
+Never commit active environment files or real credentials. Templates contain examples only. All `VITE_*` values must be treated as **public browser configuration**.
+
+### Backend: core and database
+
+| Variable | Default / accepted values | Purpose |
+| --- | --- | --- |
+| `DJANGO_DEBUG` | `False` | Enable local debugging explicitly; never enable for production |
+| `DJANGO_SECRET_KEY` | Required outside debug | Unique random signing key; known debug fallback is rejected in production |
+| `ALLOWED_HOSTS` | `localhost,127.0.0.1,testserver` | Comma-separated hostnames, without schemes |
+| `ALLOW_DEMO_SEED` | `False` | Additional opt-in for guarded demo seeding |
+| `DB_ENGINE` | Empty / SQLite fallback | `postgres` / `postgresql`, `mssql` / `sqlserver`, or SQLite fallback |
+| `USE_SQL_SERVER` | `False` | Legacy SQL Server selector; PostgreSQL branch takes precedence |
+| `DB_NAME` | PostgreSQL: `tire_shop_db`; SQL Server: `TireShopDB` | External database name; SQLite uses `backend/db.sqlite3` |
+| `DB_USER` | PostgreSQL: `postgres`; SQL Server: empty | External database username |
+| `DB_PASSWORD` | Empty | External database password; supply securely |
+| `DB_HOST` | `localhost` | External database host |
+| `DB_PORT` | PostgreSQL: `5432`; SQL Server: `1433` | Database port |
+| `CONN_MAX_AGE` | `60` | Persistent database connection lifetime in seconds |
+| `DB_DRIVER` | `ODBC Driver 17 for SQL Server` | Installed native ODBC driver name |
+| `DB_TRUSTED_CONNECTION` | True when trimmed `DB_USER` is empty; false otherwise | SQL Server integrated authentication; explicit true ignores SQL username/password |
+| `DB_ENCRYPT` | `yes` | SQL Server transport encryption |
+| `DB_TRUST_SERVER_CERTIFICATE` | `no` | SQL Server certificate-validation bypass; leave off unless deliberately justified |
+
+The last three controls accept trimmed, case-insensitive `true/false`, `yes/no`, or `1/0`; invalid values fail configuration in the SQL Server branch. **Migration impact:** SQL Server connections now default to encryption with certificate validation. Install a trusted certificate rather than hiding a trust failure. Supplying `DB_USER` selects SQL authentication unless explicitly overridden.
+
+An unknown `DB_ENGINE` silently falls back to SQLite. Verify the actual selected backend before deploying; a healthy local SQLite connection does not prove external database configuration works.
+
+### Backend: origins, sessions, caching, and hardening
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CORS_ALLOWED_ORIGINS` | localhost/127.0.0.1 on ports 3000 and 5173 | Comma-separated trusted browser origins; wildcard access is disabled |
+| `CSRF_TRUSTED_ORIGINS` | Same development origins | Trusted origins for CSRF-protected session requests |
+| `JWT_ACCESS_MINUTES` | `60` | Access-token lifetime |
+| `JWT_REFRESH_DAYS` | `14` | Refresh-token lifetime |
+| `REDIS_CACHE_URL` | Empty | Enable Django Redis cache; otherwise cache is process-local |
+| `NUM_PROXIES` | `0` | Number of trusted proxy hops for DRF client-IP handling |
+| `THROTTLE_ANON_RATE` / `THROTTLE_USER_RATE` | `30/minute` / `300/minute` | General API throttle rates |
+| `THROTTLE_LOGIN_IP_RATE` / `THROTTLE_LOGIN_USER_RATE` | `5/minute` each | Login throttles by IP and username |
+| `THROTTLE_TOKEN_REFRESH_RATE` | `15/minute` | Refresh throttle |
+| `SECURE_PROXY_SSL_HEADER` | `False` | Trust proxy-controlled `X-Forwarded-Proto: https` only when enabled |
+| `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` | `False` | Restrict cookies to HTTPS in production |
+| `SECURE_SSL_REDIRECT` | `False` | Redirect HTTP to HTTPS |
+| `SECURE_HSTS_SECONDS` | `0` | HSTS duration; enable only after HTTPS is verified |
+| `SECURE_HSTS_INCLUDE_SUBDOMAINS` / `SECURE_HSTS_PRELOAD` | `False` | Explicit HSTS policy decisions |
+| `ENABLE_DOCS_IN_PROD` | `False` | Explicitly make API docs public outside debug; normally leave off |
+
+`PAGINATION_PAGE_SIZE` is present in REST framework settings, but the current pagination class fixes its default at 20. Use the supported `page_size` request parameter (maximum 100); do not rely on this environment variable to change that default.
+
+Generate a production key with `python -c "import secrets; print(secrets.token_urlsafe(50))"`. Store it through your deployment secret mechanism. Secure cookies, HTTPS redirects, HSTS, proxy trust, and shared Redis are **not automatically configured** by installing this project.
 
 ### Frontend
-- **Framework**: React 19, TypeScript 5.x
-- **Build Tool**: Vite 6
-- **Styling**: Tailwind CSS 3.4, PostCSS, Autoprefixer
-- **Routing**: React Router 7
-- **HTTP Client**: Axios with custom error-parsing interceptors
-- **Icons**: Lucide React
-- **Data Visualization**: Recharts 3.x
-- **Testing**: Node.js Native Test Runner (`node --test`)
 
----
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | `/api/v1` | API prefix/origin used by ordinary requests and token refresh; embedded at build time |
+| `VITE_API_PROXY_TARGET` | `http://127.0.0.1:8000` | Destination for Vite's development `/api` proxy; no production routing effect |
 
-## 📁 Repository Structure
+Restart Vite after configuration changes; rebuild production assets when changing `VITE_API_BASE_URL`. A separate API origin also needs deliberate backend CORS/CSRF configuration. Keep the relative default for same-origin reverse-proxy hosting.
+
+## Testing and quality assurance
+
+### Backend
+
+Use a disposable development/test configuration, not production credentials. Run from `backend/` with the virtual environment active and `.env` configured:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pip check
+python manage.py check
+python manage.py makemigrations --check --dry-run
+python -m pytest
+python manage.py spectacular --validate --fail-on-warn --file schema.yml
+```
+
+The schema command regenerates the tracked OpenAPI snapshot; review any resulting diff. To inspect unapplied migrations, use `python manage.py migrate --plan`; back up valuable data before applying them.
+
+pytest covers permissions/token security, model/serializer validation, stock history, invoice lifecycle, returns, financial reconciliation, and discount-aware reports. The suite is pytest-based; `python manage.py test` is not an equivalent discovery path for all tests. PostgreSQL-specific row-lock/concurrency tests skip under SQLite. Run those against a dedicated PostgreSQL test database with a role allowed to create test databases. Test fixtures clear the default cache, so never point them at a production cache.
+
+No standalone Python typechecker or linter is configured; syntax checks, Django checks, dependency checks, and tests were used for this audit.
+
+### Frontend
+
+Run from `frontend/`:
+
+```bash
+npm ci
+npm test
+npm run typecheck
+npm run lint
+npm run build
+npm audit
+```
+
+Tests use Node's native TypeScript support, mocked HTTP transport, and a small hook-level TSX harness. They cover API pagination/contracts, refresh rotation/logout, duplicate-submission guards, error envelopes, selector races, plate normalization, language changes, and invoice/catalog workflows. They are **not browser-rendered end-to-end tests** and do not establish keyboard focus, layout, or concurrent-rendering correctness.
+
+### Audit snapshot
+
+| Check | Result on October 31, 2026 |
+| --- | --- |
+| Python 3.14.6 + Django 5.2.17 | 342 passed; 9 PostgreSQL-specific skips |
+| Python 3.14.6 + Django 6.1.2 | 342 passed; 9 PostgreSQL-specific skips |
+| Django checks, migration drift, fresh migration application | Passed on both tested Django versions |
+| OpenAPI validation | Passed without schema warnings |
+| Frontend clean install, tests, typecheck, Oxlint, production build | Passed; 106 tests; no lint warnings/errors |
+| Dependency vulnerability checks | No known vulnerabilities in the audited resolved npm/Python dependency sets |
+
+See [the audit report](docs/AUDIT_REPORT.md) for findings, changes, exact scope, and limitations. Passing dependency scanners is a point-in-time advisory result, not proof that the application is vulnerability-free.
+
+## Deployment and operations
+
+Before exposing the application:
+
+1. Use a unique secret, `DJANGO_DEBUG=False`, explicit hosts/origins, and non-demo accounts.
+2. Provision and verify the intended database, native drivers if needed, backups, and a restore procedure. Apply migrations after reviewing the plan.
+3. Run `python manage.py check --deploy`; investigate HTTPS, cookie, HSTS, and proxy warnings rather than assuming defaults are hardened.
+4. Build the SPA and serve `frontend/dist/` through static hosting with browser-history fallback. Route `/api/` and `/admin/` to Django; do not turn API failures into SPA HTML.
+5. Run a supervised WSGI/ASGI server. Gunicorn is a non-Windows dependency; Django `runserver` and Vite dev/preview are not production servers.
+6. Collect Django static assets, configure logging/rotation, and use shared Redis if throttle state must be shared across workers.
+7. Exercise real login/refresh, roles, sales/purchases/returns, payments, cancellation, concurrency, and deep-link workflows on the target infrastructure.
+
+`/api/health/` only checks opening a database connection. It does not check migrations, cache availability, or business integrity. `python manage.py reconcile_stock` and `python manage.py reconcile_payments` provide read-only discrepancy checks; stock repair requires explicit authorization/reason flags. See the [deployment and operations guide](docs/DEPLOYMENT_GUIDE.md) before repair operations.
+
+## Repository structure
 
 ```text
 Tire-Shop-Management/
-│
-├── backend/                       # Django REST Framework backend
-│   ├── apps/
-│   │   ├── accounts/              # Users, RBAC permissions, and JWT auth
-│   │   ├── catalog/               # Tires, brands, sizes, and stock movements
-│   │   ├── customers/             # Customers, vehicles, and plate normalization
-│   │   ├── services_app/          # Mechanical workshop service definitions
-│   │   ├── suppliers/             # Vendor and supplier management
-│   │   ├── invoices/              # Sales/purchase invoices, returns, numbering
-│   │   ├── finance/               # Receipt, payment, and refund vouchers
-│   │   └── reports/               # Executive KPI dashboard and reporting
-│   ├── config/                    # Django project settings, URLs, and ASGI/WSGI
-│   ├── utils/                     # Persian normalization, Jalali dates, exceptions
-│   ├── requirements.txt           # Production dependencies
-│   ├── requirements-dev.txt       # Testing and development dependencies
-│   ├── manage.py                  # Django CLI entrypoint
-│   └── pytest.ini                 # Pytest test runner configuration
-│
-├── frontend/                      # React 19 + TypeScript + Vite SPA
-│   ├── src/
-│   │   ├── api/                   # Axios API service clients
-│   │   ├── components/            # Reusable UI widgets, modals, plate badge
-│   │   │   ├── auth/              # Profile and password change dialogs
-│   │   │   ├── catalog/           # Stock adjustment modals
-│   │   │   ├── finance/           # Receipt and voucher cancellation modals
-│   │   │   ├── invoices/          # Invoice detail and return modals
-│   │   │   ├── layout/            # MainLayout, Navbar, Sidebar, RoleGuard
-│   │   │   └── plates/            # Iranian license plate component
-│   │   ├── context/               # AuthContext and LanguageContext (i18n)
-│   │   ├── pages/                 # Full-page views (Dashboard, Sales, Catalog...)
-│   │   ├── types/                 # TypeScript interfaces and domain schemas
-│   │   └── utils/                 # Formatters, plate parser, error extractor
-│   ├── tests/                     # Frontend unit and component tests
-│   ├── package.json               # Node packages and scripts
-│   ├── tailwind.config.js         # Tailwind theme configuration
-│   └── vite.config.ts             # Vite bundler configuration
-│
-├── docs/                          # Comprehensive technical documentation
-│   ├── ARCHITECTURE.md            # System architecture, concurrency, and security
-│   ├── DATABASE_DESIGN.md         # Schema design, relational models, constraints
-│   ├── API_REFERENCE.md           # REST API endpoints, schemas, error formats
-│   └── DEPLOYMENT_GUIDE.md        # Nginx, Gunicorn, PostgreSQL, production guide
-│
-├── start_project.bat              # One-click Windows development launcher
-├── .gitignore                     # Git ignore rules (secrets, cache, databases)
-├── LICENSE                        # MIT License
-└── README.md                      # Primary project overview
+|-- backend/
+|   |-- apps/
+|   |   |-- accounts/
+|   |   |-- catalog/
+|   |   |-- customers/
+|   |   |-- finance/
+|   |   |-- invoices/
+|   |   |-- reports/
+|   |   |-- services_app/
+|   |   `-- suppliers/
+|   |-- config/                  # Settings, URL routing, WSGI/ASGI, config tests
+|   |-- utils/                   # Shared API/domain helpers
+|   |-- .env.example
+|   |-- conftest.py
+|   |-- manage.py
+|   |-- pytest.ini
+|   |-- requirements.txt
+|   |-- requirements-dev.txt
+|   `-- schema.yml
+|-- frontend/
+|   |-- public/
+|   |-- src/
+|   |   |-- api/
+|   |   |-- assets/
+|   |   |-- components/
+|   |   |-- context/
+|   |   |-- pages/
+|   |   |-- types/
+|   |   `-- utils/
+|   |-- tests/
+|   |-- .env.example
+|   |-- package.json
+|   |-- package-lock.json
+|   `-- vite.config.ts
+|-- docs/
+|   |-- archive/                 # Unsupported historical design/SQL experiments
+|   |-- API_REFERENCE.md
+|   |-- ARCHITECTURE.md
+|   |-- AUDIT_REPORT.md
+|   |-- DATABASE_DESIGN.md
+|   `-- DEPLOYMENT_GUIDE.md
+|-- .gitignore
+|-- LICENSE
+|-- README.md
+`-- start_project.bat
 ```
 
----
+Domain apps keep their models, serializers, views, tests, and migrations together as applicable. Local databases, active `.env` files, virtual environments, `node_modules`, logs, caches, IDE settings, and generated builds are intentionally excluded from version control. Historical scripts are not runtime dependencies and must not be used to initialize the current schema.
 
-## 🛠 Getting Started & Local Setup
+## Documentation
 
-### Prerequisites
-- **Python**: Version 3.12 or newer
-- **Node.js**: Version 20.x or newer (with `npm`)
-- **Git**: Installed and configured
+| Document | Contents |
+| --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | Module boundaries, transactional services, identity and storage decisions |
+| [Database design](docs/DATABASE_DESIGN.md) | Actual model/table map, balance calculations, constraints, migration caveats |
+| [API reference](docs/API_REFERENCE.md) | Routes, role policies, payloads, pagination, error formats |
+| [Deployment and operations](docs/DEPLOYMENT_GUIDE.md) | Hardening, release checks, monitoring, reconciliation, recovery |
+| [Frontend guide](frontend/README.md) | SPA structure, session handling, scripts, test-harness limitations |
+| [Audit report](docs/AUDIT_REPORT.md) | Verified fixes, validation evidence, cleanup, outstanding risks |
+| [Historical archive](docs/archive/README.md) | Earlier coursework and standalone SQL Server experiments |
 
----
+## Contributing
 
-### Backend Setup (Django)
+1. Open an issue describing the problem, expected behavior, and reproduction steps. Do not include credentials, customer records, or production database dumps.
+2. Create a focused branch such as `fix/invoice-total-validation`, `feat/service-filter`, or `docs/setup-guide`.
+3. Keep business rules in the appropriate backend service and transport validation in serializers. Preserve atomicity, cost history, server permissions, and IRR conventions.
+4. Keep frontend contracts aligned with serializers, including nullable fields, resource-specific IDs, pagination, and standardized errors.
+5. Add regression tests for behavior changes. Include Django migrations for model changes and update related documentation/environment examples when configuration changes.
+6. Run the applicable checks above. Submit a pull request describing the change, validation results, migration/deployment impact, and any remaining limitations.
 
-1. **Navigate to the backend directory**:
-   ```bash
-   cd backend
-   ```
+Do not commit secrets, local databases, customer exports, generated assets, dependency folders, or IDE settings. Avoid unrelated refactors and broad dependency upgrades in a bug-fix pull request. No automated CI gate is bundled; contributors/reviewers must run and review the checks.
 
-2. **Create and activate a virtual environment**:
-   ```bash
-   # Linux / macOS
-   python3 -m venv .venv
-   source .venv/bin/activate
+## License
 
-   # Windows (PowerShell)
-   python -m venv .venv
-   .venv\Scripts\Activate.ps1
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   pip install -r requirements-dev.txt
-   ```
-
-4. **Configure environment settings**:
-   Copy the example environment file to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-   *(By default, SQLite is pre-configured for instant zero-configuration local development).*
-
-5. **Apply database migrations**:
-   ```bash
-   python manage.py migrate
-   ```
-
-6. **Seed demo data (Optional)**:
-   To populate the system with standard brands, tire sizes, initial stock, and sample accounts:
-   ```bash
-   python manage.py seed_tire_shop
-   ```
-   *Default seed credentials (development only):*
-   - Manager: `admin` / `admin123`
-   - Technician: `technician` / `tech123`
-   - Warehouse: `warehouse` / `warehouse123`
-
-7. **Start the backend development server**:
-   ```bash
-   python manage.py runserver 127.0.0.1:8000
-   ```
-   The backend API will be available at `http://127.0.0.1:8000/api/v1/`.
-
----
-
-### Frontend Setup (React + Vite)
-
-1. **Open a new terminal and navigate to `frontend/`**:
-   ```bash
-   cd frontend
-   ```
-
-2. **Install JavaScript dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Start the development server**:
-   ```bash
-   npm run dev
-   ```
-   The frontend application will start at `http://localhost:5173/`.
-
----
-
-### One-Click Launcher (Windows)
-
-For rapid development on Windows machines, double-click the root batch script:
-```cmd
-start_project.bat
-```
-This automatically boots both Django and Vite servers in separate terminal sessions.
-
----
-
-## ⚙️ Configuration & Environment Variables
-
-All configuration is managed securely via environment variables. See [`.env.example`](backend/.env.example) for the complete template.
-
-| Variable | Default (Dev) | Production Requirement | Purpose |
-|:---|:---:|:---:|:---|
-| `DJANGO_SECRET_KEY` | *dev-key* | **Mandatory** (50-char random) | Cryptographic signature key |
-| `DJANGO_DEBUG` | `True` | **Must be `False`** | Disables stacktrace leaks |
-| `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Your domain name(s) | Host header injection defense |
-| `DB_ENGINE` | `sqlite` | `postgres` | Database backend engine |
-| `DB_NAME` | `tire_shop_db` | Production DB name | Database schema name |
-| `DB_USER` | `postgres` | Dedicated DB user | Database connection user |
-| `DB_PASSWORD` | *(empty)* | **Strong password** | Database authentication |
-| `DB_HOST` | `127.0.0.1` | DB server address | Database host |
-| `DB_PORT` | `5432` | `5432` | Database TCP port |
-| `CORS_ALLOWED_ORIGINS` | `localhost:5173...` | Frontend production URL | Cross-Origin resource sharing |
-| `REDIS_CACHE_URL` | *(empty)* | `redis://127.0.0.1:6379/1` | Shared rate limit cache |
-| `NUM_PROXIES` | `0` | `1` (behind Nginx) | Reverse proxy IP resolution |
-
----
-
-## 🧪 Testing & Quality Assurance
-
-The codebase maintains rigorous automated test coverage across both backend and frontend layers.
-
-### Backend Test Suite (Pytest)
-Run the full backend test suite containing **323 unit, integration, and concurrency tests**:
-```bash
-# From the repository root:
-python -m pytest -c backend/pytest.ini
-
-# Or from inside backend/:
-cd backend
-python -m pytest -v
-```
-
-Test coverage spans:
-- **RBAC & Authorization**: Strict role isolation across all endpoints.
-- **Financial Integrity**: Multi-step payment lifecycles, overpayment safeguards, and remaining debt calculation.
-- **Stock Movement Ledger**: Invariant verification for all 7 stock transaction types.
-- **Concurrency & Locking**: Multi-threaded race condition tests verifying overselling prevention and sequential invoice number gaplessness.
-- **Security**: Token rotation, blacklist verification, and immediate token invalidation on password change.
-
-### Frontend Test Suite (Node Test Runner)
-Run the **55 automated frontend unit and component tests**:
-```bash
-cd frontend
-npm test
-```
-
-Verify production TypeScript compilation:
-```bash
-cd frontend
-npm run build
-```
-
----
-
-## 📖 API Documentation & Swagger
-
-Interactive API documentation is generated via `drf-spectacular` adhering to the **OpenAPI 3.0** specification:
-
-- **Swagger UI**: `http://127.0.0.1:8000/api/schema/swagger-ui/`
-- **Redoc**: `http://127.0.0.1:8000/api/schema/redoc/`
-- **Raw OpenAPI Schema (YAML)**: `http://127.0.0.1:8000/api/schema/`
-
-*(In production environments with `DJANGO_DEBUG=False`, documentation endpoints are restricted strictly to authorized managers).*
-
----
-
-## 📊 Database Schema
-
-The complete relational schema comprises 18 normalized tables with foreign key delete protection (`on_delete=PROTECT`), conditional uniqueness constraints, and non-negative field checks.
-
-For a comprehensive schema breakdown, entity relationships, and indexing strategy, see [`docs/DATABASE_DESIGN.md`](docs/DATABASE_DESIGN.md).
-
----
-
-## 🔒 Security Hardening & Best Practices
-
-1. **Zero Secret Leakage**:
-   - Production secrets, database credentials, and `.env` files are strictly excluded from version control via [`.gitignore`](.gitignore).
-   - If `DJANGO_DEBUG=False` is set without an explicit `DJANGO_SECRET_KEY`, Django aborts immediately with an `ImproperlyConfigured` exception.
-2. **Password-Bound JWT Token Invalidation**:
-   - Password changes embed a hash fingerprint claim in the JWT. Changing a password immediately revokes all outstanding access and refresh tokens across all devices.
-3. **Pessimistic Concurrency Control**:
-   - Inventory deductions and invoice confirmations acquire row locks on tires in sorted order (`select_for_update().order_by('pk')`), eliminating race conditions and deadlocks.
-4. **Defense-in-Depth Throttling**:
-   - Throttles requests per IP and per username to eliminate brute-force and credential stuffing threats.
-5. **SQL Injection & XSS Protection**:
-   - 100% of database queries use Django ORM parameterized statements.
-   - Frontend inputs are sanitized, and raw HTML injection is strictly prohibited.
-
-For complete deployment hardening instructions, see [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md).
-
----
-
-## 📚 Documentation Directory
-
-Detailed engineering documentation is organized inside the [`docs/`](docs/) directory:
-
-- [System Architecture & Concurrency Model](docs/ARCHITECTURE.md)
-- [Database Design & Schema Specifications](docs/DATABASE_DESIGN.md)
-- [REST API Reference & Endpoints](docs/API_REFERENCE.md)
-- [Production Deployment & Hardening Guide](docs/DEPLOYMENT_GUIDE.md)
-
----
-
-## 📄 License
-
-This project is licensed under the terms of the [MIT License](LICENSE).
+Distributed under the **MIT License**. Copyright (c) 2026 Shayan-Nami. See [LICENSE](LICENSE) for the full terms.
