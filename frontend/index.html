@@ -15,6 +15,9 @@
           var lang = localStorage.getItem('language') || 'fa';
           document.documentElement.setAttribute('lang', lang);
           document.documentElement.setAttribute('dir', lang === 'fa' ? 'rtl' : 'ltr');
+          if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+          }
         } catch (e) {}
       })();
     </script>

@@ -1,24 +1,26 @@
+from __future__ import annotations
+from typing import Any
 from rest_framework import serializers
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from django.db import transaction
-from django.contrib.auth import get_user_model
+from .models import User
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.password_validation import validate_password
 from utils.persian import normalize_digits
 from .services import set_password_and_revoke_tokens
 
-User = get_user_model()
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
-    def get_token(cls, user):
+    def get_token(cls, user: User) -> RefreshToken:
         token = super().get_token(user)
         token['username'] = user.username
         token['role'] = user.role
         token['full_name'] = user.full_name or user.username
         return token
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         data = super().validate(attrs)
         data['user'] = {
             'id': self.user.id,
@@ -30,7 +32,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         # SimpleJWT 5.5.1 only checks active status on refresh, not password revocation.
         refresh = self.token_class(attrs['refresh'])
         JWTAuthentication().get_user(refresh)
@@ -59,7 +61,7 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
             }
         }
 
-    def to_internal_value(self, data):
+    def to_internal_value(self, data: Any) -> dict[str, Any]:
         data = data.copy() if hasattr(data, 'copy') else dict(data)
         if 'phone_number' in data:
             if data['phone_number']:
@@ -69,7 +71,7 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
                 data['phone_number'] = None
         return super().to_internal_value(data)
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         attrs = super().validate(attrs)
         # کلمه عبور در هنگام ایجاد کاربر الزامی است
         if not self.instance and not attrs.get('password'):
@@ -85,7 +87,7 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def validate_password(self, value):
+    def validate_password(self, value: str) -> str:
         if value:
             # ارائه کانتکست کاربر جهت اعتبارسنجی مشابهت رمز با نام کاربری
             user = self.instance
@@ -97,7 +99,7 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
             validate_password(value, user=user)
         return value
 
-    def validate_phone_number(self, value):
+    def validate_phone_number(self, value: str | None) -> str | None:
         if not value:
             return None
         norm = normalize_digits(str(value).strip())
@@ -108,7 +110,7 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("این شماره موبایل قبلاً برای کاربر دیگری ثبت شده است.")
         return norm
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> User:
         password = validated_data.pop('password', None)
         user = super().create(validated_data)
         if password:
@@ -119,7 +121,7 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         return user
 
     @transaction.atomic
-    def update(self, instance, validated_data):
+    def update(self, instance: User, validated_data: dict[str, Any]) -> User:
         # استفاده از super().update() به جای انتساب دستی
         password = validated_data.pop('password', None)
         instance = super().update(instance, validated_data)
@@ -134,7 +136,7 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = ['full_name', 'phone_number']
 
-    def validate_phone_number(self, value):
+    def validate_phone_number(self, value: str | None) -> str | None:
         if not value:
             return None
         norm = normalize_digits(str(value).strip())
@@ -151,18 +153,18 @@ class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True, required=True)
     new_password = serializers.CharField(write_only=True, required=True)
 
-    def validate_old_password(self, value):
+    def validate_old_password(self, value: str) -> str:
         user = self.context['request'].user
         if not user.check_password(value):
             raise serializers.ValidationError("رمز عبور فعلی نادرست است.")
         return value
 
-    def validate_new_password(self, value):
+    def validate_new_password(self, value: str) -> str:
         user = self.context['request'].user
         validate_password(value, user=user)
         return value
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if attrs.get('old_password') == attrs.get('new_password'):
             raise serializers.ValidationError({'new_password': 'رمز عبور جدید نمی‌تواند مشابه رمز عبور فعلی باشد.'})
         return attrs

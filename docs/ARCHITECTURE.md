@@ -25,7 +25,7 @@ There is no implemented server-side rendering or background task broker.
 - [Backend requirements](../backend/requirements.txt) allow Django `>=5.2.17,<6.2`
   with DRF, SimpleJWT, django-filter, drf-spectacular, and database drivers.
 - [Frontend package metadata](../frontend/package.json) specifies React 19,
-  TypeScript 6, Vite 8, Tailwind CSS 3, Axios, React Router, Lucide, and Recharts.
+  TypeScript 6, Vite 8, Tailwind CSS 3, Axios, React Router and Lucide.
   Node.js must be at least 22.18.0.
 - [Settings](../backend/config/settings.py) select SQLite by default, PostgreSQL,
   or SQL Server. WSGI and ASGI entrypoints exist; the selected deployment server
@@ -82,8 +82,10 @@ claim of database-enforced append-only storage or double-entry inventory.
 The services use `transaction.atomic()` and `select_for_update()`, and tire locks
 are acquired in primary-key order in stock workflows. This reduces conflicting
 lock ordering; it does not prove that every database/operation is deadlock-free.
-SQLite does not validate PostgreSQL/SQL Server row-lock behavior. The audit's
-PostgreSQL-specific tests were skipped; see [validation limits](DEPLOYMENT_GUIDE.md).
+SQLite does not validate PostgreSQL/SQL Server row-lock behavior. The November 3
+verification exercised the PostgreSQL-specific tests; SQL Server remains untested.
+See [release verification](RELEASE_READINESS.md) for results and
+[validation limits](DEPLOYMENT_GUIDE.md) for deployment-specific checks.
 
 ## Financial records, not general-ledger accounting
 

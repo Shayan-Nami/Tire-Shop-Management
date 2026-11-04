@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Search, PlusCircle, Trash2, Edit2 } from 'lucide-react';
 import { suppliersApi } from '../api/suppliers';
@@ -6,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { parseApiError } from '../utils/errorParser';
 
 export const SuppliersPage: React.FC = () => {
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -86,46 +88,42 @@ export const SuppliersPage: React.FC = () => {
       setShowModal(false);
       fetchSuppliers();
     } catch (err: unknown) {
-      alert(parseApiError(err, 'خطا در ثبت تأمین‌کننده'));
+      alert(parseApiError(err, t("خطا در ثبت تأمین‌کننده"), language));
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('آیا از حذف این تأمین‌کننده اطمینان دارید؟')) return;
+    if (!confirm(t("آیا از حذف این تأمین‌کننده اطمینان دارید؟"))) return;
     try {
       await suppliersApi.deleteSupplier(id);
       fetchSuppliers();
     } catch (err: unknown) {
-      alert(parseApiError(err, 'امکان حذف تأمین‌کننده به دلیل وجود فاکتورهای خرید ثبت‌شده وجود ندارد.'));
+      alert(parseApiError(err, t("امکان حذف تأمین‌کننده به دلیل وجود فاکتورهای خرید ثبت‌شده وجود ندارد."), language));
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       {/* سربرگ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="page-heading">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">
-            تأمین‌کنندگان و نمایندگی‌های لاستیک
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            اطلاعات شرکت‌های پخش تایر، نمایندگی‌های رسمی کارخانجات و آدرس انبارها (مجموع: {totalCount} شرکت)
-          </p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("تأمین‌کنندگان و نمایندگی‌های لاستیک")}</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("اطلاعات شرکت‌های پخش تایر، نمایندگی‌های رسمی کارخانجات و آدرس انبارها (مجموع:")}{totalCount}{' '}{t("شرکت)")}</p>
         </div>
 
         {(user?.role === 'MANAGER' || user?.role === 'WAREHOUSE') && (
           <button
             onClick={handleOpenAdd}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
+            className="action-primary inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>ثبت تأمین‌کننده جدید</span>
+            <span>{t("ثبت تأمین‌کننده جدید")}</span>
           </button>
         )}
       </div>
 
       {/* جستجو */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+      <div className="filter-bar">
         <div className="relative w-full md:w-80">
           <input
             type="text"
@@ -134,29 +132,29 @@ export const SuppliersPage: React.FC = () => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="جستجو در نام شرکت یا تلفن یا نشانی..."
-            className="w-full pl-3 pr-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+            placeholder={t("جستجو در نام شرکت یا تلفن یا نشانی...")}
+            className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />
-          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 right-3" />
+          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-3" />
         </div>
       </div>
 
       {/* جدول تأمین‌کنندگان */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="surface-panel overflow-hidden">
         {loading ? (
-          <div className="py-16 text-center text-xs text-slate-400">در حال دریافت اطلاعات تأمین‌کنندگان...</div>
+          <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت اطلاعات تأمین‌کنندگان...")}</div>
         ) : suppliers.length === 0 ? (
-          <div className="py-16 text-center text-xs text-slate-400">تأمین‌کننده‌ای با این مشخصات یافت نشد.</div>
+          <div className="py-16 text-center text-xs text-slate-400">{t("تأمین‌کننده‌ای با این مشخصات یافت نشد.")}</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-right">
+          <div className="table-scroll overflow-x-auto">
+            <table className="data-table w-full text-xs text-start">
               <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="py-3 px-4">نام شرکت / نمایندگی</th>
-                  <th className="py-3 px-4">شماره تلفن</th>
-                  <th className="py-3 px-4">نشانی و دفتر مرکزی</th>
+                  <th className="py-3 px-4">{t("نام شرکت / نمایندگی")}</th>
+                  <th className="py-3 px-4">{t("شماره تلفن")}</th>
+                  <th className="py-3 px-4">{t("نشانی و دفتر مرکزی")}</th>
                   {(user?.role === 'MANAGER' || user?.role === 'WAREHOUSE') && (
-                    <th className="py-3 px-4 text-center">عملیات</th>
+                    <th className="py-3 px-4 text-center">{t("عملیات")}</th>
                   )}
                 </tr>
               </thead>
@@ -164,7 +162,7 @@ export const SuppliersPage: React.FC = () => {
                 {suppliers.map((sup) => (
                   <tr key={sup.supplier_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                      {sup.supplier_name}
+                      <bdi dir="auto">{sup.supplier_name}</bdi>
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300">
                       {sup.phone_number || '-'}
@@ -174,6 +172,8 @@ export const SuppliersPage: React.FC = () => {
                       <td className="py-3 px-4 text-center">
                         <div className="inline-flex items-center gap-1.5">
                           <button
+                            aria-label={t("ویرایش تأمین‌کننده")}
+                            title={t("ویرایش تأمین‌کننده")}
                             onClick={() => handleOpenEdit(sup)}
                             className="p-1 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                           >
@@ -181,7 +181,9 @@ export const SuppliersPage: React.FC = () => {
                           </button>
                           {user?.role === 'MANAGER' && (
                             <button
-                              onClick={() => handleDelete(sup.supplier_id)}
+                              aria-label={t("حذف تأمین‌کننده")}
+                            title={t("حذف تأمین‌کننده")}
+                            onClick={() => handleDelete(sup.supplier_id)}
                               className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -200,24 +202,18 @@ export const SuppliersPage: React.FC = () => {
         {/* صفحه‌بندی (Pagination) */}
         {totalPages > 1 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>
-              صفحه {currentPage} از {totalPages} (مجموع {totalCount} شرکت)
-            </span>
+            <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("شرکت)")}</span>
             <div className="flex gap-1">
               <button
                 disabled={currentPage <= 1}
                 onClick={() => setCurrentPage((p) => p - 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                قبلی
-              </button>
+              >{t("قبلی")}</button>
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage((p) => p + 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                بعدی
-              </button>
+              >{t("بعدی")}</button>
             </div>
           </div>
         )}
@@ -225,59 +221,53 @@ export const SuppliersPage: React.FC = () => {
 
       {/* مدال ایجاد/ویرایش تأمین‌کننده */}
       {showModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                {editingSupplier ? 'ویرایش اطلاعات تأمین‌کننده' : 'ثبت تأمین‌کننده جدید'}
+                {editingSupplier ? t("ویرایش اطلاعات تأمین‌کننده") : t("ثبت تأمین‌کننده جدید")}
               </h2>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-              >
-                ✕
+               aria-label={t("بستن پنجره")}>
+                ×
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                  نام شرکت / تأمین‌کننده:
-                </label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام شرکت / تأمین‌کننده:")}</label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="مثلاً: شرکت پخش لاستیک البرز"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+                  placeholder={t("مثلاً: شرکت پخش لاستیک البرز")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                  تلفن تماس:
-                </label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("تلفن تماس:")}</label>
                 <input
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="02188990011"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-left"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                  آدرس و انبار پخش:
-                </label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("آدرس و انبار پخش:")}</label>
                 <textarea
                   rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="آدرس، پلاک، شهر..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+                  placeholder={t("آدرس، پلاک، شهر...")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 />
               </div>
 
@@ -286,15 +276,11 @@ export const SuppliersPage: React.FC = () => {
                   type="button"
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300"
-                >
-                  انصراف
-                </button>
+                >{t("انصراف")}</button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
-                >
-                  ذخیره اطلاعات
-                </button>
+                  className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
+                >{t("ذخیره اطلاعات")}</button>
               </div>
             </form>
           </div>

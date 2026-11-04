@@ -9,9 +9,9 @@ from apps.invoices.models import SalesInvoice, PurchaseInvoice, InvoiceSequence
 
 @pytest.mark.django_db
 @pytest.mark.parametrize('model', [SalesInvoice, PurchaseInvoice, InvoiceSequence])
-def test_financial_document_admin_disallows_direct_writes(model, manager_user):
+def test_financial_document_admin_disallows_direct_writes(model, superuser):
     request = RequestFactory().get('/admin/')
-    request.user = manager_user
+    request.user = superuser
     model_admin = admin.site._registry[model]
     assert model_admin.has_view_permission(request)
     assert not model_admin.has_add_permission(request)
@@ -27,13 +27,13 @@ def test_financial_document_admin_disallows_direct_writes(model, manager_user):
 
 
 @pytest.mark.django_db
-def test_admin_post_cannot_change_invoice_or_delete_it(client, manager_user):
+def test_admin_post_cannot_change_invoice_or_delete_it(client, superuser):
     invoice = SalesInvoice.objects.create(
         invoice_number='AUDIT-ADMIN',
         customer=Customer.objects.create(full_name='آزمون پنل مدیریت'),
         total_amount='1000.00',
     )
-    client.force_login(manager_user)
+    client.force_login(superuser)
     change_url = reverse('admin:invoices_salesinvoice_change', args=[invoice.pk])
     assert client.get(change_url).status_code == 200
     assert client.post(change_url, {'total_amount': '1.00'}).status_code == 403

@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Any
 from decimal import Decimal
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
@@ -12,7 +14,7 @@ class BrandSerializer(serializers.ModelSerializer):
         fields = ['brand_id', 'brand_name', 'tires_count']
 
     @extend_schema_field(serializers.IntegerField)
-    def get_tires_count(self, obj) -> int:
+    def get_tires_count(self, obj: Brand) -> int:
         count = getattr(obj, 'tires_count', None)
         if count is not None:
             return count
@@ -26,7 +28,7 @@ class SizeSerializer(serializers.ModelSerializer):
         fields = ['size_id', 'size_name', 'tires_count']
 
     @extend_schema_field(serializers.IntegerField)
-    def get_tires_count(self, obj) -> int:
+    def get_tires_count(self, obj: Size) -> int:
         count = getattr(obj, 'tires_count', None)
         if count is not None:
             return count
@@ -59,7 +61,7 @@ class TireSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['stock_quantity']
 
-    def update(self, instance, validated_data):
+    def update(self, instance: Tire, validated_data: dict[str, Any]) -> Tire:
         # Purchase cost is initialized on creation, then owned by purchase services.
         writable_fields = {'tire_name', 'brand', 'size', 'sale_price', 'min_stock_alert'}
         update_fields = writable_fields.intersection(validated_data)
@@ -71,10 +73,10 @@ class TireSerializer(serializers.ModelSerializer):
         return instance
 
     @extend_schema_field(serializers.BooleanField)
-    def get_is_low_stock(self, obj) -> bool:
+    def get_is_low_stock(self, obj: Tire) -> bool:
         return obj.is_low_stock
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: Tire) -> dict[str, Any]:
         data = super().to_representation(instance)
         request = self.context.get('request')
         if request and hasattr(request.user, 'role') and request.user.role == 'TECHNICIAN':
@@ -113,10 +115,10 @@ class StockMovementSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     @extend_schema_field(serializers.CharField)
-    def get_jalali_date(self, obj):
+    def get_jalali_date(self, obj: StockMovement) -> str:
         return format_jalali_date(obj.created_at)
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: StockMovement) -> dict[str, Any]:
         data = super().to_representation(instance)
         request = self.context.get('request')
         if request and hasattr(request.user, 'role'):

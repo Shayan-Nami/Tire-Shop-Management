@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Any
 from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
@@ -27,7 +29,7 @@ class SalesInvoiceTireItemSerializer(serializers.ModelSerializer):
         fields = ['id', 'tire', 'tire_name', 'brand_name', 'size_name', 'quantity', 'unit_price', 'unit_cost', 'total_price']
         read_only_fields = ['id', 'unit_cost', 'total_price']
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: SalesInvoiceTireItem) -> dict[str, Any]:
         data = super().to_representation(instance)
         request = self.context.get('request')
         if request and hasattr(request.user, 'role') and request.user.role in ('TECHNICIAN', 'WAREHOUSE'):
@@ -35,7 +37,7 @@ class SalesInvoiceTireItemSerializer(serializers.ModelSerializer):
         return data
 
     @extend_schema_field(serializers.DecimalField(max_digits=14, decimal_places=2))
-    def get_total_price(self, obj):
+    def get_total_price(self, obj: SalesInvoiceTireItem) -> Decimal:
         return obj.quantity * obj.unit_price
 
 class SalesInvoiceServiceItemSerializer(serializers.ModelSerializer):
@@ -47,7 +49,7 @@ class SalesInvoiceServiceItemSerializer(serializers.ModelSerializer):
         fields = ['id', 'service', 'service_name', 'quantity', 'unit_price', 'total_price']
 
     @extend_schema_field(serializers.DecimalField(max_digits=14, decimal_places=2))
-    def get_total_price(self, obj):
+    def get_total_price(self, obj: SalesInvoiceServiceItem) -> Decimal:
         return obj.quantity * obj.unit_price
 
 class SalesInvoiceSerializer(serializers.ModelSerializer):
@@ -85,7 +87,7 @@ class SalesInvoiceSerializer(serializers.ModelSerializer):
 
 
     @extend_schema_field(serializers.CharField)
-    def get_jalali_date(self, obj):
+    def get_jalali_date(self, obj: SalesInvoice) -> str:
         return format_jalali_date(obj.invoice_date)
 
 class SalesInvoiceTireItemInputSerializer(serializers.Serializer):
@@ -140,7 +142,7 @@ class SalesInvoiceCreateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['sales_invoice_id', 'total_amount']
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         customer = attrs.get('customer')
         vehicle = attrs.get('vehicle')
         if vehicle and customer and vehicle.customer_id != customer.pk:
@@ -205,36 +207,16 @@ class SalesInvoiceCreateSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> SalesInvoice:
         tire_items = validated_data.pop('tire_items', [])
         service_items = validated_data.pop('service_items', [])
         user = self.context['request'].user if 'request' in self.context else None
 
-        prepared_tire_items = []
-        for item in tire_items:
-            tire_obj = item['tire']
-            unit_p_val = item.get('unit_price')
-            prepared_tire_items.append({
-                'tire': tire_obj,
-                'quantity': item['quantity'],
-                'unit_price': unit_p_val if unit_p_val is not None else tire_obj.sale_price
-            })
-
-        prepared_service_items = []
-        for item in service_items:
-            service_obj = item['service']
-            unit_p_val = item.get('unit_price')
-            prepared_service_items.append({
-                'service': service_obj,
-                'quantity': item.get('quantity', 1),
-                'unit_price': unit_p_val if unit_p_val is not None else service_obj.price
-            })
-
         return create_sales_invoice_service(
             customer=validated_data.get('customer'),
             vehicle=validated_data.get('vehicle'),
-            tire_items_data=prepared_tire_items,
-            service_items_data=prepared_service_items,
+            tire_items_data=tire_items,
+            service_items_data=service_items,
             discount_amount=validated_data.get('discount_amount', 0),
             discount_percent=validated_data.get('discount_percent', 0),
             status=validated_data.get('status', InvoiceStatus.CONFIRMED),
@@ -271,7 +253,7 @@ class PurchaseInvoiceSerializer(serializers.ModelSerializer):
         read_only_fields = ['purchase_invoice_id', 'invoice_number', 'payment_status', 'total_amount', 'created_by']
 
     @extend_schema_field(serializers.CharField)
-    def get_jalali_date(self, obj):
+    def get_jalali_date(self, obj: PurchaseInvoice) -> str:
         return format_jalali_date(obj.invoice_date)
 
 class PurchaseInvoiceTireItemInputSerializer(serializers.Serializer):
@@ -300,7 +282,7 @@ class PurchaseInvoiceCreateSerializer(serializers.ModelSerializer):
         fields = ['purchase_invoice_id', 'supplier', 'total_amount', 'tire_items']
         read_only_fields = ['purchase_invoice_id', 'total_amount']
 
-    def validate_tire_items(self, value):
+    def validate_tire_items(self, value: Any) -> Any:
         if not value:
             raise serializers.ValidationError("ثبت حداقل یک قلم تایر برای فاکتور خرید الزامی است.")
         tire_ids = [item['tire'].pk for item in value if 'tire' in item]
@@ -308,7 +290,7 @@ class PurchaseInvoiceCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("تایر تکراری در اقلام فاکتور خرید یافت شد. لطفاً تعداد را در یک ردیف تجمیع نمایید.")
         return value
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> PurchaseInvoice:
         tire_items = validated_data.pop('tire_items', [])
         user = self.context['request'].user if 'request' in self.context else None
 
@@ -324,7 +306,7 @@ class PurchaseInvoiceCreateSerializer(serializers.ModelSerializer):
 
         return create_purchase_invoice_service(
             supplier=validated_data['supplier'],
-            tire_items_data=prepared_tire_items,
+            tire_items_data=tire_items,
             created_by=user
         )
 
@@ -340,7 +322,7 @@ class SalesReturnItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: SalesReturnItem) -> dict[str, Any]:
         data = super().to_representation(instance)
         request = self.context.get('request')
         if request and hasattr(request.user, 'role') and request.user.role == 'TECHNICIAN':
@@ -375,7 +357,7 @@ class SalesReturnSerializer(serializers.ModelSerializer):
         read_only_fields = ['sales_return_id', 'total_refund_amount', 'created_by']
 
     @extend_schema_field(serializers.CharField)
-    def get_jalali_date(self, obj):
+    def get_jalali_date(self, obj: SalesReturn) -> str:
         return format_jalali_date(obj.return_date)
 
 class SalesReturnCreateSerializer(serializers.Serializer):
@@ -398,17 +380,17 @@ class SalesReturnCreateSerializer(serializers.Serializer):
     )
     items = SalesReturnItemInputSerializer(many=True, required=True)
 
-    def validate_return_date(self, value):
+    def validate_return_date(self, value: Any) -> Any:
         if value and value > timezone.now():
             raise serializers.ValidationError("تاریخ مرجوعی نمی‌تواند در آینده باشد.")
         return value
 
-    def validate_items(self, value):
+    def validate_items(self, value: Any) -> Any:
         if not value:
             raise serializers.ValidationError("ثبت حداقل یک قلم تایر جهت مرجوعی الزامی است.")
         return value
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         invoice = attrs.get('sales_invoice')
         items = attrs.get('items', [])
         if not items:
@@ -427,7 +409,7 @@ class SalesReturnCreateSerializer(serializers.Serializer):
                 })
         return attrs
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> SalesReturn:
         user = self.context['request'].user if 'request' in self.context else None
         return create_sales_return_service(
             invoice=validated_data['sales_invoice'],

@@ -16,8 +16,9 @@ environment variables and the [deployment guide](DEPLOYMENT_GUIDE.md) for checks
 - SQLite at `backend/db.sqlite3` otherwise. An unrecognized engine value also falls
   through to SQLite, so verify the selected backend before deployment.
 
-The current audit ran on SQLite. PostgreSQL-specific concurrency tests were
-skipped, and live external-database compatibility was not verified.
+The latest full suites passed on SQLite and PostgreSQL, including the
+PostgreSQL-specific concurrency tests. SQL Server remains unverified; see the
+[release record](RELEASE_READINESS.md) for the exact checks and remaining limits.
 
 Business tables often use explicit legacy names and `AutoField` primary keys,
 not Django's default `app_model` names. Exact names and case matter, including
@@ -25,6 +26,10 @@ not Django's default `app_model` names. Exact names and case matter, including
 also exist; they are not enumerated below. `reports` adds no business tables.
 
 ## Model-to-table map
+
+See the [entity relationship diagram](../README.md#entity-relationship-diagram)
+for the operational relationships. The tables below include the audit and
+numbering models omitted from that overview.
 
 ### Users, catalog, customers, and suppliers
 

@@ -1,3 +1,4 @@
+import type { Language } from './i18n.ts';
 /**
  * تبدیل ارقام انگلیسی به فارسی
  */
@@ -14,35 +15,37 @@ export function toPersianDigits(num: string | number | null | undefined): string
 export function formatCurrency(
   amount: number | string | null | undefined,
   showUnit: boolean = true,
-  unit: 'rial' | 'toman' = 'rial'
+  unit: 'rial' | 'toman' = 'rial',
+  language: Language = 'fa'
 ): string {
-  if (amount === null || amount === undefined || amount === '') return '۰';
+  if (amount === null || amount === undefined || amount === '') return language === 'en' ? '0' : '۰';
   
   let numeric = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(numeric)) return '۰';
+  if (!Number.isFinite(numeric)) return language === 'en' ? '0' : '۰';
 
   if (unit === 'toman') {
     numeric = Math.floor(numeric / 10);
   }
 
   const formatted = Math.floor(numeric).toLocaleString('en-US');
-  const persianFormatted = toPersianDigits(formatted);
+  const persianFormatted = language === 'fa' ? toPersianDigits(formatted) : formatted;
 
   if (!showUnit) return persianFormatted;
-  return `${persianFormatted} ${unit === 'toman' ? 'تومان' : 'ریال'}`;
+  const label = language === 'en' ? (unit === 'toman' ? 'Toman' : 'IRR') : (unit === 'toman' ? 'تومان' : 'ریال');
+  return `${persianFormatted} ${label}`;
 }
 
 /**
  * تبدیل رشته تاریخ میلادی ISO به تاریخ خوانای شمسی
  */
-export function formatIsoToJalali(isoString?: string | null): string {
+export function formatIsoToJalali(isoString?: string | null, language: Language = 'fa'): string {
   if (!isoString) return '-';
   try {
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return isoString;
 
     // استفاده از فرمت‌کننده استاندارد مرورگر برای تقویم جلالی
-    const formatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+    const formatter = new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'fa-IR-u-ca-persian', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',

@@ -6,10 +6,9 @@ from django.db import IntegrityError, connection
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
 from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementType
-from apps.customers.models import Customer, Vehicle
+from apps.customers.models import Customer
 from apps.suppliers.models import Supplier
-from apps.services_app.models import Service
-from apps.invoices.models import SalesInvoice, PurchaseInvoice, InvoiceStatus
+from apps.invoices.models import SalesInvoice, InvoiceStatus
 from apps.invoices.services import (
     create_sales_invoice_service, confirm_sales_invoice_service,
     create_sales_return_service
@@ -453,7 +452,7 @@ class TestConcurrentDraftConfirmation:
         )
 
         num_threads = 2
-        barrier = threading.Barrier(num_threads)
+        barrier = threading.Barrier(num_threads, timeout=10)
         successes = []
         errors = []
 

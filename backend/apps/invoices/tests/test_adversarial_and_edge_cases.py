@@ -3,13 +3,13 @@ from decimal import Decimal
 from django.urls import reverse
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
-from apps.accounts.models import User, UserRole
+from apps.accounts.models import User
 from apps.customers.models import Customer, Vehicle
 from apps.catalog.models import Brand, Size, Tire
 from apps.services_app.models import Service
 from apps.suppliers.models import Supplier
 from apps.invoices.models import SalesInvoice, PurchaseInvoice, InvoiceStatus, PaymentStatus
-from apps.finance.models import ReceiptVoucher, PaymentVoucher
+from apps.finance.models import ReceiptVoucher
 from apps.finance.services import create_receipt_voucher_service
 from apps.invoices.services import create_sales_invoice_service, create_purchase_invoice_service
 

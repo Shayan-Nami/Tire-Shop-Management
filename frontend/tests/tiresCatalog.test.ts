@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import * as formatters from '../src/utils/formatters.ts';
 import { parseApiError } from '../src/utils/errorParser.ts';
-import { mountComponent, nodes, page, text } from './componentHarness.ts';
+import { createRequestSequence } from '../src/utils/invoiceRequests.ts';
+import { deferred, mountComponent, nodes, page, text } from './componentHarness.ts';
 
 type Harness = ReturnType<typeof mountComponent>;
 
@@ -23,7 +24,7 @@ function change(h: Harness, control: any, value: string) {
   h.render();
 }
 
-async function setup(t: TestContext, purchasePrice: number | undefined = 70000) {
+async function setup(t: TestContext, purchasePrice: number | undefined = 70000, getTires?: (params: any) => Promise<any>) {
   const tire = {
     tire_id: 1, tire_name: 'Original tire', brand: 2, brand_name: 'Brand',
     size: 3, size_name: 'Size', stock_quantity: 5, sale_price: 100000,
@@ -33,13 +34,14 @@ async function setup(t: TestContext, purchasePrice: number | undefined = 70000) 
   const creations: any[] = [];
   const h = mountComponent('../src/pages/TiresCatalog.tsx', 'TiresCatalog', {
     '../api/catalog': { catalogApi: {
-      getTires: async () => page([tire]),
+      getTires: getTires ?? (async () => page([tire])),
       getBrands: async () => [{ brand_id: 2, brand_name: 'Brand' }],
       getSizes: async () => [{ size_id: 3, size_name: 'Size' }],
       updateTire: async (id: number, data: any) => { updates.push({ id, data }); return tire; },
       createTire: async (data: any) => { creations.push(data); return tire; },
     } },
     '../utils/formatters': formatters,
+    '../utils/invoiceRequests': { createRequestSequence },
     '../utils/errorParser': { parseApiError },
     '../context/AuthContext': { useAuth: () => ({ currencyUnit: 'rial', user: { role: 'MANAGER' } }) },
     '../components/catalog/StockAdjustmentModal': { StockAdjustmentModal: 'stock-adjustment-modal' },
@@ -100,4 +102,20 @@ test('new tire creation retains an editable initial purchase cost and sends its 
     tire_name: 'New tire', brand: 2, size: 3, sale_price: 150000,
     purchase_price: 80000, min_stock_alert: 4,
   }]);
+});
+
+
+test('an older catalog response cannot overwrite a newer search result', async (t) => {
+  const initial = deferred<any>();
+  const filtered = deferred<any>();
+  const { h } = await setup(t, 70000, (params) => params.search ? filtered.promise : initial.promise);
+  const search = find(h.tree, (node) => node.type === 'input' && node.props.placeholder?.startsWith('جستجو'));
+  change(h, search, 'no-match');
+  filtered.resolve(page([]));
+  await h.flush();
+  assert.match(text(h.tree), /تایری با این مشخصات یافت نشد/);
+  initial.resolve(page([{ tire_id: 999, tire_name: 'Stale result' }]));
+  await h.flush();
+  assert.match(text(h.tree), /تایری با این مشخصات یافت نشد/);
+  assert.ok(!text(h.tree).includes('Stale result'));
 });

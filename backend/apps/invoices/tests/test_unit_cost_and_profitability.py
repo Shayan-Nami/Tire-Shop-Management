@@ -1,10 +1,9 @@
 import pytest
 from decimal import Decimal
 from django.urls import reverse
-from rest_framework.exceptions import ValidationError
 from apps.catalog.models import Brand, Size, Tire
 from apps.customers.models import Customer
-from apps.invoices.models import SalesInvoice, SalesInvoiceTireItem, InvoiceStatus
+from apps.invoices.models import SalesInvoiceTireItem, InvoiceStatus
 from apps.invoices.services import create_sales_invoice_service
 
 @pytest.fixture

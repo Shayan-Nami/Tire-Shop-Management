@@ -7,12 +7,11 @@ from rest_framework.exceptions import ValidationError
 from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementType
 from apps.customers.models import Customer
 from apps.suppliers.models import Supplier
-from apps.finance.models import ReceiptVoucher, PaymentVoucher
+from apps.finance.models import PaymentVoucher
 from apps.finance.serializers import ReceiptVoucherSerializer, PaymentVoucherSerializer
 from apps.finance.services import create_receipt_voucher_service, create_payment_voucher_service
 from apps.invoices.models import (
-    SalesInvoice, SalesInvoiceTireItem, PurchaseInvoice, PurchaseInvoiceTireItem,
-    SalesReturn, SalesReturnItem, InvoiceStatus, PaymentStatus
+    InvoiceStatus
 )
 from apps.invoices.services import (
     create_sales_invoice_service,
@@ -175,7 +174,7 @@ class TestPurchaseInvoiceCancellation:
         tire.save()
 
         # خرید اول با قیمت ۱۵۰,۰۰۰
-        p1 = create_purchase_invoice_service(
+        create_purchase_invoice_service(
             supplier=supplier,
             tire_items_data=[{'tire': tire, 'quantity': 5, 'unit_cost': Decimal('1500000.00')}],
             created_by=manager_user

@@ -1,7 +1,17 @@
+from __future__ import annotations
+from typing import Any, TYPE_CHECKING
+from datetime import datetime
+
+if TYPE_CHECKING:
+    from apps.accounts.models import User
+    from apps.customers.models import Customer, Vehicle
+    from apps.suppliers.models import Supplier
+    from apps.invoices.models import SalesInvoice, PurchaseInvoice, SalesReturn
+
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
-from django.db import transaction, models
+from django.db import transaction, models, IntegrityError
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
+from utils.domain import DomainValidationError as ValidationError, validate_money, validate_quantity
 from .models import (
     SalesInvoice, SalesInvoiceTireItem, SalesInvoiceServiceItem,
     PurchaseInvoice, PurchaseInvoiceTireItem, SalesReturn, SalesReturnItem,
@@ -13,7 +23,7 @@ from apps.finance.services import create_receipt_voucher_service
 from utils.jalali import get_jalali_year
 
 
-def _validate_invoice_total(invoice):
+def _validate_invoice_total(invoice: SalesInvoice | PurchaseInvoice) -> None:
     field = invoice._meta.get_field('total_amount')
     maximum = Decimal(10) ** (field.max_digits - field.decimal_places) - Decimal(1).scaleb(-field.decimal_places)
     amount = invoice.total_amount
@@ -24,7 +34,7 @@ def _validate_invoice_total(invoice):
 
 
 @transaction.atomic
-def generate_next_invoice_number(doc_type: str, dt=None) -> str:
+def generate_next_invoice_number(doc_type: str, dt: datetime | None=None) -> str:
     """
     تولید اتمیک و بدون تکرار شماره فاکتور پیوسته (Gapless Sequential Numbering)
     بر اساس (doc_type, سال شمسی) با قفل select_for_update روی ردیف شمارنده
@@ -38,7 +48,7 @@ def generate_next_invoice_number(doc_type: str, dt=None) -> str:
         try:
             with transaction.atomic():
                 InvoiceSequence.objects.create(doc_type=doc_type, year=year, last_number=0)
-        except Exception:
+        except IntegrityError:
             pass
         seq = InvoiceSequence.objects.select_for_update().get(doc_type=doc_type, year=year)
 
@@ -49,13 +59,21 @@ def generate_next_invoice_number(doc_type: str, dt=None) -> str:
 
 
 @transaction.atomic
-def create_sales_invoice_service(customer, vehicle, tire_items_data, service_items_data,
-                                 discount_amount=0, discount_percent=0, status=InvoiceStatus.CONFIRMED,
-                                 payment_status=None, payment_method='کارتخوان / نقدی', reference_number='',
-                                 notes='', created_by=None):
+def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
+                                 tire_items_data: list[dict[str, Any]], service_items_data: list[dict[str, Any]],
+                                 discount_amount: Decimal | int = 0, discount_percent: Decimal | int = 0,
+                                 status: str = InvoiceStatus.CONFIRMED, payment_status: str | None = None,
+                                 payment_method: str = 'کارتخوان / نقدی', reference_number: str = '',
+                                 notes: str = '', created_by: User | None = None) -> SalesInvoice:
     """
     سرویس ایجاد فاکتور فروش همراه با کسر امن و قفل ردیفی موجودی انبار در تراکنش اتمیک
     """
+    if vehicle is not None and vehicle.customer_id != customer.pk:
+        raise ValidationError({'vehicle': 'خودروی انتخاب‌شده متعلق به این مشتری نیست.'})
+    if status not in (InvoiceStatus.DRAFT, InvoiceStatus.CONFIRMED, InvoiceStatus.CANCELLED):
+        raise ValidationError({'status': 'وضعیت فاکتور نامعتبر است.'})
+    if payment_status is not None and payment_status not in PaymentStatus.values:
+        raise ValidationError({'payment_status': 'وضعیت پرداخت نامعتبر است.'})
     if not tire_items_data and not service_items_data:
         raise ValidationError("ثبت حداقل یک قلم تایر یا یک خدمت برای صدور فاکتور فروش الزامی است.")
 
@@ -68,12 +86,12 @@ def create_sales_invoice_service(customer, vehicle, tire_items_data, service_ite
         raise ValidationError("خدمت تکراری در اقلام فاکتور یافت شد. لطفاً تعداد را تجمیع نمایید.")
 
     try:
-        discount_amount = Decimal(str(discount_amount if discount_amount is not None else 0))
+        discount_amount = validate_money(discount_amount if discount_amount is not None else 0)
     except (InvalidOperation, TypeError, ValueError):
         raise ValidationError("مبلغ تخفیف وارد شده نامعتبر است.")
 
     try:
-        discount_percent = Decimal(str(discount_percent if discount_percent is not None else 0))
+        discount_percent = validate_money(discount_percent if discount_percent is not None else 0)
     except (InvalidOperation, TypeError, ValueError):
         raise ValidationError("درصد تخفیف وارد شده نامعتبر است.")
 
@@ -121,7 +139,7 @@ def create_sales_invoice_service(customer, vehicle, tire_items_data, service_ite
     for item in tire_items_data:
         tire_obj = locked_tires[item['tire'].pk]
         try:
-            qty = int(item['quantity'])
+            qty = validate_quantity(item['quantity'])
         except (TypeError, ValueError):
             raise ValidationError("تعداد تایر وارد شده نامعتبر است.")
         if qty <= 0:
@@ -129,7 +147,7 @@ def create_sales_invoice_service(customer, vehicle, tire_items_data, service_ite
 
         unit_p_val = item.get('unit_price')
         try:
-            unit_price = Decimal(str(unit_p_val)) if unit_p_val is not None else tire_obj.sale_price
+            unit_price = validate_money(unit_p_val) if unit_p_val is not None else tire_obj.sale_price
         except (InvalidOperation, TypeError, ValueError):
             raise ValidationError("قیمت واحد تایر نامعتبر است.")
         if unit_price < Decimal('0.00'):
@@ -169,7 +187,7 @@ def create_sales_invoice_service(customer, vehicle, tire_items_data, service_ite
     for s_item in service_items_data:
         service_obj = s_item['service']
         try:
-            qty = int(s_item.get('quantity', 1))
+            qty = validate_quantity(s_item.get('quantity', 1))
         except (TypeError, ValueError):
             raise ValidationError("تعداد خدمت وارد شده نامعتبر است.")
         if qty <= 0:
@@ -177,7 +195,7 @@ def create_sales_invoice_service(customer, vehicle, tire_items_data, service_ite
 
         unit_p_val = s_item.get('unit_price')
         try:
-            unit_price = Decimal(str(unit_p_val)) if unit_p_val is not None else service_obj.price
+            unit_price = validate_money(unit_p_val) if unit_p_val is not None else service_obj.price
         except (InvalidOperation, TypeError, ValueError):
             raise ValidationError("قیمت واحد خدمت نامعتبر است.")
         if unit_price < Decimal('0.00'):
@@ -214,6 +232,7 @@ def create_sales_invoice_service(customer, vehicle, tire_items_data, service_ite
 
     # صدور خودکار سند دریافت وجه برای فاکتورهای نقدی / تسویه‌شده هم‌زمان با صدور فاکتور
     if init_payment_status == PaymentStatus.PAID and invoice.total_amount > Decimal('0.00'):
+        invoice.refresh_from_db(fields=['total_amount'])
         create_receipt_voucher_service(
             sales_invoice=invoice,
             amount=invoice.total_amount,
@@ -227,7 +246,7 @@ def create_sales_invoice_service(customer, vehicle, tire_items_data, service_ite
     return invoice
 
 @transaction.atomic
-def cancel_sales_invoice_service(invoice, user=None):
+def cancel_sales_invoice_service(invoice: SalesInvoice | int, user: User | None=None) -> SalesInvoice:
     """
     سرویس لغو فاکتور فروش و بازگرداندن اقلام کسر شده به موجودی انبار از طریق دفتر گردش انبار
     """
@@ -263,7 +282,7 @@ def cancel_sales_invoice_service(invoice, user=None):
     return locked_invoice
 
 @transaction.atomic
-def confirm_sales_invoice_service(invoice, user=None) -> SalesInvoice:
+def confirm_sales_invoice_service(invoice: SalesInvoice | int, user: User | None=None) -> SalesInvoice:
     """
     سرویس تایید فاکتور فروش در وضعیت پیش‌نویس (DRAFT)، کسر اتمیک اقلام از انبار
     و تغییر وضعیت به CONFIRMED
@@ -306,7 +325,7 @@ def confirm_sales_invoice_service(invoice, user=None) -> SalesInvoice:
     return locked_invoice
 
 @transaction.atomic
-def create_purchase_invoice_service(supplier, tire_items_data, created_by=None):
+def create_purchase_invoice_service(supplier: Supplier, tire_items_data: list[dict[str, Any]], created_by: User | None=None) -> PurchaseInvoice:
     """
     سرویس ثبت فاکتور خرید از تأمین‌کننده، افزایش موجودی انبار و به‌روزرسانی قیمت خرید تایرها
     از طریق دفتر گردش انبار
@@ -338,7 +357,7 @@ def create_purchase_invoice_service(supplier, tire_items_data, created_by=None):
     for item in tire_items_data:
         tire_obj = locked_tires[item['tire'].pk]
         try:
-            qty = int(item['quantity'])
+            qty = validate_quantity(item['quantity'])
         except (TypeError, ValueError):
             raise ValidationError("تعداد قلم خرید نامعتبر است.")
         if qty <= 0:
@@ -346,7 +365,7 @@ def create_purchase_invoice_service(supplier, tire_items_data, created_by=None):
 
         unit_c_val = item.get('unit_cost')
         try:
-            unit_cost = Decimal(str(unit_c_val)) if unit_c_val is not None else tire_obj.purchase_price
+            unit_cost = validate_money(unit_c_val) if unit_c_val is not None else tire_obj.purchase_price
         except (InvalidOperation, TypeError, ValueError):
             raise ValidationError("بهای خرید واحد نامعتبر است.")
         if unit_cost < Decimal('0.00'):
@@ -383,7 +402,7 @@ def create_purchase_invoice_service(supplier, tire_items_data, created_by=None):
     return invoice
 
 @transaction.atomic
-def cancel_purchase_invoice_service(invoice, user=None):
+def cancel_purchase_invoice_service(invoice: PurchaseInvoice | int, user: User | None=None) -> PurchaseInvoice:
     """
     سرویس لغو فاکتور خرید، کسر موجودی انبار از طریق گردش PURCHASE_CANCEL
     و بازگرداندن هوشمند نرخ خرید تایر (purchase_price) به آخرین نرخ خرید قبلی
@@ -469,7 +488,7 @@ def cancel_purchase_invoice_service(invoice, user=None):
     return locked_invoice
 
 @transaction.atomic
-def create_sales_return_service(invoice, items_data: list[dict], reason: str, return_date=None, user=None, auto_refund: bool = False) -> SalesReturn:
+def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[dict], reason: str, return_date: datetime | None=None, user: User | None=None, auto_refund: bool = False) -> SalesReturn:
     """
     سرویس ثبت سند مرجوعی فروش (SalesReturn)، افزایش موجودی انبار و ثبت دقیق گردش SALE_RETURN.
     
@@ -509,11 +528,15 @@ def create_sales_return_service(invoice, items_data: list[dict], reason: str, re
         return_date = timezone.now()
 
     # محاسبه ضریب تخفیف برای لحاظ کردن سهم تخفیف در مبلغ استرداد
-    subtotal = Decimal('0.00')
-    for ti in locked_invoice.tire_items.all():
-        subtotal += (Decimal(str(ti.quantity)) * ti.unit_price)
-    for si in locked_invoice.service_items.all():
-        subtotal += (Decimal(str(si.quantity)) * si.unit_price)
+    invoice_items = {item.pk: item for item in locked_invoice.tire_items.select_related('tire')}
+    subtotal = sum((item.quantity * item.unit_price for item in invoice_items.values()), Decimal('0.00'))
+    subtotal += locked_invoice.service_items.aggregate(
+        total=models.Sum(models.F('quantity') * models.F('unit_price'))
+    )['total'] or Decimal('0.00')
+    past_returns = {row['sales_invoice_tire_item_id']: row for row in
+        SalesReturnItem.objects.filter(sales_invoice_tire_item_id__in=invoice_items).values(
+            'sales_invoice_tire_item_id'
+        ).annotate(total_qty=models.Sum('quantity'), total_refund=models.Sum('refund_amount'))}
 
     if locked_invoice.discount_percent > 0:
         discount_factor = Decimal('1.00') - (locked_invoice.discount_percent / Decimal('100.00'))
@@ -540,26 +563,21 @@ def create_sales_return_service(invoice, items_data: list[dict], reason: str, re
         if not tire_item_id:
             raise ValidationError("شناسه قلم فاکتور تایر (sales_invoice_tire_item_id) الزامی است.")
 
-        tire_item = locked_invoice.tire_items.filter(pk=tire_item_id).first()
+        tire_item = invoice_items.get(tire_item_id)
         if not tire_item:
             raise ValidationError(f"قلم تایر با شناسه {tire_item_id} در فاکتور فروش #{locked_invoice.sales_invoice_id} یافت نشد.")
 
         try:
-            qty = int(item_data.get('quantity', 0))
+            qty = validate_quantity(item_data.get('quantity', 0))
         except (TypeError, ValueError):
             raise ValidationError("تعداد قلم مرجوعی نامعتبر است.")
         if qty <= 0:
             raise ValidationError("تعداد قلم مرجوعی باید بزرگتر از صفر باشد.")
 
         # واکشی مجموع تعداد و مبالغ استرداد قبلی این قلم درون همین تراکنش
-        past_returns_aggr = SalesReturnItem.objects.filter(
-            sales_invoice_tire_item=tire_item
-        ).aggregate(
-            total_qty=models.Sum('quantity'),
-            total_refund=models.Sum('refund_amount')
-        )
-        already_returned_qty = past_returns_aggr['total_qty'] or 0
-        already_refunded_amount = past_returns_aggr['total_refund'] or Decimal('0.00')
+        past_returns_aggr = past_returns.get(tire_item.pk, {})
+        already_returned_qty = past_returns_aggr.get('total_qty') or 0
+        already_refunded_amount = past_returns_aggr.get('total_refund') or Decimal('0.00')
 
         remaining_qty = tire_item.quantity - already_returned_qty
         if qty > remaining_qty:

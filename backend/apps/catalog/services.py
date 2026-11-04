@@ -1,11 +1,18 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from apps.accounts.models import User
+    from apps.invoices.models import SalesInvoice, PurchaseInvoice, SalesReturn
+
 from decimal import Decimal
 from django.db import transaction
-from django.db.models import Sum
-from rest_framework.exceptions import ValidationError
+from django.db.models import Sum, F
+from utils.domain import DomainValidationError as ValidationError, StockConflict, validate_money, validate_quantity
 from .models import Tire, StockMovement, StockMovementType, StockProjectionRepair
 
 @transaction.atomic
-def record_stock_movements(movements_data: list[dict], user=None) -> list[StockMovement]:
+def record_stock_movements(movements_data: list[dict], user: User | None=None) -> list[StockMovement]:
     """
     سرویس مرکزی و جامع ثبت گروهی گردش‌های انبار.
     
@@ -40,7 +47,7 @@ def record_stock_movements(movements_data: list[dict], user=None) -> list[StockM
     for item in movements_data:
         try:
             tid = int(item['tire_id'])
-            delta = int(item['quantity_delta'])
+            delta = validate_quantity(item['quantity_delta'])
         except (TypeError, ValueError, KeyError):
             raise ValidationError("مقادیر گردش انبار نامعتبر است.")
         projected_balances[tid] += delta
@@ -55,24 +62,27 @@ def record_stock_movements(movements_data: list[dict], user=None) -> list[StockM
     # ۴. اعمال تغییرات موجودی و درج رکوردهای گردش انبار
     for item in movements_data:
         tid = int(item['tire_id'])
-        delta = int(item['quantity_delta'])
+        delta = validate_quantity(item['quantity_delta'])
         if delta == 0:
             continue
 
         tire = locked_tires[tid]
-        tire.stock_quantity += delta
-        update_fields = ['stock_quantity']
+        previous_stock = tire.stock_quantity
+        updates = {'stock_quantity': F('stock_quantity') + delta}
 
         # به‌روزرسانی قیمت خرید در صورت ثبت فاکتور خرید (آخرین نرخ خرید)
         new_purchase_price = item.get('new_purchase_price')
         if new_purchase_price is not None:
-            tire.purchase_price = Decimal(str(new_purchase_price))
-            update_fields.append('purchase_price')
+            tire.purchase_price = validate_money(new_purchase_price)
+            updates['purchase_price'] = tire.purchase_price
 
-        tire.save(update_fields=update_fields)
+        updated = Tire.objects.filter(pk=tid, stock_quantity=previous_stock).update(**updates)
+        if updated != 1:
+            raise StockConflict('موجودی تغییر کرده است؛ عملیات را دوباره انجام دهید.')
+        tire.stock_quantity = previous_stock + delta
 
         raw_unit_cost = item.get('unit_cost')
-        unit_cost = Decimal(str(raw_unit_cost if raw_unit_cost is not None else tire.purchase_price))
+        unit_cost = validate_money(raw_unit_cost if raw_unit_cost is not None else tire.purchase_price)
 
         movement = StockMovement.objects.create(
             tire=tire,
@@ -95,14 +105,14 @@ def record_stock_movement(
     tire_id: int,
     quantity_delta: int,
     movement_type: str,
-    user=None,
-    sales_invoice=None,
-    purchase_invoice=None,
-    sales_return=None,
-    unit_cost=None,
+    user: User | None=None,
+    sales_invoice: SalesInvoice | None=None,
+    purchase_invoice: PurchaseInvoice | None=None,
+    sales_return: SalesReturn | None=None,
+    unit_cost: Decimal | None=None,
     description: str = '',
-    new_purchase_price=None
-) -> StockMovement:
+    new_purchase_price: Decimal | None=None
+) -> StockMovement | None:
     """
     ثبت تکی گردش انبار برای یک تایر (فراخوانی سرویس مرکزی record_stock_movements در لایه زیرین)
     """
@@ -124,12 +134,13 @@ def record_stock_movement(
 
 
 @transaction.atomic
-def adjust_tire_stock_service(tire: Tire, counted_quantity: int, reason: str, user=None) -> StockMovement:
+def adjust_tire_stock_service(tire: Tire, counted_quantity: int, reason: str, user: User | None=None) -> StockMovement:
     """
     سرویس اصلاح دستی و انبارگردانی تایر.
     ورودی: مقدار جدید شمارش‌شده توسط انباردار (counted_quantity).
     سیستم اختلاف را نسبت به موجودی جاری محاسبه و در قالب سند MANUAL_ADJUSTMENT ثبت می‌کند.
     """
+    counted_quantity = validate_quantity(counted_quantity)
     if counted_quantity < 0:
         raise ValidationError("موجودی شمارش‌شده نمی‌تواند منفی باشد.")
     if not reason or not reason.strip():
@@ -142,8 +153,12 @@ def adjust_tire_stock_service(tire: Tire, counted_quantity: int, reason: str, us
     if delta == 0:
         raise ValidationError("موجودی شمارش‌شده دقیقاً برابر با موجودی فعلی سیستم است و نیازی به تعدیل ندارد.")
 
+    updated = Tire.objects.filter(pk=locked_tire.pk, stock_quantity=locked_tire.stock_quantity).update(
+        stock_quantity=counted_quantity
+    )
+    if updated != 1:
+        raise StockConflict('موجودی تغییر کرده است؛ عملیات را دوباره انجام دهید.')
     locked_tire.stock_quantity = counted_quantity
-    locked_tire.save(update_fields=['stock_quantity'])
 
     unit_cost = Decimal(str(locked_tire.purchase_price if locked_tire.purchase_price is not None else '0.00'))
 
@@ -159,7 +174,7 @@ def adjust_tire_stock_service(tire: Tire, counted_quantity: int, reason: str, us
 
 
 @transaction.atomic
-def repair_stock_projection_service(tire_id: int, reason: str, user):
+def repair_stock_projection_service(tire_id: int, reason: str, user: User | None) -> StockProjectionRepair | None:
     """Rebuild from verified ledger truth; this is not a physical stock adjustment."""
     if not reason or not reason.strip():
         raise ValidationError('A repair reason is required.')
@@ -182,6 +197,8 @@ def repair_stock_projection_service(tire_id: int, reason: str, user):
         user=user,
         reason=reason.strip(),
     )
+    updated = Tire.objects.filter(pk=tire.pk, stock_quantity=tire.stock_quantity).update(stock_quantity=ledger_stock)
+    if updated != 1:
+        raise StockConflict('موجودی تغییر کرده است؛ عملیات را دوباره انجام دهید.')
     tire.stock_quantity = ledger_stock
-    tire.save(update_fields=['stock_quantity'])
     return repair

@@ -72,7 +72,7 @@ class TestReportsAndAnalytics:
         customer3 = Customer.objects.create(full_name='مشتری ج', phone_number='09110000003')
 
         # فاکتور الف: ۱ حلقه ۱,۰۰۰,۰۰۰ تومان - بدون پرداخت
-        inv_a = create_sales_invoice_service(
+        create_sales_invoice_service(
             customer=customer1,
             vehicle=None,
             tire_items_data=[{'tire': tire, 'quantity': 1, 'unit_price': Decimal('1000000.00')}],

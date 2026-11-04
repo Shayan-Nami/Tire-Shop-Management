@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from rest_framework_simplejwt.settings import api_settings
 from drf_spectacular.utils import extend_schema
 from django.contrib.auth import get_user_model
 from .serializers import (
@@ -68,6 +69,8 @@ class LogoutView(APIView):
         serializer.is_valid(raise_exception=True)
         try:
             token = RefreshToken(serializer.validated_data['refresh'])
+            if str(token[api_settings.USER_ID_CLAIM]) != str(getattr(request.user, api_settings.USER_ID_FIELD)):
+                raise TokenError('Refresh token does not belong to this user.')
             token.blacklist()
             return Response({'detail': 'خروج با موفقیت انجام شد و توکن در لیست سیاه قرار گرفت.'}, status=status.HTTP_200_OK)
         except TokenError:

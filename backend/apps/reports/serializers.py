@@ -1,3 +1,4 @@
+from __future__ import annotations
 from rest_framework import serializers
 
 class DashboardStatsResponseSerializer(serializers.Serializer):
@@ -50,7 +51,7 @@ class SalesByDateQuerySerializer(serializers.Serializer):
     start_date = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     end_date = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
-    def validate_start_date(self, value):
+    def validate_start_date(self, value: str | None) -> str | None:
         if value:
             from utils.jalali import parse_jalali_or_gregorian_date
             parsed = parse_jalali_or_gregorian_date(value)
@@ -58,7 +59,7 @@ class SalesByDateQuerySerializer(serializers.Serializer):
                 raise serializers.ValidationError("فرمت تاریخ شروع نامعتبر است. لطفاً تاریخ شمسی (مانند ۱۴۰۳/۰۱/۰۱) یا میلادی (YYYY-MM-DD) وارد نمایید.")
         return value
 
-    def validate_end_date(self, value):
+    def validate_end_date(self, value: str | None) -> str | None:
         if value:
             from utils.jalali import parse_jalali_or_gregorian_date
             parsed = parse_jalali_or_gregorian_date(value)

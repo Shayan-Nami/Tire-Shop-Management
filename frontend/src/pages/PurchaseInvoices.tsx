@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Search,
@@ -31,6 +32,7 @@ async function fetchAllPages<T>(
 }
 
 export const PurchaseInvoices: React.FC = () => {
+  const { t, language } = useLanguage();
   const { currencyUnit, user } = useAuth();
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -83,7 +85,7 @@ export const PurchaseInvoices: React.FC = () => {
         setTires(allTires);
       } catch (error) {
         if (active) {
-          setSelectorsError(parseApiError(error, 'خطا در دریافت فهرست تأمین‌کنندگان و تایرها. لطفاً صفحه را دوباره بارگذاری کنید.'));
+          setSelectorsError(parseApiError(error, t("خطا در دریافت فهرست تأمین‌کنندگان و تایرها. لطفاً صفحه را دوباره بارگذاری کنید."), language));
         }
       } finally {
         if (active) setSelectorsLoading(false);
@@ -91,7 +93,7 @@ export const PurchaseInvoices: React.FC = () => {
     };
     void loadSelectors();
     return () => { active = false; };
-  }, []);
+  }, [t, language]);
 
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- Query changes intentionally enter the network loading state.
@@ -150,11 +152,11 @@ export const PurchaseInvoices: React.FC = () => {
     e.preventDefault();
     if (submitBusy.current) return;
     if (!selectedSupplierId) {
-      alert('لطفاً تأمین‌کننده را انتخاب فرمایید.');
+      alert(t("لطفاً تأمین‌کننده را انتخاب فرمایید."));
       return;
     }
     if (purchaseItems.length === 0) {
-      alert('حداقل یک ردیف تایر جهت ورود به انبار انتخاب کنید.');
+      alert(t("حداقل یک ردیف تایر جهت ورود به انبار انتخاب کنید."));
       return;
     }
 
@@ -174,7 +176,7 @@ export const PurchaseInvoices: React.FC = () => {
       setPurchaseItems([]);
       fetchPurchases();
     } catch (err) {
-      alert(parseApiError(err, 'خطا در ثبت ورود کالا به انبار'));
+      alert(parseApiError(err, t("خطا در ثبت ورود کالا به انبار"), language));
     } finally {
       submitBusy.current = false;
       setSubmitting(false);
@@ -184,7 +186,7 @@ export const PurchaseInvoices: React.FC = () => {
   const handleCancelPurchase = async (inv: PurchaseInvoice) => {
     if (
       !confirm(
-        `آیا از لغو فاکتور خرید ${inv.invoice_number} اطمینان دارید؟ اقلام به صورت خودکار از موجودی انبار کسر خواهد شد.`
+        t("آیا از لغو فاکتور خرید {0} اطمینان دارید؟ اقلام به صورت خودکار از موجودی انبار کسر خواهد شد.", undefined, { 0: inv.invoice_number })
       )
     ) {
       return;
@@ -194,7 +196,7 @@ export const PurchaseInvoices: React.FC = () => {
       await invoicesApi.cancelPurchaseInvoice(inv.purchase_invoice_id);
       fetchPurchases();
     } catch (err) {
-      alert(parseApiError(err, 'امکان لغو فاکتور خرید وجود ندارد.'));
+      alert(parseApiError(err, t("امکان لغو فاکتور خرید وجود ندارد."), language));
     }
   };
 
@@ -204,25 +206,21 @@ export const PurchaseInvoices: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       {/* سربرگ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="page-heading">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">
-            فاکتورهای خرید و ورود به انبار
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            ثبت اسناد خرید از نمایندگی‌ها و تأمین‌کنندگان، شارژ خودکار موجودی و اصلاح نرخ تمام‌شده (مجموع: {totalCount} سند)
-          </p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("فاکتورهای خرید و ورود به انبار")}</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("ثبت اسناد خرید از نمایندگی‌ها و تأمین‌کنندگان، شارژ خودکار موجودی و اصلاح نرخ تمام‌شده (مجموع:")}{totalCount}{' '}{t("سند)")}</p>
         </div>
 
         <button
           onClick={() => setShowCreateModal(true)}
           disabled={selectorsLoading || !!selectorsError}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
+          className="action-primary inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
         >
           <PackagePlus className="w-4 h-4" />
-          <span>ثبت فاکتور خرید (ورود کالا)</span>
+          <span>{t("ثبت فاکتور خرید (ورود کالا)")}</span>
         </button>
       </div>
 
@@ -230,11 +228,11 @@ export const PurchaseInvoices: React.FC = () => {
         <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{selectorsError}</p>
       )}
       {selectorsLoading && (
-        <p role="status" className="text-xs text-slate-500">در حال دریافت فهرست کامل تأمین‌کنندگان و تایرها...</p>
+        <p role="status" className="text-xs text-slate-500">{t("در حال دریافت فهرست کامل تأمین‌کنندگان و تایرها...")}</p>
       )}
 
       {/* جستجو */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+      <div className="filter-bar">
         <div className="relative w-full md:w-80">
           <input
             type="text"
@@ -243,51 +241,50 @@ export const PurchaseInvoices: React.FC = () => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="جستجو در شماره فاکتور، نام تأمین‌کننده..."
-            className="w-full pl-3 pr-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+            placeholder={t("جستجو در شماره فاکتور، نام تأمین‌کننده...")}
+            className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />
-          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 right-3" />
+          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-3" />
         </div>
       </div>
 
       {/* جدول فاکتورهای خرید */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="surface-panel overflow-hidden">
         {loading ? (
-          <div className="py-16 text-center text-xs text-slate-400">در حال دریافت فاکتورهای خرید...</div>
+          <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت فاکتورهای خرید...")}</div>
         ) : invoices.length === 0 ? (
-          <div className="py-16 text-center text-xs text-slate-400">سند خریدی یافت نشد.</div>
+          <div className="py-16 text-center text-xs text-slate-400">{t("سند خریدی یافت نشد.")}</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-right">
+          <div className="table-scroll overflow-x-auto">
+            <table className="data-table w-full text-xs text-start">
               <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="py-3 px-4">شماره فاکتور</th>
-                  <th className="py-3 px-4">تاریخ ورود</th>
-                  <th className="py-3 px-4">تأمین‌کننده</th>
-                  <th className="py-3 px-4 text-center">تعداد اقلام تایر</th>
-                  <th className="py-3 px-4">مبلغ کل فاکتور</th>
-                  <th className="py-3 px-4 text-center">وضعیت</th>
-                  <th className="py-3 px-4 text-center">تسویه</th>
-                  {user?.role === 'MANAGER' && <th className="py-3 px-4 text-center">عملیات</th>}
+                  <th className="py-3 px-4">{t("شماره فاکتور")}</th>
+                  <th className="py-3 px-4">{t("تاریخ ورود")}</th>
+                  <th className="py-3 px-4">{t("تأمین‌کننده")}</th>
+                  <th className="py-3 px-4 text-center">{t("تعداد اقلام تایر")}</th>
+                  <th className="py-3 px-4">{t("مبلغ کل فاکتور")}</th>
+                  <th className="py-3 px-4 text-center">{t("وضعیت")}</th>
+                  <th className="py-3 px-4 text-center">{t("تسویه")}</th>
+                  {user?.role === 'MANAGER' && <th className="py-3 px-4 text-center">{t("عملیات")}</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {invoices.map((inv) => (
                   <tr key={inv.purchase_invoice_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                      {inv.invoice_number}
+                      <bdi dir="auto">{inv.invoice_number}</bdi>
                     </td>
                     <td className="py-3 px-4 text-slate-500">
-                      {inv.jalali_date || formatIsoToJalali(inv.invoice_date)}
+                      {(language === 'fa' && inv.jalali_date) || formatIsoToJalali(inv.invoice_date, language)}
                     </td>
                     <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">
-                      {inv.supplier_name}
+                      <bdi dir="auto">{inv.supplier_name}</bdi>
                     </td>
                     <td className="py-3 px-4 text-center tabular-nums font-bold">
-                      {inv.tire_items ? inv.tire_items.reduce((s, i) => s + i.quantity, 0) : 0} حلقه
-                    </td>
+                      {inv.tire_items ? inv.tire_items.reduce((s, i) => s + i.quantity, 0) : 0}{' '}{t("حلقه")}</td>
                     <td className="py-3 px-4 font-bold text-slate-900 dark:text-white tabular-nums">
-                      {formatCurrency(inv.total_amount, true, currencyUnit)}
+                      {formatCurrency(inv.total_amount, true, currencyUnit, language)}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span
@@ -297,7 +294,7 @@ export const PurchaseInvoices: React.FC = () => {
                             : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                         }`}
                       >
-                        {inv.status_display || inv.status}
+                        {language === 'en' ? t(inv.status) : (inv.status_display || t(inv.status))}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
@@ -310,7 +307,7 @@ export const PurchaseInvoices: React.FC = () => {
                             : 'bg-slate-500/10 text-slate-600 dark:text-slate-400'
                         }`}
                       >
-                        {inv.payment_status_display || inv.payment_status}
+                        {language === 'en' ? t(inv.payment_status) : (inv.payment_status_display || t(inv.payment_status))}
                       </span>
                     </td>
                     {user?.role === 'MANAGER' && (
@@ -318,7 +315,7 @@ export const PurchaseInvoices: React.FC = () => {
                         {inv.status === 'CONFIRMED' && (
                           <button
                             onClick={() => handleCancelPurchase(inv)}
-                            title="لغو فاکتور خرید و کسر از انبار"
+                            title={t("لغو فاکتور خرید و کسر از انبار")}
                             className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors"
                           >
                             <XCircle className="w-3.5 h-3.5" />
@@ -335,24 +332,19 @@ export const PurchaseInvoices: React.FC = () => {
 
         {totalPages > 1 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>
-              صفحه {currentPage} از {totalPages}
+            <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages}
             </span>
             <div className="flex gap-1">
               <button
                 disabled={currentPage <= 1}
                 onClick={() => setCurrentPage((p) => p - 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
-              >
-                قبلی
-              </button>
+              >{t("قبلی")}</button>
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage((p) => p + 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
-              >
-                بعدی
-              </button>
+              >{t("بعدی")}</button>
             </div>
           </div>
         )}
@@ -360,36 +352,32 @@ export const PurchaseInvoices: React.FC = () => {
 
       {/* مدال ثبت فاکتور خرید */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
-              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                ثبت ورود کالا و فاکتور خرید از تأمین‌کننده
-              </h2>
+              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("ثبت ورود کالا و فاکتور خرید از تأمین‌کننده")}</h2>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-              >
-                ✕
+               aria-label={t("بستن پنجره")}>
+                ×
               </button>
             </div>
 
             <form onSubmit={handleCreatePurchase} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                  تأمین‌کننده کالا:
-                </label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("تأمین‌کننده کالا:")}</label>
                 <select
                   required
                   value={selectedSupplierId}
                   onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 >
-                  <option value="">انتخاب تأمین‌کننده...</option>
+                  <option value="">{t("انتخاب تأمین‌کننده...")}</option>
                   {suppliers.map((s) => (
                     <option key={s.supplier_id} value={s.supplier_id}>
-                      {s.supplier_name} ({s.phone_number || 'بدون شماره'})
+                      {s.supplier_name} ({s.phone_number || t("بدون شماره")})
                     </option>
                   ))}
                 </select>
@@ -398,9 +386,7 @@ export const PurchaseInvoices: React.FC = () => {
               {/* افزودن تایر */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-700 dark:text-slate-300">
-                    اقلام تایر خریداری‌شده:
-                  </label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300">{t("اقلام تایر خریداری‌شده:")}</label>
                   <select
                     onChange={(e) => {
                       if (e.target.value) {
@@ -408,38 +394,36 @@ export const PurchaseInvoices: React.FC = () => {
                         e.target.value = '';
                       }
                     }}
-                    className="w-56 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                    className="ui-field w-56 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
                   >
-                    <option value="">+ افزودن تایر به فاکتور...</option>
-                    {tires.map((t) => (
-                      <option key={t.tire_id} value={t.tire_id}>
-                        {t.tire_name} ({t.brand_name})
+                    <option value="">{t("+ افزودن تایر به فاکتور...")}</option>
+                    {tires.map((tireChoice) => (
+                      <option key={tireChoice.tire_id} value={tireChoice.tire_id}>
+                        {tireChoice.tire_name} ({tireChoice.brand_name})
                       </option>
                     ))}
                   </select>
                 </div>
 
                 {purchaseItems.length === 0 ? (
-                  <div className="p-4 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                    هیچ کالایی انتخاب نشده است.
-                  </div>
+                  <div className="p-4 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">{t("هیچ کالایی انتخاب نشده است.")}</div>
                 ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                    <table className="w-full text-xs text-right">
+                  <div className="table-scroll overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                    <table className="data-table w-full text-xs text-start">
                       <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
                         <tr>
-                          <th className="py-2.5 px-3">نام تایر</th>
-                          <th className="py-2.5 px-3 text-center">تعداد (حلقه)</th>
-                          <th className="py-2.5 px-3">نرخ خرید واحد (ریال)</th>
-                          <th className="py-2.5 px-3">جمع</th>
-                          <th className="py-2.5 px-3 text-center">حذف</th>
+                          <th className="py-2.5 px-3">{t("نام تایر")}</th>
+                          <th className="py-2.5 px-3 text-center">{t("تعداد (حلقه)")}</th>
+                          <th className="py-2.5 px-3">{t("نرخ خرید واحد (ریال)")}</th>
+                          <th className="py-2.5 px-3">{t("جمع")}</th>
+                          <th className="py-2.5 px-3 text-center">{t("حذف")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {purchaseItems.map((item) => (
                           <tr key={item.tireId}>
                             <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                              {item.tire.tire_name}
+                              <bdi dir="auto">{item.tire.tire_name}</bdi>
                             </td>
                             <td className="py-2.5 px-3 text-center">
                               <input
@@ -449,7 +433,7 @@ export const PurchaseInvoices: React.FC = () => {
                                 onChange={(e) =>
                                   handleUpdateItemQty(item.tireId, parseInt(e.target.value) || 0)
                                 }
-                                className="w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center font-bold"
+                                className="ui-field w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center font-bold"
                               />
                             </td>
                             <td className="py-2.5 px-3">
@@ -460,11 +444,11 @@ export const PurchaseInvoices: React.FC = () => {
                                 onChange={(e) =>
                                   handleUpdateItemCost(item.tireId, parseFloat(e.target.value) || 0)
                                 }
-                                className="w-28 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-bold tabular-nums text-left"
+                                className="ui-field w-28 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-bold tabular-nums text-end"
                               />
                             </td>
                             <td className="py-2.5 px-3 font-bold tabular-nums">
-                              {formatCurrency(item.quantity * item.unitCost, true, currencyUnit)}
+                              {formatCurrency(item.quantity * item.unitCost, true, currencyUnit, language)}
                             </td>
                             <td className="py-2.5 px-3 text-center">
                               <button
@@ -484,9 +468,9 @@ export const PurchaseInvoices: React.FC = () => {
               </div>
 
               <div className="flex justify-between items-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800 font-bold">
-                <span>جمع کل فاکتور خرید:</span>
+                <span>{t("جمع کل فاکتور خرید:")}</span>
                 <span className="text-sm text-brand-600 dark:text-brand-400 tabular-nums">
-                  {formatCurrency(purchaseTotal, true, currencyUnit)}
+                  {formatCurrency(purchaseTotal, true, currencyUnit, language)}
                 </span>
               </div>
 
@@ -495,15 +479,13 @@ export const PurchaseInvoices: React.FC = () => {
                   type="button"
                   onClick={() => setShowCreateModal(false)}
                   className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300"
-                >
-                  انصراف
-                </button>
+                >{t("انصراف")}</button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
+                  className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
                 >
-                  {submitting ? 'در حال ثبت...' : 'ثبت ورود به انبار'}
+                  {submitting ? t("در حال ثبت...") : t("ثبت ورود به انبار")}
                 </button>
               </div>
             </form>

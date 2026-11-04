@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementType
 from apps.customers.models import Customer
 from apps.suppliers.models import Supplier
-from apps.invoices.models import SalesInvoice, InvoiceStatus
+from apps.invoices.models import InvoiceStatus
 from apps.invoices.services import (
     create_sales_invoice_service,
     cancel_sales_invoice_service,

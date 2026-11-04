@@ -79,6 +79,17 @@ test('i18n translation dictionary covers core application terms in FA and EN', (
   assert.equal(translations.langToggleAria.fa, 'تغییر زبان بین فارسی و انگلیسی (FA / EN)');
 });
 
+test('English interpolation preserves zero and inserts values without modifying saved text', (t) => {
+  mockDOMEnvironment(t, { language: 'en' });
+  const provider = mountComponent('../src/context/LanguageContext.tsx', 'LanguageProvider', {
+    '../utils/i18n': { translations },
+  }, { children: null });
+  t.after(() => provider.unmount());
+  const translate = provider.tree.props.value.t;
+  assert.equal(translate('Missing key', 'Count: {count}', { count: 0 }), 'Count: 0');
+  assert.equal(translate('Missing key', '{name}', { name: 'نام مشتری' }), 'نام مشتری');
+});
+
 test('LanguageProvider defaults to Persian (fa) with rtl direction when storage is empty', async (t) => {
   const env = mockDOMEnvironment(t);
 

@@ -1,3 +1,4 @@
+import { useLanguage } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { X, SlidersHorizontal, AlertCircle } from 'lucide-react';
 import { Tire } from '../../types';
@@ -15,6 +16,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t, language } = useLanguage();
   const [countedQty, setCountedQty] = useState<number>(tire?.stock_quantity ?? 0);
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -27,7 +29,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason.trim()) {
-      setErrorMessage('ثبت دلیل یا شرح انبارگردانی الزامی است.');
+      setErrorMessage(t("ثبت دلیل یا شرح انبارگردانی الزامی است."));
       return;
     }
 
@@ -41,21 +43,19 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      setErrorMessage(parseApiError(err, 'خطا در ثبت اصلاحیه موجودی انبار'));
+      setErrorMessage(parseApiError(err, t("خطا در ثبت اصلاحیه موجودی انبار"), language));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="w-5 h-5 text-brand-600 dark:text-brand-400" />
-            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-              انبارگردانی و اصلاح موجودی تایر
-            </h2>
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("انبارگردانی و اصلاح موجودی تایر")}</h2>
           </div>
           <button
             onClick={onClose}
@@ -67,12 +67,10 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
           <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
-            <p className="font-bold text-slate-900 dark:text-white text-sm">{tire.tire_name}</p>
-            <p className="text-slate-500">
-              برند: {tire.brand_name} | سایز: {tire.size_name}
+            <p className="font-bold text-slate-900 dark:text-white text-sm"><bdi dir="auto">{tire.tire_name}</bdi></p>
+            <p className="text-slate-500">{t("برند:")}<bdi dir="auto">{tire.brand_name}</bdi> {t("| سایز:")} <bdi dir="auto">{tire.size_name}</bdi>
             </p>
-            <p className="text-slate-700 dark:text-slate-300">
-              موجودی سیستمی فعلی: <span className="font-bold text-brand-600">{tire.stock_quantity} حلقه</span>
+            <p className="text-slate-700 dark:text-slate-300">{t("موجودی سیستمی فعلی:")}<span className="font-bold text-brand-600">{tire.stock_quantity} {' '}{t("حلقه")}</span>
             </p>
           </div>
 
@@ -84,20 +82,18 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
           )}
 
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-700 dark:text-slate-300 block">
-              موجودی واقعی شمارش‌شده در انبار (حلقه):
-            </label>
+            <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("موجودی واقعی شمارش‌شده در انبار (حلقه):")}</label>
             <input
               type="number"
               min={0}
               value={countedQty}
               onChange={(e) => setCountedQty(parseInt(e.target.value) || 0)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-center text-sm font-bold focus:ring-2 focus:ring-brand-500 outline-none"
+              className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-center text-sm font-bold focus:ring-2 focus:ring-brand-500 outline-none"
             />
           </div>
 
           <div className="flex items-center justify-between p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px]">
-            <span className="text-slate-500">مغایرت موجودی انبار:</span>
+            <span className="text-slate-500">{t("مغایرت موجودی انبار:")}</span>
             <span
               className={`font-black tabular-nums ${
                 diff > 0
@@ -107,21 +103,19 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                   : 'text-slate-600 dark:text-slate-400'
               }`}
             >
-              {diff > 0 ? `+${diff} (مازاد انبار)` : diff < 0 ? `${diff} (کسری انبار)` : 'بدون تغییر (تطابق کامل)'}
+              {diff > 0 ? t("+{0} (مازاد انبار)", undefined, { 0: diff }) : diff < 0 ? t("{0} (کسری انبار)", undefined, { 0: diff }) : t("بدون تغییر (تطابق کامل)")}
             </span>
           </div>
 
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-700 dark:text-slate-300 block">
-              دلیل / شرح انبارگردانی (الزامی):
-            </label>
+            <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("دلیل / شرح انبارگردانی (الزامی):")}</label>
             <textarea
               rows={3}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="مثلاً: انبارگردانی پایان دوره، کشف خطای شمارش قبلی..."
+              placeholder={t("مثلاً: انبارگردانی پایان دوره، کشف خطای شمارش قبلی...")}
               required
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs"
+              className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs"
             />
           </div>
 
@@ -130,15 +124,13 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
               type="button"
               onClick={onClose}
               className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              انصراف
-            </button>
+            >{t("انصراف")}</button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm transition-colors"
+              className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm transition-colors"
             >
-              {submitting ? 'در حال اصلاح...' : 'ثبت قطعی اصلاحیه'}
+              {submitting ? t("در حال اصلاح...") : t("ثبت قطعی اصلاحیه")}
             </button>
           </div>
         </form>

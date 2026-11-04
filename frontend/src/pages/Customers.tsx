@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Search, PlusCircle, Plus } from 'lucide-react';
 import { crmApi } from '../api/crm';
@@ -6,6 +7,7 @@ import { IranianPlateBadge } from '../components/plates/IranianPlateBadge';
 import { parseApiError } from '../utils/errorParser';
 
 export const Customers: React.FC = () => {
+  const { t, language } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
@@ -24,7 +26,7 @@ export const Customers: React.FC = () => {
   // افزودن خودرو برای مشتری
   const [selectedCustomerForVehicle, setSelectedCustomerForVehicle] = useState<Customer | null>(null);
   const [plate, setPlate] = useState<string>('');
-  const [model, setModel] = useState<string>('پژو ۲۰۶');
+  const [model, setModel] = useState<string>(t("پژو ۲۰۶"));
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -71,7 +73,7 @@ export const Customers: React.FC = () => {
       setAddress('');
       fetchCustomers();
     } catch (err: unknown) {
-      alert(parseApiError(err, 'خطا در ثبت مشتری'));
+      alert(parseApiError(err, t("خطا در ثبت مشتری"), language));
     }
   };
 
@@ -88,34 +90,30 @@ export const Customers: React.FC = () => {
       setPlate('');
       fetchCustomers();
     } catch (err: unknown) {
-      alert(parseApiError(err, 'خطا در ثبت خودرو'));
+      alert(parseApiError(err, t("خطا در ثبت خودرو"), language));
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       {/* سربرگ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="page-heading">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">
-            مشتریان و وسایل نقلیه (CRM)
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            بانک اطلاعات مشتریان، پرونده پلاک‌های خودرویی و تاریخچه فاکتورها (مجموع: {totalCount} پرونده)
-          </p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("مشتریان و وسایل نقلیه (CRM)")}</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("بانک اطلاعات مشتریان، پرونده پلاک‌های خودرویی و تاریخچه فاکتورها (مجموع:")}{totalCount}{' '}{t("پرونده)")}</p>
         </div>
 
         <button
           onClick={() => setShowAddCustomerModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
+          className="action-primary inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
         >
           <PlusCircle className="w-4 h-4" />
-          <span>ثبت مشتری جدید</span>
+          <span>{t("ثبت مشتری جدید")}</span>
         </button>
       </div>
 
       {/* جستجو */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+      <div className="filter-bar">
         <div className="relative w-full md:w-80">
           <input
             type="text"
@@ -124,36 +122,36 @@ export const Customers: React.FC = () => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="جستجو در نام، شماره موبایل، کد ملی یا پلاک..."
-            className="w-full pl-3 pr-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+            placeholder={t("جستجو در نام، شماره موبایل، کد ملی یا پلاک...")}
+            className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />
-          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 right-3" />
+          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-3" />
         </div>
       </div>
 
       {/* جدول مشتریان */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="surface-panel overflow-hidden">
         {loading ? (
-          <div className="py-16 text-center text-xs text-slate-400">در حال دریافت مشتریان...</div>
+          <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت مشتریان...")}</div>
         ) : customers.length === 0 ? (
-          <div className="py-16 text-center text-xs text-slate-400">مشتری با این مشخصات یافت نشد.</div>
+          <div className="py-16 text-center text-xs text-slate-400">{t("مشتری با این مشخصات یافت نشد.")}</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-right">
+          <div className="table-scroll overflow-x-auto">
+            <table className="data-table w-full text-xs text-start">
               <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="py-3 px-4">نام مشتری</th>
-                  <th className="py-3 px-4">شماره تماس</th>
-                  <th className="py-3 px-4">کد ملی</th>
-                  <th className="py-3 px-4">وسایل نقلیه و پلاک‌ها</th>
-                  <th className="py-3 px-4 text-center">افزودن پلاک</th>
+                  <th className="py-3 px-4">{t("نام مشتری")}</th>
+                  <th className="py-3 px-4">{t("شماره تماس")}</th>
+                  <th className="py-3 px-4">{t("کد ملی")}</th>
+                  <th className="py-3 px-4">{t("وسایل نقلیه و پلاک‌ها")}</th>
+                  <th className="py-3 px-4 text-center">{t("افزودن پلاک")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {customers.map((c) => (
                   <tr key={c.customer_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                      {c.full_name}
+                      <bdi dir="auto">{c.full_name}</bdi>
                       {c.address && (
                         <span className="block text-[10px] text-slate-400 font-normal">
                           {c.address}
@@ -161,7 +159,7 @@ export const Customers: React.FC = () => {
                       )}
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300">
-                      {c.phone_number}
+                      <bdi dir="auto">{c.phone_number}</bdi>
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-500">
                       {c.national_code || '-'}
@@ -172,14 +170,14 @@ export const Customers: React.FC = () => {
                           {c.vehicles.map((v) => (
                             <div key={v.vehicle_id} className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                               <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium">
-                                {v.model}:
+                                <bdi dir="auto">{v.model}</bdi>:
                               </span>
                               <IranianPlateBadge plateString={v.license_plate} size="sm" />
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-slate-400 text-[11px]">بدون خودروی ثبت‌شده</span>
+                        <span className="text-slate-400 text-[11px]">{t("بدون خودروی ثبت‌شده")}</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-center">
@@ -188,7 +186,7 @@ export const Customers: React.FC = () => {
                         className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-brand-600 dark:text-brand-400 text-[11px] font-semibold flex items-center gap-1 mx-auto"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>پلاک جدید</span>
+                        <span>{t("پلاک جدید")}</span>
                       </button>
                     </td>
                   </tr>
@@ -201,24 +199,18 @@ export const Customers: React.FC = () => {
         {/* صفحه‌بندی (Pagination) */}
         {totalPages > 1 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>
-              صفحه {currentPage} از {totalPages} (مجموع {totalCount} پرونده)
-            </span>
+            <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("پرونده)")}</span>
             <div className="flex gap-1">
               <button
                 disabled={currentPage <= 1}
                 onClick={() => setCurrentPage((p) => p - 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                قبلی
-              </button>
+              >{t("قبلی")}</button>
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage((p) => p + 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                بعدی
-              </button>
+              >{t("بعدی")}</button>
             </div>
           </div>
         )}
@@ -226,65 +218,63 @@ export const Customers: React.FC = () => {
 
       {/* مدال افزودن مشتری */}
       {showAddCustomerModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
-              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                ثبت مشتری جدید
-              </h2>
+              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("ثبت مشتری جدید")}</h2>
               <button
                 type="button"
                 onClick={() => setShowAddCustomerModal(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-              >
-                ✕
+               aria-label={t("بستن پنجره")}>
+                ×
               </button>
             </div>
 
             <form onSubmit={handleCreateCustomer} className="p-6 space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">نام کامل:</label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام کامل:")}</label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="مثلاً: علی عباسی"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+                  placeholder={t("مثلاً: علی عباسی")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">شماره موبایل:</label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("شماره موبایل:")}</label>
                 <input
                   type="text"
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="09141122334"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-left"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">کد ملی (اختیاری):</label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("کد ملی (اختیاری):")}</label>
                 <input
                   type="text"
                   value={nationalCode}
                   onChange={(e) => setNationalCode(e.target.value)}
-                  placeholder="10 رقمی"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-left"
+                  placeholder={t("10 رقمی")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">آدرس:</label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("آدرس:")}</label>
                 <textarea
                   rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="آدرس محل سکونت یا محل کار..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+                  placeholder={t("آدرس محل سکونت یا محل کار...")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 />
               </div>
 
@@ -293,15 +283,11 @@ export const Customers: React.FC = () => {
                   type="button"
                   onClick={() => setShowAddCustomerModal(false)}
                   className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300"
-                >
-                  انصراف
-                </button>
+                >{t("انصراف")}</button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
-                >
-                  ثبت مشتری
-                </button>
+                  className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
+                >{t("ثبت مشتری")}</button>
               </div>
             </form>
           </div>
@@ -310,45 +296,42 @@ export const Customers: React.FC = () => {
 
       {/* مدال افزودن خودرو برای مشتری */}
       {selectedCustomerForVehicle && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
-              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                افزودن پلاک برای {selectedCustomerForVehicle.full_name}
+              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("افزودن پلاک برای")}{' '}{selectedCustomerForVehicle.full_name}
               </h2>
               <button
                 type="button"
                 onClick={() => setSelectedCustomerForVehicle(null)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-              >
-                ✕
+               aria-label={t("بستن پنجره")}>
+                ×
               </button>
             </div>
 
             <form onSubmit={handleAddVehicle} className="p-6 space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">مدل خودرو:</label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("مدل خودرو:")}</label>
                 <input
                   type="text"
                   required
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="مثلاً: تیبا ۲، تارا، هایما..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+                  placeholder={t("مثلاً: تیبا ۲، تارا، هایما...")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                  شماره پلاک (فرمت: 12ب345-ایران11):
-                </label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("شماره پلاک (فرمت: 12ب345-ایران11):")}</label>
                 <input
                   type="text"
                   required
                   value={plate}
                   onChange={(e) => setPlate(e.target.value)}
-                  placeholder="12ب345-ایران11"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-left"
+                  placeholder={t("12ب345-ایران11")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-end"
                 />
                 <div className="pt-2">
                   <IranianPlateBadge plateString={plate} size="sm" />
@@ -360,15 +343,11 @@ export const Customers: React.FC = () => {
                   type="button"
                   onClick={() => setSelectedCustomerForVehicle(null)}
                   className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300"
-                >
-                  انصراف
-                </button>
+                >{t("انصراف")}</button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
-                >
-                  ثبت خودرو
-                </button>
+                  className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
+                >{t("ثبت خودرو")}</button>
               </div>
             </form>
           </div>

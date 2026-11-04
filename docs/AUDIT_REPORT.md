@@ -1,137 +1,264 @@
-# Codebase Health and Publication Audit
+# بازنگری شش‌مرحله‌ای معماری و امنیت
 
-**Date:** October 31, 2026  
-**Scope:** Django backend, React/Vite frontend, API contracts, dependency advisories, repository hygiene, and public documentation.  
-**Result:** Verified blockers were fixed and the checked local suites pass. This is not a penetration-test report, security certification, or production-readiness guarantee.
+**تاریخ:** ۳۱ اکتبر ۲۰۲۶
 
-## Executive summary
+**نسخه مبنای مقایسه:** `45510db`
 
-- Prevented invoice-total overflow from committing invalid financial/stock records and breaking subsequent API reads.
-- Fixed SQLite decimal-division truncation affecting discount-aware reporting on Django 5.2.
-- Added the missing Redis client and made SQL Server authentication/TLS controls explicit with secure defaults.
-- Fixed incomplete paginated selectors, duplicate financial submissions, and refresh/logout handling in the frontend.
-- Aligned TypeScript contracts and UI error parsing with backend serializers and exception envelopes.
-- Patched frontend dependencies and raised vulnerable Python dependency minimums; the audited resolved sets have no known advisories.
-- Removed generated/local artifacts, strengthened ignore rules, archived historical material, and replaced inaccurate/template documentation.
+> **یادداشت تاریخی:** این گزارش یک بازنگری تاریخی مربوط به ۳۱ اکتبر ۲۰۲۶ است و نتایج بررسی‌ها و وضعیت جاری پروژه در [`docs/RELEASE_READINESS.md`](RELEASE_READINESS.md) ثبت شده است. مواردی نظیر نگهداری فایل‌های بایگانی، محدودیت‌های ویرایشگر Zed و اجرا نشدن تست‌های PostgreSQL صرفاً بازتاب‌دهنده شرایط این بررسی در تاریخ ۳۱ اکتبر هستند و وضعیت فعلی پروژه نیستند؛ پوشه بایگانی (`docs/archive/`) در تمیزکاری بعدی از درخت کاری جاری حذف شده و تنها در تاریخچهٔ Git در دسترس است، و پایپ‌لاین CI تست‌های خودکار را روی PostgreSQL اجرا می‌کند.
 
-## Phase 1 — Health, quality, and contract audit
+**دامنه بررسی:** هشت اپ دامنه‌ای Django، بررسی سازگاری SQLite، SQL Server و PostgreSQL و ارتباط موجود React/TypeScript با API. گردش‌کار تک‌فروشگاهی و ساختار API حفظ شده است.
 
-### Verified defects and remediation
+## نتیجه مدیریتی
 
-| Finding | Evidence / impact | Remediation | Main files |
+- **۵۱۰ تست بک‌اند موفق، ۹ تست اجرا‌نشده و بدون هشدار.** مبنای سالم: ۳۴۲ تست موفق و ۹ تست اجرا‌نشده. ۱۶۸ مورد تست اضافه شد.
+- **۱۰۶ تست فرانت‌اند موفق بود** و بررسی TypeScript، لینت و ساخت نسخه انتشار نیز موفق بود.
+- پوشش دستورات کد اجرایی Python از **۹۳٫۳۲٪ (۲٬۷۹۵ از ۲٬۹۹۵)** به **۹۳٫۵۳٪ (۲٬۸۶۰ از ۳٬۰۵۸)** رسید؛ یعنی **۰٫۲۱ واحد درصد افزایش**. کد تست‌ها و migrationها در این اعداد محاسبه نشده است.
+- مرجوعی شش‌قلمی اکنون **۹ کوئری SELECT به‌جای ۲۶ کوئری** اجرا می‌کند. مرجوعی تک‌قلمی نیز به‌جای ۱۱ کوئری، ۹ کوئری اجرا می‌کند. تعداد عملیات نوشتن، مطابق انتظار، همچنان با تعداد اقلام سند افزایش می‌یابد.
+- ساختار OpenAPI تولیدشده، با وابستگی‌های نصب‌شده و تنظیمات SQLite یکسان، دقیقاً با نسخه دست‌نخورده برابر است. نیازی به migration مدل یا ساختار دیتابیس و تغییر ایندکس نبود.
+- هش SHA-256 فایل اصلی `backend/db.sqlite3` تغییر نکرده است. بررسی‌ها با دیتابیس‌های درون‌حافظه‌ای و کش محلی هر فرایند انجام شد.
+- آسیب‌پذیری تأییدشده‌ای با شدت بالا احراز نشد. این کار شامل بررسی کد و تست‌های رگرسیون محلی است و گواهی تست نفوذ روی سامانه زنده محسوب نمی‌شود.
+
+## مرحله ۱ — معماری و مرزبندی مسئولیت‌ها
+
+| اپ | مسئولیت و وابستگی‌ها | نتیجه بررسی |
+| --- | --- | --- |
+| accounts | کاربران، نقش‌ها، JWT، پروفایل و چرخه رمز عبور؛ خروجی سازگار مجوزها به invoices ارجاع دارد | مجوزهای API و سرویس رمز عبور/توکن حفظ شد؛ نام مستعار عمومی مجوز نیز حفظ شد |
+| customers | اطلاعات مشترک مشتریان و خودروها؛ مجوزهای نقش از accounts | اعتبارسنجی ورودی serializer و نرمال‌سازی/قیدهای مدل حفظ شد؛ تطابق خودرو و مشتری در سرویس فاکتور نیز کنترل می‌شود |
+| catalog | برند، سایز، تایر، دفتر گردش موجودی و بازیابی آن؛ ارتباط با فاکتورها و نقش‌های کاربری | تغییر دفتر گردش و موجودی محاسبه‌شده بر عهده سرویس‌های انبار است؛ نوشتن محافظت‌شده اکنون مانده‌های قدیمی را رد می‌کند |
+| services_app | فهرست خدمات مورد استفاده در اقلام خدمات فاکتور؛ نقش‌های کاربری | ایجاد، خواندن، ویرایش و حذف فهرست خدمات حفظ شد؛ سامانه نوبت‌دهی اضافه نشد |
+| suppliers | فهرست مشترک تأمین‌کنندگان برای خرید؛ نقش‌های کاربری | سیاست موجود تغییر اطلاعات توسط انباردار/مدیر حفظ شد |
+| invoices | فروش، خرید، اقلام، شماره‌گذاری و مرجوعی؛ هماهنگی مشتریان، کالا، خدمات، تأمین‌کنندگان و امور مالی | سرویس‌های تراکنشی حفظ شد؛ منطق تکراری قیمت پیش‌فرض در serializer حذف و مدیریت رقابت شماره‌گذاری به IntegrityError محدود شد |
+| finance | دریافت، پرداخت، استرداد و وضعیت پرداخت محاسبه‌شده؛ مدل‌های فاکتور | اعتبارسنجی مبلغ در مرز سرویس و ترتیب قفل‌گذاری والد پیش از فرزند هنگام ابطال اضافه شد |
+| reports | تحلیل فقط‌خواندنی اطلاعات کالا، فاکتور و امور مالی | محاسبات هر پنج گزارش به توابع سرویس دارای اعلان نوع منتقل شد؛ viewها ورودی را اعتبارسنجی و پاسخ را برمی‌گردانند |
+
+سرویس‌های فاکتور عمداً موجودی و امور مالی را هماهنگ می‌کنند. سرویس‌های مالی مدل‌های فاکتور را وارد می‌کنند، نه سرویس‌های فاکتور را؛ واردکردن توابع تطبیق درون تابع، از چرخه هنگام مقداردهی اولیه جلوگیری می‌کند. importهای صرفاً مربوط به نوع با شرط محافظت می‌شوند. ویژگی‌های فقط‌خواندنی مانده‌ها و قیدهای دیتابیس همچنان مسئولیت مناسبی برای مدل هستند. بررسی‌های مقدماتی serializer قطعی نیستند؛ سرویس‌ها قواعد یکپارچگی مالی را درون تراکنش دوباره بررسی می‌کنند. لایه عمومی repository یا ساختار چندمستأجری جدیدی اضافه نشد.
+
+## مرحله ۲ — یافته‌های امنیت و یکپارچگی
+
+| یافته / اولویت | شواهد | اصلاح و تأیید |
+| --- | --- | --- |
+| مبلغ مالی غیرقابل ذخیره — ریسک متوسط یکپارچگی برای فراخوان مستقیم سرویس | فراخوان مستقیم سرویس دریافت با `NaN` خطای InvalidOperation ایجاد می‌کرد؛ مقدار `0.001` پذیرفته می‌شد، با اینکه مبالغ با دو رقم اعشار ذخیره می‌شوند. serializerهای API از قبل این ورودی‌ها را رد می‌کردند. | اعتبارسنجی مشترک و دارای نوع، مقادیر غیرمتناهی، دقت اعشاری اضافی و سرریز را رد می‌کند. صفرهای انتهایی بی‌اثر همچنان معتبرند. دریافت خودکار از مبلغ ذخیره‌شده فاکتور استفاده می‌کند. تست‌های بازتولید، تسویه و چرخه کامل موفق‌اند. |
+| قطع بی‌صدای بخش اعشاری تعداد — ریسک متوسط یکپارچگی برای فراخوان مستقیم سرویس | سرویس‌ها روی تعداد ورودی از `int()` استفاده می‌کردند؛ در نتیجه مقدار کسری می‌توانست به تعداد دیگری در سفارش تبدیل شود. | اعتبارسنجی عدد صحیح، کسرها، مقادیر بولی و مقادیر غیرمتناهی را رد می‌کند؛ تست‌های رگرسیون بازگشت کامل سند و موجودی را تأیید می‌کنند. |
+| بررسی‌نشدن مالکیت refresh token هنگام خروج — شدت پایین / دفاع چندلایه | کاربر احرازهویت‌شده می‌توانست refresh token معتبر کاربر دیگری را ارسال و آن را وارد فهرست سیاه کند. سوءاستفاده مستلزم در اختیار داشتن همان توکن است. | پیش از درج در فهرست سیاه، شناسه کاربر در claim تنظیم‌شده توکن با کاربر احرازهویت‌شده مقایسه می‌شود. تست تأیید می‌کند درخواست ردشده، توکن کاربر دیگر را از کار نمی‌اندازد. رفتار پاسخ موجود خروج حفظ شده است. |
+| ناسازگاری مجوز فروش superuser — صحت کنترل دسترسی | درخواست POST از superuser دارای نقش انباردار، پیش از بررسی استثنای superuser رد می‌شد. | اولویت superuser به‌صورت یکسان اعمال شد؛ تست مستقیم و ماتریس نقش‌های خواندن/نوشتن موفق‌اند. |
+| نوشتن موجودی قدیمی و ناسازگاری ترتیب قفل مالی — مقاوم‌سازی هم‌زمانی | سرویس موجودی مانده خوانده‌شده و سپس تغییرکرده را ذخیره می‌کرد؛ ابطال سند ابتدا فرزند و سپس فاکتور والد را قفل می‌کرد. SQLite قفل‌گذاری ردیفی را نادیده می‌گیرد. | نوشتن شرطی موجودی، مانده مشاهده‌شده را کنترل می‌کند؛ به‌روزرسانی ناموفق، تغییرات دفتر گردش را برمی‌گرداند. ابطال ابتدا فاکتور و سپس سند را قفل می‌کند. تست رقابت SQLite یک خروج قطعی از انبار و نتیجه امن تلاش مجدد را تأیید می‌کند. رفتار موتور واقعی دارای قفل ردیفی هنوز تأیید نشده است. |
+| پنهان‌شدن خطاهای شماره‌گذاری — صحت مدیریت خطا | تخصیص شماره هنگام تلاش برای ساخت شمارنده، تمام استثناها را می‌گرفت. | فقط خطای مورد انتظارِ رقابت روی یکتایی گرفته می‌شود؛ خطاهای نامرتبط دیتابیس منتشر می‌شوند و تراکنش برمی‌گردد. |
+
+بررسی احراز هویت شامل انقضای access/refresh، چرخش توکن و فهرست سیاه، ابطال پس از تغییر رمز و کاربران غیرفعال بود. مجوزها از وضعیت فعلی کاربر در دیتابیس استفاده می‌کنند، نه از کنترل نقش فرانت‌اند که قابل اعتماد نیست. محافظت موجود از اسرار، مبدأهای صریح CORS، میان‌افزار CSRF، محدودسازی نرخ، endpointهای اسناد مالی تغییرناپذیر، کوئری‌های پارامتری ORM، روابط محافظت‌شده و پنهان‌سازی فیلدهای هزینه/رمز حفظ شد. ورودی عمومی جدیدی برای SQL خام ایجاد نشد. نمونه‌های تاریخی SQL (که اکنون از درخت کاری حذف شده و در تاریخچهٔ Git در دسترس‌اند) جزو endpointهای برنامه نیستند.
+
+### ماتریس مجوزها
+
+| بخش | خواندن | ایجاد / تغییر | قواعد سطح رکورد |
 | --- | --- | --- | --- |
-| Invoice total exceeds storage capacity | Valid individual prices multiplied by quantities could exceed `DecimalField(14,2)`. A reproduced purchase returned 500 after committing invoice/stock, and later list serialization also failed. | Validate computed totals within the existing atomic transaction. Invalid totals return 400 and roll back documents, stock, movement history, and numbering. Regression tests cover sales, purchases, boundaries, discounts, and rollback. | `backend/apps/invoices/services.py`, `backend/apps/invoices/tests/test_invoice_total_bounds.py` |
-| Incorrect discount reporting on Django 5.2 / SQLite | NUMERIC casts could still perform integer division; percentage discounts were ignored and full returns could leave phantom revenue. | Added SQLite-specific real-number division while preserving decimal SQL arithmetic on other backends. Added fractional-allocation, revenue/profit, and full-return regressions. | `backend/utils/expressions.py`, `backend/apps/reports/views.py`, `backend/apps/reports/tests/test_brand_discount_audit.py` |
-| Redis cache dependency missing | Configuring `REDIS_CACHE_URL` reproduced `ModuleNotFoundError: redis`. | Declare Redis client dependency and test backend initialization/reads with the connection mocked. | `backend/requirements.txt`, `backend/config/test_dependencies.py` |
-| SQL Server authentication/TLS ambiguity | Configuration combined SQL credentials with unconditional trusted authentication and certificate-validation bypass. | Select integrated/SQL authentication deliberately. Default to encryption and certificate verification; validate new Boolean controls. Tests inspect configuration and connection strings without native connections. | `backend/config/settings.py`, `backend/config/test_database_settings.py` |
-| Paginated data silently truncated | Users, brands, sizes, and low-stock helpers discarded records after the first backend page. | Reuse complete-pagination helper, retaining array-response compatibility. | `frontend/src/api/pagination.ts`, `frontend/src/api/auth.ts`, `frontend/src/api/catalog.ts` |
-| Repeated financial/stock mutations | Purchase, receipt, and return handlers could submit again while a request was pending. | Synchronous in-flight guards with regression coverage. These are browser guards, not backend idempotency guarantees. | `frontend/src/pages/PurchaseInvoices.tsx`, receipt/return modal components |
-| JWT retry/rotation mismatch | Queued 401 requests could retry more than once; logout retries could submit the already blacklisted pre-rotation refresh token. | Mark all retries once and use the current refresh token for logout. Test real Axios interceptors with mocked transport. | `frontend/src/api/client.ts`, `frontend/tests/apiClient.test.ts` |
-| API type/error-envelope drift | Several nullable fields and purchase/report shapes differed from serializers; creation types allowed unsupported states or omitted required reasons. Forms sometimes expected unwrapped errors. | Correct request/read contracts, add compile-time contract tests, and reuse `parseApiError` in affected forms. | `frontend/src/types/index.ts`, API modules, form handlers, contract/error tests |
-| Hardcoded API configuration | API base and development proxy destination were not configurable. | Add `VITE_API_BASE_URL` and `VITE_API_PROXY_TARGET`, retain same-origin/local defaults, and document public build-time behavior. | `frontend/src/api/client.ts`, `frontend/vite.config.ts`, `frontend/src/vite-env.d.ts` |
+| مدیریت کاربران | مدیر / superuser | مدیر / superuser | مدیر عادی نمی‌تواند superuser را تغییر دهد؛ غیرفعال‌سازی، تغییر نقش و حذف حساب خود همچنان مسدود است |
+| پروفایل / رمز / خروج | خود کاربر احرازهویت‌شده | خود کاربر احرازهویت‌شده | refresh token خروج باید متعلق به خود کاربر باشد |
+| مشتریان / خودروها | همه نقش‌های احرازهویت‌شده | همه نقش‌ها؛ حذف فقط مدیر | اطلاعات مشترک فروشگاه؛ خودروی فاکتور باید متعلق به مشتری همان فاکتور باشد |
+| برند / سایز / تایر / تأمین‌کننده | همه نقش‌های احرازهویت‌شده | انباردار / مدیر | محدودیت مشاهده بهای خرید برای تکنسین حفظ شده است |
+| تاریخچه / اصلاح موجودی | انباردار / مدیر | اصلاح توسط انباردار / مدیر؛ دفتر گردش تغییرناپذیر | سرویس‌ها موجودی و دفتر گردش را با هم نگهداری می‌کنند |
+| فهرست خدمات | همه نقش‌های احرازهویت‌شده | مدیر | خدمات معتبر با قیمت صفر حفظ شده‌اند |
+| فاکتور فروش | مدیر/انباردار؛ تکنسین فقط فاکتورهای خود | تکنسین / مدیر؛ لغو فقط مدیر | جزئیات و تأیید از queryset محدودشده به دست می‌آیند؛ اسناد مالی تغییرناپذیرند |
+| فاکتور خرید | انباردار / مدیر | انباردار / مدیر؛ لغو فقط مدیر | ویرایش/حذف مستقیم سند مجاز نیست |
+| مرجوعی و اسناد خزانه | مدیر | مدیر؛ ابطال از طریق عملیات صریح سرویس | اقلام مرجوعی و استردادهای مرتبط باید متعلق به فاکتور انتخاب‌شده باشند |
+| گزارش‌ها | مدیر | فقط‌خواندنی | اطلاعات تجمیعی فروشگاه |
 
-No new schema/data migration was needed for these fixes. No API route was renamed.
+دسترسی ویژه superuser حفظ شده است. ورود و تمدید توکن، ورودی‌های عمومی احراز هویت با محدودسازی نرخ اختصاصی هستند. endpoint سلامت عمومی است؛ دسترسی مستندات و schema در محیط عملیاتی از سیاست موجود مدیر/تنظیمات پیروی می‌کند. تست‌های جدید ماتریس، ۲۰ بخش خواندن و ۱۰ بخش ایجاد را برای هویت ناشناس، تکنسین، انباردار، مدیر عادی و superuser پوشش می‌دهند؛ تست‌های قبلی عملیات جزئیات و دسترسی بین تکنسین‌ها را پوشش می‌دهند. این به معنی آزمایش جامع همه ترکیب‌های ممکن URL و ورودی نیست.
 
-### Dependency review
+## مراحل ۳ تا ۵ — تست‌ها، بازآرایی و کارایی
 
-- The initial frontend audit reported **4 affected packages: 3 high and 1 moderate**; one high-severity affected dependency was present in the production dependency tree.
-- `npm audit fix --ignore-scripts` updated dependencies within existing manifest ranges. Final `npm audit`, production-only audit, and the final `npm ci` audit reported **0 vulnerabilities**.
-- Backend clean Windows and Linux resolutions were audited with **pip-audit 2.10.1** against public package/version metadata. No repository source was uploaded. The audited sets contained **49 packages each, 0 known vulnerabilities, and 0 skipped packages**.
-- Minimum-version probes found vulnerable releases still permitted by broad Python requirements. Lower bounds were raised to Django **5.2.17**, DRF **3.18.2**, SimpleJWT **5.5.1**, pytest **9.0.3**, and python-dotenv **1.2.2**. The Django upper bound remains `<6.2`.
-- Compatibility checks passed for the resolved environments. Linux packages were resolved/audited, not executed on Linux.
-- The frontend lockfile is committed; Python requirements are not a full hash-pinned lockfile. A clean resolution today does not guarantee future versions or artifact integrity. Native libraries, OS packages, Python itself, and ODBC driver security were not comprehensively assessed.
+- fixtureهای مدیر عادی و superuser جدا شد. تست‌های اختصاصی پنل مدیریت صراحتاً superuser می‌خواهند تا اختیارات ویژه، اشکال مجوز مدیر عادی را پنهان نکند.
+- تست گردش‌کار ترکیبی از پیش‌نویس تا تأیید، پرداخت جزئی، تسویه، مرجوعی و استرداد، همراه با تست خدمت با قیمت صفر، بازگشت شماره‌گذاری، تعداد نامعتبر و بازگشت تراکنش پس از شکست نوشتن اضافه شد.
+- تست تأیید هم‌زمان روی SQLite با اتصال‌های مستقل، زمان انتظار محدود، نتایج صریح threadها و پاک‌سازی اتصال اضافه شد. تست‌های قبلی قفل ردیفی نیز اکنون علاوه بر join، برای barrier محدودیت زمانی دارند.
+- استثناهای اعتبارسنجی دامنه دارای نوع و سازگار با قالب موجود `success/status_code/errors` اضافه شد. توابع سرویس دامنه و متدهای serializer اعلان نوع گرفتند؛ تعریف فیلدهای serializer و نوع پاسخ‌ها حفظ شد.
+- بررسی‌های صحت کد و کد بلااستفاده Ruff روی سورس و تست‌های بک‌اند، به‌جز migrationهای تاریخی، اضافه شد. importها و متغیرهای محلی بلااستفاده بدون حذف آثار جانبی عملیات پاک شدند. خروجی‌های مورد نیاز برای سازگاری حفظ شدند.
+- **بررسی سخت‌گیرانه mypy در محدوده `utils/domain.py` اضافه شد.** سایر بخش‌های ORM و serializer اعلان نوع رابط دارند، اما ادعای موفقیت بررسی نوع جامع Django ORM برای آن‌ها نمی‌شود؛ داده‌های پویا همچنان از `Any` استفاده می‌کنند.
+- اقلام اصلی مرجوعی یکجا واکشی و مرجوعی‌های قبلی یک‌بار تجمیع می‌شوند؛ تصویر بهای خرید اولیه، تخصیص استرداد با احتساب تخفیف و گردکردن آخرین مرجوعی حفظ شده است. تست رشد تعداد کوئری، مرجوعی‌ها، فهرست فاکتورها، داشبورد، فروش برند و سودآوری را پوشش می‌دهد.
+- واکشی پیشاپیش روابط، ایندکس کلیدهای خارجی، ایندکس تاریخ/وضعیت فاکتور، قیدهای یکتایی و تجمیع‌های ORM موجود حفظ شدند. بدون نیاز اندازه‌گیری‌شده، ایندکس یا migration حدسی اضافه نشد.
 
-### Configuration and API review
+## مرحله ۶ — سابقه تأیید نتایج
 
-- Eight Django domain apps are installed; Django system checks found no configuration/model-reference errors.
-- SQLite, PostgreSQL, and SQL Server selection branches exist on one `default` connection; there is no multi-database router. Unknown `DB_ENGINE` values fall back to SQLite.
-- JWT and session authentication are enabled; authenticated API access is the default. Roles are exactly `MANAGER`, `TECHNICIAN`, and `WAREHOUSE`, with action-level permissions and technician sales-queryset restrictions.
-- CORS uses explicit origins, not wildcard access. Production hosts/origins, proxy trust, HTTPS/cookies/HSTS, and a shared throttle cache require operator configuration.
-- Frontend domain prefixes match backend routing: `auth`, `crm`, `catalog`, `workshop`, `procurement`, `invoices`, `treasury`, and `analytics`.
-- No URL/method mismatch was found in the inspected API clients. Payload/response and pagination problems were corrected as described above.
-- API documentation is public in debug mode and manager/superuser-protected outside debug unless `ENABLE_DOCS_IN_PROD` explicitly makes it public.
-- The known debug-only Django secret is rejected outside debug mode. Demo seed credentials are predictable, guarded by two opt-ins, and must never be promoted unchanged to an exposed database.
-
-### Validation record
-
-Backend validation used **Python 3.14.6**, clean virtual environments, isolated SQLite databases, and disposable copies for migration checks. The original local database was not migrated or modified; its hash remained unchanged during backend validation.
-
-| Check | Result |
+| بررسی | نتیجه |
 | --- | --- |
-| Python syntax compilation | 173 backend Python files passed after fixes |
-| Dependency installation and compatibility | Clean requirements/dev installations and pip/uv compatibility checks passed |
-| Baseline backend suite | 314 passed; 9 skipped |
-| Final suite, Django 5.2.17 | **342 passed; 9 skipped** |
-| Final suite, Django 6.1.2 | **342 passed; 9 skipped** |
-| Targeted final reporting/config suite | 43 passed on each Django version |
-| Django `check` | Passed on both tested versions |
-| `makemigrations --check --dry-run` | No model/migration drift on either version |
-| Fresh `migrate`, migration-state/constraint checks | Passed on both versions |
-| Upgrade of a disposable local-database copy | Six pending migrations applied successfully; schema/constraint/integrity checks passed |
-| `spectacular --validate --fail-on-warn` | Passed on both tested versions |
-| Frontend baseline suite | 55 passed |
-| Final frontend suite | **106 passed; 0 failed/skipped** |
-| `npm ci` | Passed; final lockfile reinstall audited 173 packages |
-| `npm run typecheck` and forced `tsc -b` | Passed |
-| `npm run lint` | 0 warnings/errors; 64 files checked |
-| `npm run build` | Passed with Vite 8.3.5; 2,562 modules transformed |
-| `npm audit` and production-only audit | 0 known vulnerabilities |
-| `npm ls --depth=0` | No missing/invalid direct dependencies reported |
-| Documentation links and anchors | 104 local links/anchors across 8 public Markdown files passed |
-| Ignore rules and publication candidates | 22 cases passed; no unwanted artifacts or files over 100 MiB found |
-| `git diff --check` | Passed; Git emitted only line-ending conversion notices |
+| مبنای اولیه در محیط موجود | ۳۴۱ موفق، ۹ اجرا‌نشده، یک شکست به علت نصب‌نبودن وابستگی Redis |
+| مبنای سالم و دست‌نخورده پس از نصب وابستگی‌های اعلام‌شده | ۳۴۲ موفق، ۹ اجرا‌نشده |
+| مجموعه کامل نهایی بک‌اند | ۵۱۰ موفق، ۹ اجرا‌نشده، بدون هشدار |
+| تست‌های مبنا و نهایی فرانت‌اند | هر کدام ۱۰۶ موفق |
+| بررسی نوع / لینت / ساخت فرانت‌اند | موفق |
+| Ruff / mypy سخت‌گیرانه در محدوده مشخص / سازگاری وابستگی‌های pip | موفق |
+| بررسی سیستمی Django / اختلاف مدل و migration | موفق / بدون تغییر |
+| migrationهای دیتابیس تازه | هنگام آماده‌سازی دیتابیس مستقل pytest اعمال شدند |
+| اعتبارسنجی OpenAPI با درنظرگرفتن هشدار به‌عنوان شکست | موفق؛ ساختار schema تولیدشده مبنا و نهایی یکسان است |
+| تعداد SELECT مرجوعی یک‌قلمی و شش‌قلمی | مبنا: ۱۱ و ۲۶؛ نهایی: ۹ و ۹ |
+| SHA-256 فایل SQLite اصلی | بدون تغییر |
+| `git diff --check` | موفق؛ فقط پیام‌های موجود Git درباره تبدیل پایان خط در Windows دیده می‌شود |
 
-The final frontend reinstall/test/typecheck/lint/build/audit sequence was rerun from the lockfile after documentation reconciliation and starter-asset removal. Backend suites were run through isolated wrappers to avoid connecting to the original SQLite database. Standard contributor commands and environment setup are documented in the [root README](../README.md).
+مقایسه سالم با Python 3.14.6، Django 6.1.1، DRF 3.18.3 و SQLite انجام شد. سورس مبنا از نسخه اولیه Git به پوشه موقت استخراج و با همان محیط نصب‌شده اجرا شد. در هر دو اجرا از `--cov=apps --cov=utils` استفاده شد؛ اعداد بالا از مجموع دستورات پوشش‌داده‌شده و کل دستورات در خروجی JSON، پس از حذف تست‌ها و migrationها، محاسبه شده‌اند. شکاف‌های مهم باقی‌مانده شامل مسیرهای غیرمنتظره مدیریت استثنا (۷۶٫۳٪)، ابزارهای تقویم (۸۵٫۰٪) و برخی شاخه‌های خطای فاکتور (پوشش سرویس ۸۹٫۶٪) هستند.
 
-### Deployment checks and limits
+نسخه schema ثبت‌شده در مخزن، به علت رفتار نسخه نصب‌شده چارچوب و بک‌اند دیتابیس، در حدود/قالب پنج فیلد عدد صحیح با schema تازه‌تولیدشده تفاوت دارد. تولید schema برای سورس اولیه و اصلاح‌شده در همین محیط، نتیجه یکسان می‌دهد؛ نسخه ثبت‌شده برای واردکردن این اختلاف محیطی بازنویسی نشد.
 
-- Default `check --deploy` reported **W004, W008, W012, W016** for HSTS, HTTPS redirect, and secure cookies. Turning on those controls still leaves explicit subdomain/preload policy choices. Local-development defaults were not blindly hardened in ways that would break local HTTP.
-- Nine skipped tests require PostgreSQL row-lock/concurrency behavior. **Live PostgreSQL, SQL Server, Redis, and browser end-to-end workflows were not verified.**
-- SQL Server settings/connection strings were tested without connecting. Native ODBC Driver 17/18 was not installed in the audit environment.
-- No paid/cloud penetration scan or source upload occurred. This was code inspection, dependency advisory review, and automated local tests—not exhaustive exploit testing.
-- **Editor diagnostics are not clean.** The language servers report Django ORM/decorator/descriptor typing errors and Python lint warnings across existing and changed files, plus unresolved Vite/Node imports in the editor. The clean installed CLI TypeScript build and automated suites pass. The editor import/type-analysis configuration was not repaired, and these diagnostics were not suppressed; CLI success should not be presented as a passing Python static typecheck.
+### بازتولید محلی
 
-## Phase 2 — Repository cleanup and publication hygiene
+از پوشه `backend/` و پس از نصب `requirements-dev.txt`:
 
-### Completed
+```powershell
+python -m pytest --ds=config.verification_settings --cov=apps --cov=utils
+python manage.py check --settings=config.verification_settings
+python manage.py makemigrations --check --dry-run --settings=config.verification_settings
+python manage.py spectacular --settings=config.verification_settings --validate --fail-on-warn --file "$env:TEMP/tire-schema.yml"
+python -m ruff check .
+python -m mypy
+python -m pip check
+```
 
-- Expanded root/backend/frontend `.gitignore` coverage for Python caches, environments, databases/sidecars, logs, media/static output, Node dependencies, build outputs, environment files, coverage, OS files, and editor settings including `.zed/`.
-- Preserved negation rules allowing dummy `.env.example` templates to be tracked.
-- Added `frontend/.env.example` with public API/proxy defaults and an explicit no-secrets warning.
-- Removed local `.zed/`, scratch, pytest/Python cache directories, backend logs, frontend build/audit-build output, and unused React/Vite starter SVGs. Test/build commands recreate generated files; final cleanup removes them again.
-- Moved tracked coursework/design documents to `docs/archive/phase-1-and-2/` and standalone SQL experiments to `docs/archive/phase-3/`. Content was preserved, not deleted.
-- Moved locally excluded agent-coordination notes into `docs/archive/`; these remain locally excluded and are not current public documentation.
-- Preserved the local SQLite database and installed Node dependencies; both are ignored rather than destructively removed.
-- Verified the current index contains no local database, active environment file, logs, cache bytecode, dependency directory, or build output in the checked patterns.
-- Checked available history for the specific `.env` and SQLite paths examined; none appeared. This was not an exhaustive all-history secret scan.
+تنظیمات `config.verification_settings` بارگذاری `.env` را غیرفعال می‌کند و از SQLite درون‌حافظه‌ای و کش حافظه محلی استفاده می‌کند. این تنظیمات فقط برای بررسی است و نباید برای سرویس‌دهی برنامه استفاده شود. در پوشه `frontend/` دستورهای `npm test`، `npm run typecheck`، `npm run lint` و `npm run build` را اجرا کنید.
 
-### Explicit limitations
+### محدودیت‌های باقی‌مانده استقرار و مقیاس‌پذیری
 
-1. **Backend template privacy:** `backend/.env.example` exists and is tracked, but Zed's `private_files` setting blocked reading it. It was neither bypassed nor overwritten. Its contents/dummy-only status could not be verified. Review it manually against the root README before publishing.
-2. **Historical binaries:** archived PDF/DOCX/image material was preserved but not exhaustively inspected for embedded metadata or personal information. Review before public release.
-3. **History:** no history rewrite was performed. Current ignore rules cannot remove a secret already present in historical commits; rotate/rewrite if a broader secret scan finds one.
+- ۹ تست اختصاصی قفل ردیفی/بک‌اند روی SQLite اجرا نشده‌اند. سرویس محلی PostgreSQL وجود دارد، اما دسترسی احرازهویت‌شده برای تست روی دیتابیس موقت فراهم نبود. نمونه محلی قابل استفاده SQL Server یا درایور جدید ODBC پیکربندی‌شده نیز موجود نبود. این اجرا عملکرد هیچ‌یک از این دو دیتابیس واقعی را تأیید نمی‌کند.
+- SQLite ممکن است عملیات نوشتن هم‌زمان را با خطای قفل رد کند؛ به‌روزرسانی شرطی از یکپارچگی محافظت می‌کند، اما هم‌زمانی در حد موتورهای سروری یا تلاش مجدد خودکار فراهم نمی‌کند. تست جدید نتیجه امن و تلاش مجدد صریح در زمانی بعد را بررسی می‌کند، نه موفقیت تمام درخواست‌ها زیر بار.
+- رفتار Redis با تست‌های شبیه‌سازی‌شده موجود پوشش داده شد، نه با استقرار واقعی کش مشترک. گردش‌کار سرتاسری در مرورگر واقعی و تنظیمات proxy/TLS محیط عملیاتی آزمایش نشد.
+- پروتکل جدید کلید جلوگیری از اجرای تکراری، جداسازی مستأجرها، نوبت‌دهی، migration محیط عملیاتی، آپلود سورس یا اسکن نفوذ خارجی اضافه یا اجرا نشد.
+- تنظیمات اختصاصی استقرار برای HTTPS، کوکی، HSTS، proxy مورد اعتماد، مبدأهای CORS/CSRF و کش مشترک محدودسازی نرخ را مشخص کنید. پیش از استقرار گردش‌کار مالی با کاربران هم‌زمان، تست‌های هم‌زمانی موجود را روی دیتابیس تست اختصاصی SQL Server/PostgreSQL اجرا کنید.
+- migration ساختاری جدیدی لازم نیست. فرایند معمول پشتیبان‌گیری و انتشار را حفظ کنید و پس از استقرار، خطاهای اعتبارسنجی، قفل/بن‌بست دیتابیس و اختلاف‌های تطبیق موجودی/پرداخت را پایش کنید.
 
-## Phase 3 — Documentation
+---
 
-Replaced the root [README](../README.md) with an English guide covering badges, mission/features, architecture diagram, stack, app/data model, JWT/session/RBAC, endpoint table, SPA routing/state, setup for both operating-system families, configuration tables, tests, production considerations, repository structure, contribution guidance, and MIT licensing.
+# ممیزی تاریخی؛ محفوظ برای ثبت سابقه
 
-Reconciled these related documents with current source:
+# ممیزی سلامت کد و آماده‌سازی انتشار
 
-- [API reference](API_REFERENCE.md)
-- [Architecture](ARCHITECTURE.md)
-- [Database design](DATABASE_DESIGN.md)
-- [Deployment and operations](DEPLOYMENT_GUIDE.md)
-- [Frontend guide](../frontend/README.md)
-- [Historical archive](archive/README.md)
+**تاریخ:** ۳۱ اکتبر ۲۰۲۶
 
-Removed unsupported claims about an accountant role, double-entry accounting, Redis as a task broker, non-existent authentication routes, and bundled production infrastructure. Audit results are presented as dated observations rather than badges claiming live CI coverage.
+**دامنه:** بک‌اند Django، فرانت‌اند React/Vite، قراردادهای API، اعلان‌های امنیتی وابستگی‌ها، نظم مخزن و مستندات عمومی.
 
-## Remaining release actions
+**نتیجه:** موانع تأییدشده اصلاح شدند و مجموعه تست‌های محلی بررسی‌شده موفق‌اند. این گزارش، تست نفوذ، گواهی امنیت یا تضمین آمادگی محیط عملیاتی نیست.
 
-1. **Apply existing migrations to the local database before using it with current code.** Six are pending in the preserved local database: catalog 0008–0009, finance 0006, and invoices 0013–0015. Back up first; the upgrade passed only on a disposable copy during the audit.
-2. **Configure and validate deployment security.** Replace secrets/origins, rotate or delete demo accounts, verify SQL Server certificate/authentication settings if used, and resolve deployment-check warnings for the actual topology.
-3. **Run PostgreSQL concurrency tests and real-browser workflows.** SQLite tests do not establish row-lock safety, native dialog/focus behavior, responsive rendering, or deployed token/proxy behavior.
-4. **Review publication-sensitive material.** Manually review the privacy-blocked backend template and historical binary documents; consider a dedicated all-history secret scan before the first public push.
-5. **Track nonblocking design/maintenance gaps.** Frontend guards do not fully model backend superuser overrides and sometimes restrict navigation more than API read permissions. Strict TypeScript mode is not enabled. `PAGINATION_PAGE_SIZE` is shadowed by the pagination class's fixed default of 20; request-level `page_size` works. Browser submission guards do not provide cross-client/server idempotency.
+## خلاصه مدیریتی
 
-No commits or branches were created. The working tree contains the changes for review.
+- از ثبت اطلاعات مالی/موجودی نامعتبر بر اثر سرریز مبلغ کل فاکتور و خراب‌شدن خواندن‌های بعدی API جلوگیری شد.
+- قطع اعشار در تقسیم SQLite که گزارش‌های دارای تخفیف را روی Django 5.2 تحت تأثیر قرار می‌داد، اصلاح شد.
+- کلاینت Redis که نصب آن اعلام نشده بود اضافه شد و کنترل‌های احراز هویت/TLS در SQL Server با پیش‌فرض امن صریح شدند.
+- انتخابگرهای ناقص صفحه‌بندی‌شده، ارسال تکراری عملیات مالی و مدیریت تمدید توکن/خروج در فرانت‌اند اصلاح شدند.
+- قراردادهای TypeScript و پردازش خطای رابط کاربری با serializerهای بک‌اند و قالب خطا هماهنگ شدند.
+- وابستگی‌های فرانت‌اند به‌روزرسانی امنیتی شدند و حداقل نسخه وابستگی‌های آسیب‌پذیر Python افزایش یافت؛ مجموعه نسخه‌های حل‌شده و بررسی‌شده، اعلان آسیب‌پذیری شناخته‌شده‌ای نداشتند.
+- فایل‌های تولیدشده/محلی حذف، قواعد نادیده‌گرفتن تقویت، محتوای تاریخی بایگانی و مستندات نادرست/قالبی جایگزین شدند.
+
+## مرحله ۱ — ممیزی سلامت، کیفیت و قراردادها
+
+### اشکال‌های تأییدشده و اصلاح آن‌ها
+
+| یافته | شواهد / اثر | اصلاح | فایل‌های اصلی |
+| --- | --- | --- | --- |
+| مبلغ کل فاکتور بیش از ظرفیت ذخیره | حاصل ضرب قیمت‌های منفرد معتبر در تعداد می‌توانست از `DecimalField(14,2)` فراتر رود. خرید بازتولیدشده پس از ثبت فاکتور/موجودی، خطای 500 می‌داد و سپس سریال‌سازی فهرست نیز خراب می‌شد. | مبلغ محاسبه‌شده در همان تراکنش اتمیک اعتبارسنجی شد. مبلغ نامعتبر پاسخ 400 می‌دهد و اسناد، موجودی، تاریخچه گردش و شماره‌گذاری برمی‌گردند. تست‌ها فروش، خرید، مرزها، تخفیف و بازگشت تراکنش را پوشش می‌دهند. | `backend/apps/invoices/services.py`، `backend/apps/invoices/tests/test_invoice_total_bounds.py` |
+| گزارش نادرست تخفیف روی Django 5.2 / SQLite | تبدیل NUMERIC همچنان می‌توانست تقسیم صحیح انجام دهد؛ تخفیف درصدی نادیده گرفته می‌شد و مرجوعی کامل ممکن بود درآمد غیرواقعی باقی بگذارد. | تقسیم حقیقی اختصاصی SQLite اضافه و محاسبات اعشاری SQL در سایر موتورها حفظ شد. تست تخصیص کسری، درآمد/سود و مرجوعی کامل اضافه شد. | `backend/utils/expressions.py`، `backend/apps/reports/views.py`، `backend/apps/reports/tests/test_brand_discount_audit.py` |
+| وابستگی کش Redis اعلام نشده بود | تنظیم `REDIS_CACHE_URL` خطای `ModuleNotFoundError: redis` را بازتولید می‌کرد. | وابستگی کلاینت Redis اعلام و راه‌اندازی/خواندن بک‌اند با اتصال شبیه‌سازی‌شده تست شد. | `backend/requirements.txt`، `backend/config/test_dependencies.py` |
+| ابهام احراز هویت/TLS در SQL Server | تنظیمات، اعتبارنامه SQL را با احراز هویت مورد اعتمادِ بدون شرط و عبور از اعتبارسنجی گواهی ترکیب می‌کرد. | انتخاب آگاهانه احراز هویت یکپارچه یا SQL؛ رمزنگاری و بررسی گواهی به‌صورت پیش‌فرض؛ اعتبارسنجی کنترل‌های بولی جدید. تست‌ها تنظیمات و رشته اتصال را بدون اتصال واقعی بررسی می‌کنند. | `backend/config/settings.py`، `backend/config/test_database_settings.py` |
+| ناقص‌شدن بی‌صدای اطلاعات صفحه‌بندی‌شده | ابزارهای کاربران، برندها، سایزها و کمبود موجودی، رکوردهای بعد از صفحه اول بک‌اند را کنار می‌گذاشتند. | استفاده مجدد از ابزار دریافت تمام صفحات با حفظ سازگاری پاسخ آرایه‌ای. | `frontend/src/api/pagination.ts`، `frontend/src/api/auth.ts`، `frontend/src/api/catalog.ts` |
+| تغییرات تکراری مالی/موجودی | مدیریت‌کننده‌های خرید، دریافت و مرجوعی می‌توانستند در زمان انتظار پاسخ، دوباره درخواست بفرستند. | محافظ همگام برای درخواست در حال اجرا همراه با تست رگرسیون. این محافظ مرورگری است، نه تضمین اجرای یک‌باره در بک‌اند. | `frontend/src/pages/PurchaseInvoices.tsx` و اجزای پنجره دریافت/مرجوعی |
+| ناسازگاری تلاش مجدد/چرخش JWT | درخواست‌های صف‌شده با خطای 401 ممکن بود بیش از یک‌بار تکرار شوند؛ تلاش مجدد خروج می‌توانست refresh token پیش از چرخش و از قبل مسدودشده را بفرستد. | علامت‌گذاری همه تلاش‌های مجدد برای یک نوبت و استفاده از refresh token جاری در خروج. تست interceptor واقعی Axios با انتقال شبیه‌سازی‌شده. | `frontend/src/api/client.ts`، `frontend/tests/apiClient.test.ts` |
+| اختلاف نوع API و قالب خطا | بعضی فیلدهای nullable و ساختارهای خرید/گزارش با serializerها متفاوت بودند؛ نوع ایجاد وضعیت نامعتبر را می‌پذیرفت یا دلیل الزامی را حذف می‌کرد. فرم‌ها گاهی خطای بدون پوشش انتظار داشتند. | اصلاح قرارداد درخواست/خواندن، افزودن تست زمان کامپایل قرارداد و استفاده مجدد از `parseApiError` در فرم‌های مربوط. | `frontend/src/types/index.ts`، ماژول‌های API، مدیریت‌کننده‌های فرم و تست قرارداد/خطا |
+| تنظیمات ثابت API در کد | نشانی پایه API و مقصد proxy توسعه قابل تنظیم نبودند. | افزودن `VITE_API_BASE_URL` و `VITE_API_PROXY_TARGET`، حفظ پیش‌فرض هم‌مبدأ/محلی و مستندسازی عمومی‌بودن تنظیمات زمان ساخت. | `frontend/src/api/client.ts`، `frontend/vite.config.ts`، `frontend/src/vite-env.d.ts` |
+
+برای این اصلاحات migration جدید ساختار/داده لازم نبود. نام هیچ مسیر API تغییر نکرد.
+
+### بررسی وابستگی‌ها
+
+- ممیزی اولیه فرانت‌اند **۴ بسته آسیب‌پذیر: ۳ مورد شدید و ۱ مورد متوسط** گزارش کرد؛ یکی از وابستگی‌های شدید در درخت وابستگی نسخه عملیاتی وجود داشت.
+- دستور `npm audit fix --ignore-scripts` وابستگی‌ها را در محدوده نسخه‌های مجاز فعلی به‌روزرسانی کرد. اجرای نهایی `npm audit`، بررسی فقط وابستگی‌های عملیاتی و ممیزی نهایی `npm ci`، **صفر آسیب‌پذیری** گزارش کردند.
+- مجموعه وابستگی‌های بک‌اند حل‌شده در محیط تمیز Windows و Linux با **pip-audit 2.10.1** و فراداده عمومی بسته/نسخه بررسی شدند. سورس مخزن آپلود نشد. هر مجموعه شامل **۴۹ بسته، صفر آسیب‌پذیری شناخته‌شده و صفر بسته بررسی‌نشده** بود.
+- بررسی حداقل نسخه نشان داد محدوده‌های گسترده Python هنوز انتشارهای آسیب‌پذیر را مجاز می‌دانند. حد پایین به Django **5.2.17**، DRF **3.18.2**، SimpleJWT **5.5.1**، pytest **9.0.3** و python-dotenv **1.2.2** افزایش یافت. حد بالای Django همچنان `<6.2` است.
+- بررسی سازگاری محیط‌های حل‌شده موفق بود. بسته‌های Linux حل و ممیزی شدند، اما روی Linux اجرا نشدند.
+- lockfile فرانت‌اند در مخزن ثبت شده است؛ requirementsهای Python یک lockfile کامل با هش‌های ثابت نیستند. حل سالم وابستگی‌ها در زمان بررسی، نسخه‌های آینده یا اصالت فایل‌های بسته را تضمین نمی‌کند. کتابخانه‌های بومی، بسته‌های سیستم‌عامل، خود Python و امنیت درایور ODBC به‌صورت جامع ارزیابی نشدند.
+
+### بررسی تنظیمات و API
+
+- هشت اپ دامنه‌ای Django نصب هستند؛ بررسی سیستمی Django خطای تنظیمات یا ارجاع مدل پیدا نکرد.
+- شاخه‌های انتخاب SQLite، PostgreSQL و SQL Server روی یک اتصال `default` وجود دارند؛ مسیریاب چنددیتابیسی وجود ندارد. مقدار ناشناخته `DB_ENGINE` به SQLite برمی‌گردد.
+- احراز هویت JWT و session فعال است و دسترسی احرازهویت‌شده پیش‌فرض API است. نقش‌ها دقیقاً `MANAGER`، `TECHNICIAN` و `WAREHOUSE` هستند؛ مجوز سطح عملیات و محدودیت queryset فروش تکنسین اعمال می‌شود.
+- CORS مبدأهای صریح دارد، نه دسترسی wildcard. میزبان/مبدأ محیط عملیاتی، اعتماد به proxy، HTTPS/کوکی/HSTS و کش مشترک محدودسازی نرخ نیازمند تنظیم اپراتور است.
+- پیشوندهای دامنه فرانت‌اند با مسیرهای بک‌اند برابرند: `auth`، `crm`، `catalog`، `workshop`، `procurement`، `invoices`، `treasury` و `analytics`.
+- در کلاینت‌های API بررسی‌شده، ناسازگاری URL/متد پیدا نشد. مشکلات داده درخواست/پاسخ و صفحه‌بندی مطابق توضیحات بالا اصلاح شدند.
+- مستندات API در حالت debug عمومی است و خارج از آن برای مدیر/superuser محافظت می‌شود، مگر اینکه `ENABLE_DOCS_IN_PROD` صراحتاً آن را عمومی کند.
+- کلید شناخته‌شده Django که فقط برای debug است، خارج از debug رد می‌شود. اعتبارنامه‌های داده آزمایشی قابل پیش‌بینی‌اند، دو فعال‌سازی صریح نیاز دارند و نباید بدون تغییر به دیتابیس در معرض دسترسی منتقل شوند.
+
+### سابقه اعتبارسنجی
+
+اعتبارسنجی بک‌اند با **Python 3.14.6**، محیط‌های مجازی تمیز، دیتابیس‌های مستقل SQLite و نسخه‌های موقت برای بررسی migration انجام شد. دیتابیس محلی اصلی migration یا تغییر داده نشد؛ هش آن در طول اعتبارسنجی ثابت ماند.
+
+| بررسی | نتیجه |
+| --- | --- |
+| کامپایل نحوی Python | ۱۷۳ فایل Python بک‌اند پس از اصلاحات موفق بود |
+| نصب وابستگی و سازگاری | نصب تمیز requirements/dev و بررسی سازگاری pip/uv موفق بود |
+| مجموعه تست مبنای بک‌اند | ۳۱۴ موفق؛ ۹ اجرا‌نشده |
+| مجموعه نهایی روی Django 5.2.17 | **۳۴۲ موفق؛ ۹ اجرا‌نشده** |
+| مجموعه نهایی روی Django 6.1.2 | **۳۴۲ موفق؛ ۹ اجرا‌نشده** |
+| مجموعه هدفمند نهایی گزارش/تنظیمات | ۴۳ تست موفق روی هر نسخه Django |
+| `check` در Django | روی هر دو نسخه موفق |
+| `makemigrations --check --dry-run` | در هیچ نسخه‌ای اختلاف مدل و migration نبود |
+| اجرای تازه `migrate` و بررسی وضعیت migration/قیدها | روی هر دو نسخه موفق |
+| ارتقای نسخه موقت دیتابیس محلی | شش migration معوق موفق اعمال شد؛ ساختار، قیدها و یکپارچگی تأیید شد |
+| `spectacular --validate --fail-on-warn` | روی هر دو نسخه موفق |
+| مجموعه مبنای فرانت‌اند | ۵۵ موفق |
+| مجموعه نهایی فرانت‌اند | **۱۰۶ موفق؛ صفر شکست/اجرانشده** |
+| `npm ci` | موفق؛ نصب مجدد نهایی از lockfile تعداد ۱۷۳ بسته را ممیزی کرد |
+| `npm run typecheck` و اجرای اجباری `tsc -b` | موفق |
+| `npm run lint` | صفر هشدار/خطا؛ ۶۴ فایل بررسی شد |
+| `npm run build` | موفق با Vite 8.3.5؛ تعداد ۲٬۵۶۲ ماژول تبدیل شد |
+| `npm audit` و ممیزی فقط وابستگی‌های عملیاتی | صفر آسیب‌پذیری شناخته‌شده |
+| `npm ls --depth=0` | وابستگی مستقیم مفقود یا نامعتبر گزارش نشد |
+| پیوندها و لنگرهای مستندات | ۱۰۴ پیوند/لنگر محلی در ۸ فایل Markdown عمومی موفق بود |
+| قواعد نادیده‌گرفتن و فایل‌های نامزد انتشار | ۲۲ مورد موفق؛ فایل ناخواسته یا بیش از ۱۰۰ MiB یافت نشد |
+| `git diff --check` | موفق؛ Git فقط پیام تبدیل پایان خط داد |
+
+چرخه نهایی نصب مجدد، تست، بررسی نوع، لینت، ساخت و ممیزی فرانت‌اند پس از هماهنگ‌سازی مستندات و حذف فایل‌های آغازین، از lockfile دوباره اجرا شد. تست‌های بک‌اند با ابزارهای اجرای مستقل انجام شدند تا به SQLite اصلی وصل نشوند. دستورهای استاندارد مشارکت و آماده‌سازی محیط در [README اصلی](../README.md) مستند شده‌اند.
+
+### بررسی‌ها و محدودیت‌های استقرار
+
+- اجرای پیش‌فرض `check --deploy` هشدارهای **W004، W008، W012 و W016** مربوط به HSTS، هدایت به HTTPS و کوکی امن را گزارش کرد. فعال‌کردن این کنترل‌ها همچنان نیاز به تصمیم صریح درباره زیردامنه‌ها و preload دارد. پیش‌فرض توسعه محلی به‌شکلی که HTTP محلی را خراب کند، کورکورانه سخت‌گیرانه نشد.
+- ۹ تست اجرا‌نشده به رفتار قفل ردیفی/هم‌زمانی PostgreSQL نیاز دارند. **PostgreSQL، SQL Server، Redis واقعی و گردش‌کار سرتاسری مرورگر تأیید نشدند.**
+- تنظیمات و رشته اتصال SQL Server بدون اتصال واقعی تست شدند. درایور بومی ODBC Driver 17/18 در محیط ممیزی نصب نبود.
+- اسکن نفوذ پولی/ابری یا آپلود سورس انجام نشد. این کار بررسی کد، اعلان‌های آسیب‌پذیری وابستگی‌ها و تست خودکار محلی بود؛ نه آزمایش جامع سوءاستفاده از آسیب‌پذیری‌ها.
+- **پیام‌های تشخیصی ویرایشگر پاک نیستند.** language serverها خطاهای نوع Django ORM، decorator و descriptor و هشدارهای لینت Python را در فایل‌های موجود و تغییرکرده گزارش می‌کنند؛ importهای Vite/Node نیز در ویرایشگر حل نشده‌اند. ساخت TypeScript با CLI در محیط تمیز و تست‌های خودکار موفق‌اند. تنظیمات تحلیل نوع/import ویرایشگر تعمیر و این پیام‌ها سرکوب نشدند؛ موفقیت CLI نباید به‌عنوان موفقیت بررسی نوع ایستای Python ارائه شود.
+
+## مرحله ۲ — پاک‌سازی مخزن و آماده‌سازی انتشار
+
+### کارهای انجام‌شده
+
+- پوشش `.gitignore` ریشه، بک‌اند و فرانت‌اند برای کش Python، محیط‌ها، دیتابیس و فایل‌های جانبی، لاگ، خروجی media/static، وابستگی Node، خروجی ساخت، فایل محیط، coverage، فایل سیستم‌عامل و تنظیمات ویرایشگر از جمله `.zed/` گسترش یافت.
+- قواعد استثنا برای ثبت قالب‌های نمونه `.env.example` حفظ شدند.
+- فایل `frontend/.env.example` با پیش‌فرض عمومی API/proxy و هشدار صریحِ قراردادن‌نکردن اسرار اضافه شد.
+- پوشه محلی `.zed/`، فایل‌های موقت، کش pytest/Python، لاگ بک‌اند، خروجی ساخت/audit-build فرانت‌اند و SVGهای آغازین بلااستفاده React/Vite حذف شدند. دستورهای تست/ساخت فایل‌های تولیدی را دوباره می‌سازند؛ پاک‌سازی نهایی آن‌ها را دوباره حذف می‌کند.
+- مستندات درسی/طراحی و آزمایش‌های مستقل SQL در آن زمان به `docs/archive/` منتقل شدند (این فایل‌ها متعاقباً در ۴ نوامبر ۲۰۲۶ از درخت کاری فعال حذف شدند و در تاریخچهٔ Git حفظ شده‌اند).
+- دیتابیس محلی SQLite و وابستگی‌های نصب‌شده Node حفظ شدند؛ هر دو نادیده گرفته می‌شوند، نه اینکه به‌صورت مخرب حذف شوند.
+- بررسی شد که index فعلی در الگوهای بررسی‌شده دیتابیس محلی، فایل محیط فعال، لاگ، بایت‌کد کش، پوشه وابستگی یا خروجی ساخت ندارد.
+- تاریخچه در دسترس برای مسیرهای مشخص `.env` و SQLite بررسی شد؛ هیچ‌یک پیدا نشد. این بررسی، اسکن جامع اسرار در کل تاریخچه نبود.
+
+### محدودیت‌های صریح
+
+1. **حریم خصوصی قالب بک‌اند (محدودیت تاریخی محیط Zed):** در زمان بررسی ۳۱ اکتبر، فایل `backend/.env.example` وجود داشت و ثبت شده بود، اما تنظیم `private_files` در محیط ویرایشگر Zed خواندن آن را مسدود کرد. محتوای قالب در بررسی‌های بعدی تطبیق داده شد.
+2. **فایل‌های باینری تاریخی:** PDF، DOCX و تصاویر بایگانی‌شده حفظ شدند، اما فراداده تعبیه‌شده یا اطلاعات شخصی آن‌ها به‌صورت جامع بررسی نشد. پیش از انتشار عمومی بازبینی شوند.
+3. **تاریخچه:** بازنویسی تاریخچه انجام نشد. قواعد نادیده‌گرفتن فعلی، راز یا کلیدی را که قبلاً در commitهای تاریخی ثبت شده حذف نمی‌کنند؛ اگر اسکن جامع‌تر موردی یافت، کلید را تعویض و در صورت نیاز تاریخچه را بازنویسی کنید.
+
+## مرحله ۳ — مستندات
+
+[README اصلی](../README.md) با راهنمای انگلیسی شامل نشان‌ها، مأموریت/قابلیت‌ها، نمودار معماری، فناوری‌ها، مدل اپ/داده، JWT/session/RBAC، جدول endpointها، مسیریابی و وضعیت SPA، راه‌اندازی برای هر دو خانواده سیستم‌عامل، جدول تنظیمات، تست‌ها، ملاحظات محیط عملیاتی، ساختار مخزن، راهنمای مشارکت و مجوز MIT جایگزین شد.
+
+مستندات مرتبط زیر با سورس موجود هماهنگ شدند:
+
+- [مرجع API](API_REFERENCE.md)
+- [معماری](ARCHITECTURE.md)
+- [طراحی دیتابیس](DATABASE_DESIGN.md)
+- [استقرار و عملیات](DEPLOYMENT_GUIDE.md)
+- [راهنمای فرانت‌اند](../frontend/README.md)
+- بایگانی تاریخی در پاک‌سازی ۴ نوامبر ۲۰۲۶ از درخت جاری حذف شد؛ نسخه‌های ثبت‌شده در تاریخچهٔ Git موجودند.
+
+ادعاهای بدون پشتوانه درباره نقش حسابدار، حسابداری دوطرفه، Redis به‌عنوان کارگزار وظایف، مسیرهای احراز هویت ناموجود و زیرساخت عملیاتی همراه پروژه حذف شد. نتایج ممیزی به‌صورت مشاهدات تاریخ‌دار ارائه می‌شوند، نه نشان‌هایی با ادعای پوشش CI زنده.
+
+## اقدام‌های باقی‌مانده برای انتشار
+
+1. **پیش از استفاده دیتابیس محلی با کد فعلی، migrationهای موجود را اعمال کنید.** در دیتابیس محلی حفظ‌شده شش مورد معوق است: catalog 0008–0009، finance 0006 و invoices 0013–0015. ابتدا پشتیبان بگیرید؛ ارتقا در این ممیزی فقط روی نسخه موقت موفق بوده است.
+2. **امنیت استقرار را تنظیم و اعتبارسنجی کنید.** اسرار و مبدأها را جایگزین، حساب‌های آزمایشی را حذف یا اعتبارنامه آن‌ها را تعویض، در صورت استفاده تنظیمات گواهی/احراز هویت SQL Server را بررسی و هشدارهای استقرار را متناسب با توپولوژی واقعی رفع کنید.
+3. **تست هم‌زمانی PostgreSQL و گردش‌کار مرورگر واقعی:** تست‌های خودکار هم‌زمانی و پایگاه‌داده PostgreSQL متعاقباً در پایپ‌لاین CI اضافه و اجرا شدند، اما گردش‌کار مرورگر روی سیستم زنده و چاپ فیزیکی همچنان نیازمند بررسی محیط استقرار است.
+4. **محتوای حساس انتشار را بازبینی کنید.** قالب بک‌اند مسدودشده به علت حریم خصوصی و اسناد باینری تاریخی را دستی بررسی کنید؛ پیش از نخستین push عمومی، اسکن اختصاصی اسرار در کل تاریخچه را در نظر بگیرید.
+5. **شکاف‌های غیربازدارنده طراحی/نگهداری را پیگیری کنید.** محافظ‌های فرانت‌اند استثناهای superuser بک‌اند را کامل مدل نمی‌کنند و گاهی مسیر‌یابی را بیش از مجوز خواندن API محدود می‌کنند. حالت strict در TypeScript فعال نیست. مقدار `PAGINATION_PAGE_SIZE` تحت‌الشعاع پیش‌فرض ثابت ۲۰ در کلاس صفحه‌بندی است؛ `page_size` در سطح درخواست کار می‌کند. محافظ ارسال مرورگر، اجرای یک‌باره میان چند کلاینت یا روی سرور را تضمین نمی‌کند.
+
+هیچ commit یا شاخه‌ای ایجاد نشد. تغییرات برای بازبینی در درخت کاری موجود است.

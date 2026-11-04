@@ -1,0 +1,12 @@
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["F", "E9"]
+
+[tool.mypy]
+python_version = "3.14"
+files = ["utils/domain.py"]
+strict = true

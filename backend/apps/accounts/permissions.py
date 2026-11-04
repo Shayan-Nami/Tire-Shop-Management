@@ -51,8 +51,9 @@ class ReadOnlyOrWarehouse(BasePermission):
         return request.user.role in [UserRole.WAREHOUSE, UserRole.MANAGER] or request.user.is_superuser
 
 
+from apps.invoices.permissions import SalesInvoicePermission as SalesInvoicePermission
+
 # کلاس SalesInvoicePermission به اپ دامنه مربوطه (invoices) منتقل شده و جهت سازگاری به عقب در این ماژول نگه‌داری می‌شود.
-from apps.invoices.permissions import SalesInvoicePermission
 
 
 class IsDocManagerOrDebug(BasePermission):

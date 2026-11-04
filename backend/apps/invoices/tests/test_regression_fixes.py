@@ -3,22 +3,17 @@ from decimal import Decimal
 from datetime import datetime, timezone as py_timezone
 from django.urls import reverse
 from django.conf import settings
-from rest_framework.test import APIClient
 from apps.accounts.models import User, UserRole
 from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementType
-from apps.customers.models import Customer, Vehicle
+from apps.customers.models import Customer
 from apps.suppliers.models import Supplier
 from apps.invoices.models import (
-    SalesInvoice, SalesInvoiceTireItem, SalesInvoiceServiceItem,
-    PurchaseInvoice, PurchaseInvoiceTireItem, InvoiceStatus, PaymentStatus,
-    SalesReturn, SalesReturnItem
+    SalesInvoice, SalesInvoiceServiceItem,
+    InvoiceStatus
 )
 from apps.services_app.models import Service
-from apps.finance.models import ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher
-from apps.finance.services import create_receipt_voucher_service, create_payment_voucher_service
 from apps.invoices.services import (
     create_sales_invoice_service, create_purchase_invoice_service,
-    cancel_sales_invoice_service, cancel_purchase_invoice_service,
     create_sales_return_service, generate_next_invoice_number
 )
 from apps.catalog.services import adjust_tire_stock_service
@@ -112,7 +107,7 @@ class TestRegressionFixes:
     # --------------------------------------------------------------------------
     # 3. Access Control: Non-superuser manager blocked from modifying superuser
     # --------------------------------------------------------------------------
-    def test_manager_cannot_modify_superuser(self, api_client, manager_user):
+    def test_manager_cannot_modify_superuser(self, api_client, superuser):
         # مدیر عادی که سوپریوزر نیست
         regular_manager = User.objects.create_user(
             username='regular_mgr',
@@ -121,7 +116,6 @@ class TestRegressionFixes:
             is_staff=True,
             is_superuser=False
         )
-        superuser = manager_user  # is_superuser=True
 
         api_client.force_authenticate(user=regular_manager)
         url = reverse('user-detail', kwargs={'pk': superuser.pk})
@@ -488,7 +482,7 @@ class TestRegressionFixes:
     # 13. Catalog Serializers: tires_count uses SerializerMethodField
     # --------------------------------------------------------------------------
     def test_l2_catalog_serializers_tires_count(self):
-        from apps.catalog.serializers import BrandSerializer, SizeSerializer
+        from apps.catalog.serializers import BrandSerializer
         brand = Brand.objects.create(brand_name='برند بدون انوتیشن')
         ser = BrandSerializer(brand)
         assert ser.data['tires_count'] == 0

@@ -7,7 +7,7 @@ from apps.catalog.models import Brand, Size, Tire, StockMovement
 from apps.services_app.models import Service
 from apps.customers.models import Customer, Vehicle
 from apps.suppliers.models import Supplier
-from apps.invoices.services import create_sales_invoice_service, create_purchase_invoice_service
+from apps.invoices.services import create_sales_invoice_service
 
 User = get_user_model()
 

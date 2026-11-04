@@ -1,0 +1,3 @@
+# Consistent text files on Windows and Linux; preserve Windows launcher endings.
+* text=auto eol=lf
+*.bat text eol=crlf

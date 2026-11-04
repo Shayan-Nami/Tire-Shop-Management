@@ -28,9 +28,6 @@ export default defineConfig(({ mode }) => {
               if (id.includes('react') || id.includes('scheduler')) {
                 return 'react-core';
               }
-              if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor')) {
-                return 'recharts';
-              }
               if (id.includes('axios')) {
                 return 'axios';
               }

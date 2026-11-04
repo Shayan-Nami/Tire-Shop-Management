@@ -6,9 +6,8 @@ from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementT
 from apps.customers.models import Customer
 from apps.suppliers.models import Supplier
 from apps.invoices.models import (
-    SalesInvoice, PurchaseInvoice, InvoiceStatus, PaymentStatus
+    InvoiceStatus, PaymentStatus
 )
-from apps.finance.models import ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher
 from apps.finance.services import (
     create_receipt_voucher_service,
     cancel_receipt_voucher_service,
@@ -16,8 +15,7 @@ from apps.finance.services import (
     cancel_payment_voucher_service,
     create_customer_refund_voucher_service,
     cancel_customer_refund_voucher_service,
-    sync_sales_invoice_payment_status,
-    sync_purchase_invoice_payment_status
+    sync_sales_invoice_payment_status
 )
 from apps.invoices.services import (
     create_sales_invoice_service,
@@ -420,7 +418,7 @@ class TestPaymentStatusAndVouchers:
         assert assert_in_sync() == PaymentStatus.UNPAID
 
         # گام ۲: پرداخت جزئی ۵۰۰,۰۰۰ -> PARTIAL
-        r1 = create_receipt_voucher_service(invoice, Decimal('500000.00'), user=manager_user)
+        create_receipt_voucher_service(invoice, Decimal('500000.00'), user=manager_user)
         assert assert_in_sync() == PaymentStatus.PARTIAL
 
         # گام ۳: پرداخت مابقی ۷۰۰,۰۰۰ -> PAID

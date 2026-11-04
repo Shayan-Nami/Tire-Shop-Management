@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translations, type Language, type Direction } from '../utils/i18n';
 
 export type { Language, Direction };
@@ -9,7 +9,7 @@ export interface LanguageContextType {
   isRTL: boolean;
   toggleLanguage: () => void;
   setLanguage: (lang: Language) => void;
-  t: (key: string, defaultText?: string) => string;
+  t: (key: string, defaultText?: string, values?: Record<string, string | number>) => string;
 }
 
 const applyDocumentLanguage = (lang: Language): void => {
@@ -17,6 +17,7 @@ const applyDocumentLanguage = (lang: Language): void => {
     const dir: Direction = lang === 'fa' ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', dir);
     document.documentElement.setAttribute('lang', lang);
+    document.title = translations.appTitle[lang];
     if (document.body) {
       document.body.setAttribute('dir', dir);
     }
@@ -67,13 +68,11 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setLanguageState((prev) => (prev === 'fa' ? 'en' : 'fa'));
   };
 
-  const t = (key: string, defaultText?: string): string => {
+  const t = useCallback((key: string, defaultText?: string, values?: Record<string, string | number>): string => {
     const entry = translations[key];
-    if (entry) {
-      return entry[language] || defaultText || entry.fa;
-    }
-    return defaultText || key;
-  };
+    const message = entry?.[language] || defaultText || key || '';
+    return message.replace(/\{(\w+)\}/g, (placeholder, name) => String(values?.[name] ?? placeholder));
+  }, [language]);
 
   const direction: Direction = language === 'fa' ? 'rtl' : 'ltr';
 

@@ -8,7 +8,7 @@ from apps.customers.models import Customer
 from apps.suppliers.models import Supplier
 from apps.invoices.models import PaymentStatus
 from apps.invoices.services import create_sales_invoice_service, create_purchase_invoice_service
-from apps.finance.services import create_receipt_voucher_service, create_payment_voucher_service
+from apps.finance.services import create_payment_voucher_service
 
 
 @pytest.fixture

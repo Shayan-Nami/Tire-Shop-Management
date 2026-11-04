@@ -3,15 +3,13 @@ import pytest
 from decimal import Decimal
 from django.urls import reverse
 from django.core.cache import cache
-from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from apps.accounts.models import UserRole
 from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementType
 from apps.customers.models import Customer
 from apps.suppliers.models import Supplier
-from apps.invoices.models import SalesInvoice, PurchaseInvoice, InvoiceStatus
-from apps.invoices.services import create_sales_invoice_service, create_purchase_invoice_service, generate_next_invoice_number
+from apps.invoices.services import create_sales_invoice_service, create_purchase_invoice_service
 
 User = get_user_model()
 
@@ -572,7 +570,7 @@ class TestThrottlingAndEnvironment:
         # مقایسه پیام و ساختار خطا
         assert res_non_existing.data['errors']['detail'] == res_wrong_pw.data['errors']['detail']
 
-    def test_admin_panel_blocked_for_non_staff_users(self, client, setup_security_data, manager_user):
+    def test_admin_panel_blocked_for_non_staff_users(self, client, setup_security_data, superuser):
         """
         بررسی امنیتی پنل ادمین جنگو (/admin/):
         فقط کاربران با مشخصه is_staff=True می‌توانند وارد پنل مدیریت شوند.
@@ -589,8 +587,8 @@ class TestThrottlingAndEnvironment:
             assert '/admin/login/' in res_tech_admin.url
 
         # کاربر مدیر دارای is_staff=True است
-        assert manager_user.is_staff is True
-        client.force_login(manager_user)
+        assert superuser.is_staff is True
+        client.force_login(superuser)
         res_mgr_admin = client.get('/admin/')
         assert res_mgr_admin.status_code == 200
 

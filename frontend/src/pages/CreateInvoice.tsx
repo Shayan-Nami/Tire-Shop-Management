@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -37,6 +38,7 @@ interface SelectedServiceRow {
 }
 
 export const CreateInvoice: React.FC = () => {
+  const { t, language } = useLanguage();
   const { currencyUnit } = useAuth();
   const navigate = useNavigate();
 
@@ -71,7 +73,7 @@ export const CreateInvoice: React.FC = () => {
   const [newCustomerPhone, setNewCustomerPhone] = useState<string>('');
   const [newCustomerNationalCode, setNewCustomerNationalCode] = useState<string>('');
   const [newVehiclePlate, setNewVehiclePlate] = useState<string>('');
-  const [newVehicleModel, setNewVehicleModel] = useState<string>('پژو ۲۰۶');
+  const [newVehicleModel, setNewVehicleModel] = useState<string>(t("پژو ۲۰۶"));
 
   // استیت‌های لودینگ و خطا
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -134,7 +136,7 @@ export const CreateInvoice: React.FC = () => {
       selectedVehicleIdRef.current = ownedVehicles[0]?.vehicle_id ?? '';
       setSelectedVehicleId(selectedVehicleIdRef.current);
     } catch (error) {
-      if (isCurrent()) setVehicleError(parseApiError(error, 'خطا در دریافت خودروهای مشتری'));
+      if (isCurrent()) setVehicleError(parseApiError(error, t("خطا در دریافت خودروهای مشتری"), language));
     } finally {
       if (isCurrent()) setLoadingVehicles(false);
     }
@@ -152,12 +154,12 @@ export const CreateInvoice: React.FC = () => {
         setTires(allTires);
         setServices(allServices);
       } catch (error) {
-        if (active) setCatalogError(parseApiError(error, 'خطا در بارگذاری کالاها و خدمات'));
+        if (active) setCatalogError(parseApiError(error, t("خطا در بارگذاری کالاها و خدمات"), language));
       }
     };
     void fetchData();
     return () => { active = false; };
-  }, []);
+  }, [t, language]);
 
   useEffect(() => {
     const requests = customerRequests.current;
@@ -178,7 +180,7 @@ export const CreateInvoice: React.FC = () => {
             ? [selected, ...found] : found;
         });
       } catch (error) {
-        if (isCurrent()) setCustomerError(parseApiError(error, 'خطا در جستجوی مشتریان'));
+        if (isCurrent()) setCustomerError(parseApiError(error, t("خطا در جستجوی مشتریان"), language));
       } finally {
         if (isCurrent()) setIsSearchingCustomer(false);
       }
@@ -187,7 +189,7 @@ export const CreateInvoice: React.FC = () => {
       clearTimeout(timer);
       requests.invalidate();
     };
-  }, [customerSearch]);
+  }, [customerSearch, t, language]);
 
   const handleCustomerChange = (custId: number | '') => {
     quickCreateRequests.current.invalidate();
@@ -217,14 +219,14 @@ export const CreateInvoice: React.FC = () => {
     if (!tire) return;
 
     if (tire.stock_quantity <= 0) {
-      alert(`موجودی تایر '${tire.tire_name}' در انبار صفر است.`);
+      alert(t("موجودی تایر '{0}' در انبار صفر است.", undefined, { 0: tire.tire_name }));
       return;
     }
 
     const existing = tireItems.find((item) => item.tireId === tireId);
     if (existing) {
       if (existing.quantity >= tire.stock_quantity) {
-        alert(`تعداد درخواستی نمی‌تواند بیشتر از موجودی انبار (${tire.stock_quantity}) باشد.`);
+        alert(t("تعداد درخواستی نمی‌تواند بیشتر از موجودی انبار ({0}) باشد.", undefined, { 0: tire.stock_quantity }));
         return;
       }
       setTireItems(
@@ -250,7 +252,7 @@ export const CreateInvoice: React.FC = () => {
     if (!tire) return;
 
     if (qty > tire.stock_quantity) {
-      alert(`حداکثر موجودی قابل فروش این تایر ${tire.stock_quantity} حلقه است.`);
+      alert(t("حداکثر موجودی قابل فروش این تایر {0} حلقه است.", undefined, { 0: tire.stock_quantity }));
       qty = tire.stock_quantity;
     }
 
@@ -334,7 +336,7 @@ export const CreateInvoice: React.FC = () => {
     e.preventDefault();
     if (quickCreateBusy.current || submitBusy.current) return;
     if (!newCustomerName.trim() || !newCustomerPhone.trim() || !newVehiclePlate.trim()) {
-      setQuickCreateError('لطفاً نام، شماره موبایل و شماره پلاک را تکمیل فرمایید.');
+      setQuickCreateError(t("لطفاً نام، شماره موبایل و شماره پلاک را تکمیل فرمایید."));
       return;
     }
 
@@ -373,7 +375,7 @@ export const CreateInvoice: React.FC = () => {
       });
       if (!isCurrent()) return;
       if (newVehicle.customer !== selectedCustomerIdRef.current) {
-        throw new Error('خودروی دریافتی متعلق به مشتری انتخاب‌شده نیست.');
+        throw new Error(t("خودروی دریافتی متعلق به مشتری انتخاب‌شده نیست."));
       }
 
       setCustomerVehicles([newVehicle, ...vehicles.filter((vehicle) => vehicle.customer === newVehicle.customer && vehicle.vehicle_id !== newVehicle.vehicle_id)]);
@@ -381,7 +383,7 @@ export const CreateInvoice: React.FC = () => {
       setSelectedVehicleId(newVehicle.vehicle_id);
       closeQuickCreate();
     } catch (error) {
-      if (isCurrent()) setQuickCreateError(parseApiError(error, 'خطا در ثبت مشتری یا خودرو؛ اطلاعات ذخیره‌شده را پیش از تلاش مجدد بررسی کنید.'));
+      if (isCurrent()) setQuickCreateError(parseApiError(error, t("خطا در ثبت مشتری یا خودرو؛ اطلاعات ذخیره‌شده را پیش از تلاش مجدد بررسی کنید."), language));
     } finally {
       if (isCurrent()) {
         quickCreateBusy.current = false;
@@ -419,19 +421,19 @@ export const CreateInvoice: React.FC = () => {
   const handleSubmitInvoice = async () => {
     if (submitBusy.current) return;
     if (quickCreateBusy.current || creatingCustomer || loadingVehicles || selectedCustomerIdRef.current !== selectedCustomerId) {
-      setErrorMessage('لطفاً تا تکمیل اطلاعات مشتری و خودرو صبر کنید.');
+      setErrorMessage(t("لطفاً تا تکمیل اطلاعات مشتری و خودرو صبر کنید."));
       return;
     }
     if (!selectedCustomerId) {
-      setErrorMessage('لطفاً مشتری را انتخاب فرمایید.');
+      setErrorMessage(t("لطفاً مشتری را انتخاب فرمایید."));
       return;
     }
     if (!vehicleIsCurrent || selectedVehicleIdRef.current !== selectedVehicleId) {
-      setErrorMessage('لطفاً خودروی مربوطه را انتخاب فرمایید.');
+      setErrorMessage(t("لطفاً خودروی مربوطه را انتخاب فرمایید."));
       return;
     }
     if (tireItems.length === 0 && serviceItems.length === 0) {
-      setErrorMessage('حداقل یک حلقه لاستیک یا یک خدمت فنی باید به فاکتور افزوده شود.');
+      setErrorMessage(t("حداقل یک حلقه لاستیک یا یک خدمت فنی باید به فاکتور افزوده شود."));
       return;
     }
 
@@ -462,7 +464,7 @@ export const CreateInvoice: React.FC = () => {
 
       navigate('/invoices/sales');
     } catch (error) {
-      setErrorMessage(parseApiError(error, 'خطا در ثبت فاکتور فروش'));
+      setErrorMessage(parseApiError(error, t("خطا در ثبت فاکتور فروش"), language));
     } finally {
       submitBusy.current = false;
       setSubmitting(false);
@@ -470,16 +472,12 @@ export const CreateInvoice: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       {/* سربرگ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="page-heading">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">
-            میز کار صندوق و صدور فاکتور فروش
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            ثبت آنی فروش کالا، تعویض، بالانس و صدور صورتحساب هوشمند
-          </p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("میز کار صندوق و صدور فاکتور فروش")}</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("ثبت آنی فروش کالا، تعویض، بالانس و صدور صورتحساب هوشمند")}</p>
         </div>
       </div>
 
@@ -492,9 +490,9 @@ export const CreateInvoice: React.FC = () => {
 
       {(catalogError || customerError || vehicleError) && (
         <div role="alert" className="p-4 rounded-xl bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs space-y-1">
-          {catalogError && <p>{catalogError} — برای تلاش مجدد صفحه را تازه‌سازی کنید.</p>}
-          {customerError && <p id="invoice-customer-error">{customerError} — برای تلاش مجدد جستجو را تغییر دهید.</p>}
-          {vehicleError && <p id="invoice-vehicle-error">{vehicleError} — برای تلاش مجدد مشتری را دوباره انتخاب کنید.</p>}
+          {catalogError && <p>{catalogError} {t("— برای تلاش مجدد صفحه را تازه‌سازی کنید.")}</p>}
+          {customerError && <p id="invoice-customer-error">{customerError} {t("— برای تلاش مجدد جستجو را تغییر دهید.")}</p>}
+          {vehicleError && <p id="invoice-vehicle-error">{vehicleError} {t("— برای تلاش مجدد مشتری را دوباره انتخاب کنید.")}</p>}
         </div>
       )}
 
@@ -502,11 +500,11 @@ export const CreateInvoice: React.FC = () => {
         {/* ستون ۲تایی راست: فرم اقلام، مشتری و خدمات */}
         <div className="lg:col-span-2 space-y-6">
           {/* کارت انتخاب مشتری و خودرو */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="p-5 surface-panel space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100 font-bold text-sm">
                 <User className="w-4 h-4 text-brand-600" />
-                <span>مشخصات مشتری و خودرو</span>
+                <span>{t("مشخصات مشتری و خودرو")}</span>
               </div>
               <button
                 type="button"
@@ -515,7 +513,7 @@ export const CreateInvoice: React.FC = () => {
                 className="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 font-semibold"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>ثبت سریع مشتری/خودرو جدید</span>
+                <span>{t("ثبت سریع مشتری/خودرو جدید")}</span>
               </button>
             </div>
 
@@ -523,28 +521,24 @@ export const CreateInvoice: React.FC = () => {
               {/* انتخاب مشتری با جستجوی زنده */}
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="invoice-customer" className="font-semibold text-slate-700 dark:text-slate-300 block">
-                    مشتری:
-                  </label>
+                  <label htmlFor="invoice-customer" className="font-semibold text-slate-700 dark:text-slate-300 block">{t("مشتری:")}</label>
                   {isSearchingCustomer && (
-                    <span className="text-[10px] text-brand-600 dark:text-brand-400 animate-pulse font-medium">
-                      در حال جستجو...
-                    </span>
+                    <span className="text-[10px] text-brand-600 dark:text-brand-400 animate-pulse font-medium">{t("در حال جستجو...")}</span>
                   )}
                 </div>
                 <div className="relative">
                   <input
                     type="text"
-                    aria-label="جستجوی نام یا موبایل مشتری"
+                    aria-label={t("جستجوی نام یا موبایل مشتری")}
                     value={customerSearch}
                     onChange={(e) => {
                       customerRequests.current.invalidate();
                       setCustomerSearch(e.target.value);
                     }}
-                    placeholder="جستجوی زنده نام یا موبایل مشتری..."
-                    className="w-full pl-3 pr-8 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none mb-1.5"
+                    placeholder={t("جستجوی زنده نام یا موبایل مشتری...")}
+                    className="ui-field w-full pe-3 ps-8 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none mb-1.5"
                   />
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 right-2.5" />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-2.5" />
                 </div>
                 <select
                   id="invoice-customer"
@@ -553,9 +547,9 @@ export const CreateInvoice: React.FC = () => {
                   disabled={submitting}
                   value={selectedCustomerId}
                   onChange={(e) => handleCustomerChange(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
                 >
-                  <option value="">انتخاب خریدار ({customers.length} مورد)...</option>
+                  <option value="">{t("انتخاب خریدار (")}{customers.length} {' '}{t("مورد)...")}</option>
                   {customers.map((c) => (
                     <option key={c.customer_id} value={c.customer_id}>
                       {c.full_name} ({c.phone_number})
@@ -567,13 +561,9 @@ export const CreateInvoice: React.FC = () => {
               {/* انتخاب خودرو */}
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="invoice-vehicle" className="font-semibold text-slate-700 dark:text-slate-300 block">
-                    خودرو و پلاک:
-                  </label>
+                  <label htmlFor="invoice-vehicle" className="font-semibold text-slate-700 dark:text-slate-300 block">{t("خودرو و پلاک:")}</label>
                   {loadingVehicles && (
-                    <span className="text-[10px] text-brand-600 dark:text-brand-400 animate-pulse font-medium">
-                      در حال دریافت خودروها...
-                    </span>
+                    <span className="text-[10px] text-brand-600 dark:text-brand-400 animate-pulse font-medium">{t("در حال دریافت خودروها...")}</span>
                   )}
                 </div>
                 <select
@@ -586,14 +576,14 @@ export const CreateInvoice: React.FC = () => {
                                       setSelectedVehicleId(selectedVehicleIdRef.current);
                                     }}
                   disabled={submitting || creatingCustomer || !selectedCustomerId || customerVehicles.length === 0 || loadingVehicles}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none disabled:opacity-50 mt-7 sm:mt-8"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none disabled:opacity-50 mt-7 sm:mt-8"
                 >
                   {vehicleError ? (
-                    <option value="">دریافت خودروها ناموفق بود؛ مشتری را دوباره انتخاب کنید</option>
+                    <option value="">{t("دریافت خودروها ناموفق بود؛ مشتری را دوباره انتخاب کنید")}</option>
                   ) : loadingVehicles ? (
-                    <option value="">در حال بارگذاری خودروهای مشتری...</option>
+                    <option value="">{t("در حال بارگذاری خودروهای مشتری...")}</option>
                   ) : customerVehicles.length === 0 ? (
-                    <option value="">هیچ خودرویی برای این مشتری ثبت نشده است</option>
+                    <option value="">{t("هیچ خودرویی برای این مشتری ثبت نشده است")}</option>
                   ) : (
                     customerVehicles.map((v) => (
                       <option key={v.vehicle_id} value={v.vehicle_id}>
@@ -608,7 +598,7 @@ export const CreateInvoice: React.FC = () => {
             {/* پیش‌نمایش گرافیکی پلاک انتخاب‌شده */}
             {selectedVehicleId && (
               <div className="pt-2 flex items-center gap-3">
-                <span className="text-xs text-slate-500">پلاک انتخاب‌شده:</span>
+                <span className="text-xs text-slate-500">{t("پلاک انتخاب‌شده:")}</span>
                 <IranianPlateBadge
                   plateString={
                     customerVehicles.find((v) => v.vehicle_id === selectedVehicleId)
@@ -621,31 +611,31 @@ export const CreateInvoice: React.FC = () => {
           </div>
 
           {/* انتخاب و اقلام تایر */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="p-5 surface-panel space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100 font-bold text-sm">
                 <Package className="w-4 h-4 text-brand-600" />
-                <span>اقلام تایر و لاستیک</span>
+                <span>{t("اقلام تایر و لاستیک")}</span>
               </div>
               <div className="w-56 text-xs">
                 <select
-                  aria-label="افزودن تایر از کاتالوگ"
+                  aria-label={t("افزودن تایر از کاتالوگ")}
                   onChange={(e) => {
                     if (e.target.value) {
                       addTireItem(Number(e.target.value));
                       e.target.value = '';
                     }
                   }}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                  className="ui-field w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
                 >
-                  <option value="">+ افزودن تایر از کاتالوگ...</option>
-                  {tires.map((t) => (
+                  <option value="">{t("+ افزودن تایر از کاتالوگ...")}</option>
+                  {tires.map((tireChoice) => (
                     <option
-                      key={t.tire_id}
-                      value={t.tire_id}
-                      disabled={t.stock_quantity <= 0}
+                      key={tireChoice.tire_id}
+                      value={tireChoice.tire_id}
+                      disabled={tireChoice.stock_quantity <= 0}
                     >
-                      {t.tire_name} ({t.brand_name}) - موجودی: {t.stock_quantity}
+                      {tireChoice.tire_name} ({tireChoice.brand_name}{t(") - موجودی:")} {tireChoice.stock_quantity}
                     </option>
                   ))}
                 </select>
@@ -654,36 +644,32 @@ export const CreateInvoice: React.FC = () => {
 
             {/* پیام راهنمای نرخ‌گذاری بر اساس تورم و بازار */}
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-300 text-[11px] flex items-center gap-2">
-              <span className="font-bold shrink-0">💡 نرخ‌گذاری شناور بازار:</span>
-              <span>
-                قیمت واحد تایرها بر اساس نوسانات بازار و تورم قابل تعیین است؛ نرخ کاتالوگ صرفاً به عنوان پیشنهاد پیش‌فرض درج می‌شود و می‌توانید آن را در ستون «قیمت واحد فروش» مستقیماً تغییر دهید.
-              </span>
+              <span className="font-bold shrink-0">{t("💡 نرخ‌گذاری شناور بازار:")}</span>
+              <span>{t("قیمت واحد تایرها بر اساس نوسانات بازار و تورم قابل تعیین است؛ نرخ کاتالوگ صرفاً به عنوان پیشنهاد پیش‌فرض درج می‌شود و می‌توانید آن را در ستون «قیمت واحد فروش» مستقیماً تغییر دهید.")}</span>
             </div>
 
             {tireItems.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                هیچ تایری به فاکتور افزوده نشده است. از منوی بالا تایر را انتخاب فرمایید.
-              </div>
+              <div className="py-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">{t("هیچ تایری به فاکتور افزوده نشده است. از منوی بالا تایر را انتخاب فرمایید.")}</div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                <table className="w-full text-xs text-right">
+              <div className="table-scroll overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table className="data-table w-full text-xs text-start">
                   <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="py-2.5 px-3">شرح تایر</th>
-                      <th className="py-2.5 px-3 text-center">موجودی</th>
-                      <th className="py-2.5 px-3 text-center">تعداد (حلقه)</th>
-                      <th className="py-2.5 px-3">قیمت واحد فروش (نرخ روز بازار)</th>
-                      <th className="py-2.5 px-3">جمع</th>
-                      <th className="py-2.5 px-3 text-center">حذف</th>
+                      <th className="py-2.5 px-3">{t("شرح تایر")}</th>
+                      <th className="py-2.5 px-3 text-center">{t("موجودی")}</th>
+                      <th className="py-2.5 px-3 text-center">{t("تعداد (حلقه)")}</th>
+                      <th className="py-2.5 px-3">{t("قیمت واحد فروش (نرخ روز بازار)")}</th>
+                      <th className="py-2.5 px-3">{t("جمع")}</th>
+                      <th className="py-2.5 px-3 text-center">{t("حذف")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {tireItems.map((item) => (
                       <tr key={item.tireId}>
                         <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                          {item.tire.tire_name}
+                          <bdi dir="auto">{item.tire.tire_name}</bdi>
                           <span className="block text-[10px] text-slate-400 font-normal">
-                            {item.tire.brand_name} - {item.tire.size_name}
+                            <bdi dir="auto">{item.tire.brand_name}</bdi> - <bdi dir="auto">{item.tire.size_name}</bdi>
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-center text-slate-500 tabular-nums">
@@ -698,7 +684,7 @@ export const CreateInvoice: React.FC = () => {
                             onChange={(e) =>
                               updateTireItemQty(item.tireId, parseInt(e.target.value) || 0)
                             }
-                            className="w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center font-bold text-xs"
+                            className="ui-field w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center font-bold text-xs"
                           />
                         </td>
                         <td className="py-2.5 px-3">
@@ -715,12 +701,12 @@ export const CreateInvoice: React.FC = () => {
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
-                                className="w-28 sm:w-32 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-left font-bold text-xs tabular-nums focus:ring-2 focus:ring-brand-500 outline-none"
+                                className="ui-field w-28 sm:w-32 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-end font-bold text-xs tabular-nums focus:ring-2 focus:ring-brand-500 outline-none"
                               />
-                              <span className="text-[10px] text-slate-400 font-medium">ریال</span>
+                              <span className="text-[10px] text-slate-400 font-medium">{t("ریال")}</span>
                             </div>
                             <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                              <span>پایه: {formatCurrency(item.tire.sale_price, true, currencyUnit)}</span>
+                              <span>{t("پایه:")} {formatCurrency(item.tire.sale_price, true, currencyUnit, language)}</span>
                               {item.unitPrice !== Number(item.tire.sale_price) && (
                                 <button
                                   type="button"
@@ -728,16 +714,14 @@ export const CreateInvoice: React.FC = () => {
                                     updateTireItemUnitPrice(item.tireId, Number(item.tire.sale_price))
                                   }
                                   className="text-brand-600 dark:text-brand-400 hover:underline font-semibold"
-                                  title="بازنشانی به نرخ کاتالوگ"
-                                >
-                                  بازنشانی
-                                </button>
+                                  title={t("بازنشانی به نرخ کاتالوگ")}
+                                >{t("بازنشانی")}</button>
                               )}
                             </div>
                           </div>
                         </td>
                         <td className="py-2.5 px-3 font-bold tabular-nums">
-                          {formatCurrency(item.quantity * item.unitPrice, true, currencyUnit)}
+                          {formatCurrency(item.quantity * item.unitPrice, true, currencyUnit, language)}
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <button
@@ -757,27 +741,27 @@ export const CreateInvoice: React.FC = () => {
           </div>
 
           {/* انتخاب و اقلام خدمات کارگاهی */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="p-5 surface-panel space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100 font-bold text-sm">
                 <Wrench className="w-4 h-4 text-brand-600" />
-                <span>خدمات فنی خودرو (تعویض، بالانس، پنچرگیری)</span>
+                <span>{t("خدمات فنی خودرو (تعویض، بالانس، پنچرگیری)")}</span>
               </div>
               <div className="w-56 text-xs">
                 <select
-                  aria-label="افزودن خدمت کارگاهی"
+                  aria-label={t("افزودن خدمت کارگاهی")}
                   onChange={(e) => {
                     if (e.target.value) {
                       addServiceItem(Number(e.target.value));
                       e.target.value = '';
                     }
                   }}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                  className="ui-field w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
                 >
-                  <option value="">+ افزودن خدمت کارگاهی...</option>
+                  <option value="">{t("+ افزودن خدمت کارگاهی...")}</option>
                   {services.map((s) => (
                     <option key={s.service_id} value={s.service_id}>
-                      {s.service_name} ({formatCurrency(s.price, true, currencyUnit)})
+                      {s.service_name} ({formatCurrency(s.price, true, currencyUnit, language)})
                     </option>
                   ))}
                 </select>
@@ -785,26 +769,24 @@ export const CreateInvoice: React.FC = () => {
             </div>
 
             {serviceItems.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                هیچ خدمتی به فاکتور افزوده نشده است (اختیاری).
-              </div>
+              <div className="py-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">{t("هیچ خدمتی به فاکتور افزوده نشده است (اختیاری).")}</div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                <table className="w-full text-xs text-right">
+              <div className="table-scroll overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table className="data-table w-full text-xs text-start">
                   <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="py-2.5 px-3">عنوان خدمت</th>
-                      <th className="py-2.5 px-3 text-center">تعداد / چرخ</th>
-                      <th className="py-2.5 px-3">تعرفه واحد (ریال)</th>
-                      <th className="py-2.5 px-3">جمع</th>
-                      <th className="py-2.5 px-3 text-center">حذف</th>
+                      <th className="py-2.5 px-3">{t("عنوان خدمت")}</th>
+                      <th className="py-2.5 px-3 text-center">{t("تعداد / چرخ")}</th>
+                      <th className="py-2.5 px-3">{t("تعرفه واحد (ریال)")}</th>
+                      <th className="py-2.5 px-3">{t("جمع")}</th>
+                      <th className="py-2.5 px-3 text-center">{t("حذف")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {serviceItems.map((item) => (
                       <tr key={item.serviceId}>
                         <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                          {item.service.service_name}
+                          <bdi dir="auto">{item.service.service_name}</bdi>
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <input
@@ -814,7 +796,7 @@ export const CreateInvoice: React.FC = () => {
                             onChange={(e) =>
                               updateServiceItemQty(item.serviceId, parseInt(e.target.value) || 0)
                             }
-                            className="w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center font-bold text-xs"
+                            className="ui-field w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center font-bold text-xs"
                           />
                         </td>
                         <td className="py-2.5 px-3">
@@ -831,12 +813,12 @@ export const CreateInvoice: React.FC = () => {
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
-                                className="w-28 sm:w-32 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-left font-bold text-xs tabular-nums focus:ring-2 focus:ring-brand-500 outline-none"
+                                className="ui-field w-28 sm:w-32 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-end font-bold text-xs tabular-nums focus:ring-2 focus:ring-brand-500 outline-none"
                               />
-                              <span className="text-[10px] text-slate-400 font-medium">ریال</span>
+                              <span className="text-[10px] text-slate-400 font-medium">{t("ریال")}</span>
                             </div>
                             <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                              <span>پایه: {formatCurrency(item.service.price, true, currencyUnit)}</span>
+                              <span>{t("پایه:")} {formatCurrency(item.service.price, true, currencyUnit, language)}</span>
                               {item.unitPrice !== Number(item.service.price) && (
                                 <button
                                   type="button"
@@ -844,16 +826,14 @@ export const CreateInvoice: React.FC = () => {
                                     updateServiceItemUnitPrice(item.serviceId, Number(item.service.price))
                                   }
                                   className="text-brand-600 dark:text-brand-400 hover:underline font-semibold"
-                                  title="بازنشانی به تعرفه پایه"
-                                >
-                                  بازنشانی
-                                </button>
+                                  title={t("بازنشانی به تعرفه پایه")}
+                                >{t("بازنشانی")}</button>
                               )}
                             </div>
                           </div>
                         </td>
                         <td className="py-2.5 px-3 font-bold tabular-nums">
-                          {formatCurrency(item.quantity * item.unitPrice, true, currencyUnit)}
+                          {formatCurrency(item.quantity * item.unitPrice, true, currencyUnit, language)}
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <button
@@ -875,64 +855,62 @@ export const CreateInvoice: React.FC = () => {
 
         {/* ستون ۱تایی چپ: خلاصه مالی، تخفیف، وضعیت و صدور */}
         <div className="space-y-6">
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-            <h2 className="font-bold text-slate-900 dark:text-white text-sm">
-              صورتحساب و شرایط تسویه
-            </h2>
+          <div className="p-5 surface-panel space-y-4">
+            <h2 className="font-bold text-slate-900 dark:text-white text-sm">{t("صورتحساب و شرایط تسویه")}</h2>
 
             {/* ریز مبالغ */}
             <div className="space-y-2 text-xs border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>جمع اقلام تایر:</span>
+                <span>{t("جمع اقلام تایر:")}</span>
                 <span className="font-semibold tabular-nums">
-                  {formatCurrency(tiresSubtotal, true, currencyUnit)}
+                  {formatCurrency(tiresSubtotal, true, currencyUnit, language)}
                 </span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>جمع خدمات کارگاهی:</span>
+                <span>{t("جمع خدمات کارگاهی:")}</span>
                 <span className="font-semibold tabular-nums">
-                  {formatCurrency(servicesSubtotal, true, currencyUnit)}
+                  {formatCurrency(servicesSubtotal, true, currencyUnit, language)}
                 </span>
               </div>
               <div className="flex justify-between text-slate-800 dark:text-slate-200 font-bold pt-1">
-                <span>جمع ناخالص کل:</span>
+                <span>{t("جمع ناخالص کل:")}</span>
                 <span className="tabular-nums">
-                  {formatCurrency(grossTotal, true, currencyUnit)}
+                  {formatCurrency(grossTotal, true, currencyUnit, language)}
                 </span>
               </div>
             </div>
 
             {/* تخفیف */}
             <div className="space-y-2 text-xs">
-              <label className="font-semibold text-slate-700 dark:text-slate-300 block">
-                تخفیف فاکتور:
-              </label>
+              <label className="font-semibold text-slate-700 dark:text-slate-300 block">{t("تخفیف فاکتور:")}</label>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <span className="text-[10px] text-slate-400 block mb-1">مبلغ ریالی:</span>
+                  <span className="text-[10px] text-slate-400 block mb-1">{t("مبلغ ریالی:")}</span>
                   <input
                     type="number"
                     min={0}
+                    aria-label={t("مبلغ تخفیف (ریال)")}
                     value={discountAmount}
                     onChange={(e) => {
                       setDiscountAmount(e.target.value);
                       setDiscountPercent('0');
                     }}
-                    className="w-full px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                    className="ui-field w-full px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 block mb-1">درصدی (%):</span>
+                  <span className="text-[10px] text-slate-400 block mb-1">{t("درصدی (%):")}</span>
                   <input
                     type="number"
                     min={0}
                     max={100}
+                    aria-label={t("درصد تخفیف")}
                     value={discountPercent}
                     onChange={(e) => {
                       setDiscountPercent(e.target.value);
                       setDiscountAmount('0');
                     }}
-                    className="w-full px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                    className="ui-field w-full px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
                   />
                 </div>
               </div>
@@ -940,19 +918,15 @@ export const CreateInvoice: React.FC = () => {
 
             {/* مبلغ خالص قابل پرداخت */}
             <div className="p-3 rounded-xl bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-900/40 text-center space-y-1">
-              <span className="text-xs text-brand-700 dark:text-brand-300 font-medium">
-                مبلغ نهایی قابل پرداخت:
-              </span>
+              <span className="text-xs text-brand-700 dark:text-brand-300 font-medium">{t("مبلغ نهایی قابل پرداخت:")}</span>
               <div className="text-xl font-black text-brand-600 dark:text-brand-400 tabular-nums">
-                {formatCurrency(netPayable, true, currencyUnit)}
+                {formatCurrency(netPayable, true, currencyUnit, language)}
               </div>
             </div>
 
             {/* وضعیت صدور فاکتور */}
             <div className="space-y-2 text-xs">
-              <label className="font-semibold text-slate-700 dark:text-slate-300 block">
-                وضعیت فاکتور:
-              </label>
+              <label className="font-semibold text-slate-700 dark:text-slate-300 block">{t("وضعیت فاکتور:")}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -965,7 +939,7 @@ export const CreateInvoice: React.FC = () => {
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>تایید قطعی (کسر انبار)</span>
+                  <span>{t("تایید قطعی (کسر انبار)")}</span>
                 </button>
                 <button
                   type="button"
@@ -978,16 +952,14 @@ export const CreateInvoice: React.FC = () => {
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>پیش‌نویس</span>
+                  <span>{t("پیش‌نویس")}</span>
                 </button>
               </div>
             </div>
 
             {/* وضعیت پرداخت */}
             <div className="space-y-2 text-xs">
-              <label className="font-semibold text-slate-700 dark:text-slate-300 block">
-                وضعیت تسویه اولیه:
-              </label>
+              <label className="font-semibold text-slate-700 dark:text-slate-300 block">{t("وضعیت تسویه اولیه:")}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -997,9 +969,7 @@ export const CreateInvoice: React.FC = () => {
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                   }`}
-                >
-                  تسویه کامل نقدی/پوز
-                </button>
+                >{t("تسویه کامل نقدی/پوز")}</button>
                 <button
                   type="button"
                   onClick={() => setPaymentStatus('UNPAID')}
@@ -1008,28 +978,24 @@ export const CreateInvoice: React.FC = () => {
                       ? 'bg-slate-700 text-white shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                   }`}
-                >
-                  نسیه / تسویه بعداً
-                </button>
+                >{t("نسیه / تسویه بعداً")}</button>
               </div>
             </div>
 
             {/* یادداشت */}
             <div className="space-y-1.5 text-xs">
-              <label className="font-semibold text-slate-700 dark:text-slate-300 block">
-                توضیحات فاکتور:
-              </label>
+              <label className="font-semibold text-slate-700 dark:text-slate-300 block">{t("توضیحات فاکتور:")}</label>
               <textarea
                 rows={2}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="یادداشت تکنسین..."
-                className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                placeholder={t("یادداشت تکنسین...")}
+                className="ui-field w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
               />
             </div>
 
             <p id="invoice-submit-help" role="status" className="text-xs text-slate-500 dark:text-slate-400">
-              {creatingCustomer ? 'ثبت مشتری و خودرو در حال انجام است.' : loadingVehicles ? 'منتظر دریافت خودروهای مشتری باشید.' : !vehicleIsCurrent ? 'برای ثبت فاکتور، مشتری و خودروی متعلق به او را انتخاب کنید.' : status === 'DRAFT' ? 'پیش‌نویس ذخیره می‌شود؛ موجودی انبار کسر نمی‌شود.' : 'فاکتور قطعی صادر و موجودی انبار کسر می‌شود.'}
+              {creatingCustomer ? t("ثبت مشتری و خودرو در حال انجام است.") : loadingVehicles ? t("منتظر دریافت خودروهای مشتری باشید.") : !vehicleIsCurrent ? t("برای ثبت فاکتور، مشتری و خودروی متعلق به او را انتخاب کنید.") : status === 'DRAFT' ? t("پیش‌نویس ذخیره می‌شود؛ موجودی انبار کسر نمی‌شود.") : t("فاکتور قطعی صادر و موجودی انبار کسر می‌شود.")}
             </p>
             {/* دکمه ثبت نهایی */}
             <button
@@ -1037,10 +1003,10 @@ export const CreateInvoice: React.FC = () => {
               onClick={handleSubmitInvoice}
               disabled={submitting || creatingCustomer || !vehicleIsCurrent}
               aria-describedby="invoice-submit-help"
-              className="w-full py-3 px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg shadow-brand-600/30 flex items-center justify-center gap-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
+              className="action-primary w-full py-3 px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg shadow-brand-600/30 flex items-center justify-center gap-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{invoiceSubmitLabel(status, submitting)}</span>
+              <span>{t(invoiceSubmitLabel(status, submitting))}</span>
             </button>
           </div>
         </div>
@@ -1054,35 +1020,31 @@ export const CreateInvoice: React.FC = () => {
           onCancel={(event) => { event.preventDefault(); closeQuickCreate(); }}
           className="m-auto p-4 w-full max-w-lg max-h-[90dvh] overflow-y-auto bg-transparent backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm"
         >
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
-              <h2 id="quick-create-title" className="text-base font-bold text-slate-800 dark:text-slate-100">
-                ثبت مشتری و خودروی جدید
-              </h2>
+              <h2 id="quick-create-title" className="text-base font-bold text-slate-800 dark:text-slate-100">{t("ثبت مشتری و خودروی جدید")}</h2>
               <button
                 type="button"
                 onClick={closeQuickCreate}
-                aria-label="بستن ثبت سریع"
+                aria-label={t("بستن ثبت سریع")}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
               >
-                ✕
+                ×
               </button>
             </div>
 
             <form onSubmit={handleCreateCustomerAndVehicle} aria-busy={creatingCustomer} className="p-6 space-y-4 text-xs">
               {quickCreateError && <p id="quick-create-error" role="alert" className="text-rose-600 dark:text-rose-400">{quickCreateError}</p>}
-              {creatingCustomer && <p role="status">در حال ثبت؛ بستن پنجره عملیات ذخیره‌سازی در سرور را لغو نمی‌کند.</p>}
+              {creatingCustomer && <p role="status">{t("در حال ثبت؛ بستن پنجره عملیات ذخیره‌سازی در سرور را لغو نمی‌کند.")}</p>}
               {tempCreatedCustomer && (
                 <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs space-y-1">
-                  <p className="font-bold">✓ مشخصات مشتری «{tempCreatedCustomer.full_name}» با موفقیت ذخیره شد.</p>
-                  <p className="text-[11px]">اکنون اطلاعات خودرو و پلاک را اصلاح و دکمه «ثبت و انتخاب» را کلیک فرمایید.</p>
+                  <p className="font-bold">{t("✓ مشخصات مشتری «")}<bdi dir="auto">{tempCreatedCustomer.full_name}</bdi>{t("» با موفقیت ذخیره شد.")}</p>
+                  <p className="text-[11px]">{t("اکنون اطلاعات خودرو و پلاک را اصلاح و دکمه «ثبت و انتخاب» را کلیک فرمایید.")}</p>
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label htmlFor="quick-customer-name" className="font-bold text-slate-700 dark:text-slate-300 block">
-                  نام و نام خانوادگی مشتری:
-                </label>
+                <label htmlFor="quick-customer-name" className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام و نام خانوادگی مشتری:")}</label>
                 <input
                   type="text"
                   required
@@ -1091,15 +1053,13 @@ export const CreateInvoice: React.FC = () => {
                   autoFocus
                   value={newCustomerName}
                   onChange={(e) => setNewCustomerName(e.target.value)}
-                  placeholder="مثلاً: محمد حسینی"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl disabled:opacity-60"
+                  placeholder={t("مثلاً: محمد حسینی")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl disabled:opacity-60"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="quick-customer-phone" className="font-bold text-slate-700 dark:text-slate-300 block">
-                  شماره موبایل:
-                </label>
+                <label htmlFor="quick-customer-phone" className="font-bold text-slate-700 dark:text-slate-300 block">{t("شماره موبایل:")}</label>
                 <input
                   type="text"
                   required
@@ -1108,14 +1068,12 @@ export const CreateInvoice: React.FC = () => {
                   value={newCustomerPhone}
                   onChange={(e) => setNewCustomerPhone(e.target.value)}
                   placeholder="09123456789"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-left disabled:opacity-60"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end disabled:opacity-60"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="quick-customer-national-code" className="font-bold text-slate-700 dark:text-slate-300 block">
-                  کد ملی (اختیاری):
-                </label>
+                <label htmlFor="quick-customer-national-code" className="font-bold text-slate-700 dark:text-slate-300 block">{t("کد ملی (اختیاری):")}</label>
                 <input
                   type="text"
                   disabled={!!tempCreatedCustomer}
@@ -1123,37 +1081,33 @@ export const CreateInvoice: React.FC = () => {
                   value={newCustomerNationalCode}
                   onChange={(e) => setNewCustomerNationalCode(e.target.value)}
                   placeholder="0012345678"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-left disabled:opacity-60"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end disabled:opacity-60"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="quick-vehicle-model" className="font-bold text-slate-700 dark:text-slate-300 block">
-                  مدل خودرو:
-                </label>
+                <label htmlFor="quick-vehicle-model" className="font-bold text-slate-700 dark:text-slate-300 block">{t("مدل خودرو:")}</label>
                 <input
                   type="text"
                   required
                   id="quick-vehicle-model"
                   value={newVehicleModel}
                   onChange={(e) => setNewVehicleModel(e.target.value)}
-                  placeholder="مثلاً: پژو پارس، سمند، دنا..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+                  placeholder={t("مثلاً: پژو پارس، سمند، دنا...")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="quick-vehicle-plate" className="font-bold text-slate-700 dark:text-slate-300 block">
-                  شماره پلاک ایران (فرمت استاندارد: 12ب345-ایران11):
-                </label>
+                <label htmlFor="quick-vehicle-plate" className="font-bold text-slate-700 dark:text-slate-300 block">{t("شماره پلاک ایران (فرمت استاندارد: 12ب345-ایران11):")}</label>
                 <input
                   type="text"
                   required
                   id="quick-vehicle-plate"
                   value={newVehiclePlate}
                   onChange={(e) => setNewVehiclePlate(e.target.value)}
-                  placeholder="مثلاً: 34د567-ایران22"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-left font-mono"
+                  placeholder={t("مثلاً: 34د567-ایران22")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end font-mono"
                 />
                 <div className="pt-1">
                   <IranianPlateBadge plateString={newVehiclePlate} size="sm" />
@@ -1165,16 +1119,14 @@ export const CreateInvoice: React.FC = () => {
                   type="button"
                   onClick={closeQuickCreate}
                   className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300"
-                >
-                  انصراف
-                </button>
+                >{t("انصراف")}</button>
                 <button
                   type="submit"
                   disabled={creatingCustomer}
                   aria-describedby={quickCreateError ? 'quick-create-error' : undefined}
-                  className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
+                  className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
                 >
-                  {creatingCustomer ? 'در حال ثبت...' : 'ثبت و انتخاب'}
+                  {creatingCustomer ? t("در حال ثبت...") : t("ثبت و انتخاب")}
                 </button>
               </div>
             </form>

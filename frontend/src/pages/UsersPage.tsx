@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import React, { useEffect, useState } from 'react';
 import { UserPlus, Trash2, Edit2, ShieldAlert } from 'lucide-react';
 import { authApi } from '../api/auth';
@@ -6,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { parseApiError } from '../utils/errorParser';
 
 export const UsersPage: React.FC = () => {
+  const { t, language } = useLanguage();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -80,7 +82,7 @@ export const UsersPage: React.FC = () => {
         });
       } else {
         if (!password) {
-          setErrorMessage('تعیین کلمه عبور برای کاربر جدید الزامی است.');
+          setErrorMessage(t("تعیین کلمه عبور برای کاربر جدید الزامی است."));
           setSubmitting(false);
           return;
         }
@@ -96,7 +98,7 @@ export const UsersPage: React.FC = () => {
       setShowModal(false);
       fetchUsers();
     } catch (err: unknown) {
-      setErrorMessage(parseApiError(err, 'خطا در ثبت کاربر'));
+      setErrorMessage(parseApiError(err, t("خطا در ثبت کاربر"), language));
     } finally {
       setSubmitting(false);
     }
@@ -104,56 +106,52 @@ export const UsersPage: React.FC = () => {
 
   const handleDelete = async (u: User) => {
     if (u.id === currentUser?.id) {
-      alert('امکان حذف حساب کاربری خودتان وجود ندارد.');
+      alert(t("امکان حذف حساب کاربری خودتان وجود ندارد."));
       return;
     }
-    if (!confirm(`آیا از حذف حساب کاربری '${u.full_name || u.username}' اطمینان دارید؟`)) return;
+    if (!confirm(t("آیا از حذف حساب کاربری '{0}' اطمینان دارید؟", undefined, { 0: u.full_name || u.username }))) return;
 
     try {
       await authApi.deleteUser(u.id);
       fetchUsers();
     } catch (err: unknown) {
-      alert(parseApiError(err, 'خطا در حذف کاربر'));
+      alert(parseApiError(err, t("خطا در حذف کاربر"), language));
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       {/* سربرگ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="page-heading">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">
-            مدیریت کاربران و سطح دسترسی (RBAC)
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            تعریف پرسنل، انتصاب نقش‌های سازمانی (مدیر، حسابدار، انباردار، تکنسین)
-          </p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("مدیریت کاربران و سطح دسترسی (RBAC)")}</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("تعریف پرسنل، انتصاب نقش‌های سازمانی (مدیر، حسابدار، انباردار، تکنسین)")}</p>
         </div>
 
         <button
           onClick={handleOpenAdd}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
+          className="action-primary inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
         >
           <UserPlus className="w-4 h-4" />
-          <span>تعریف کاربر جدید</span>
+          <span>{t("تعریف کاربر جدید")}</span>
         </button>
       </div>
 
       {/* جدول کاربران */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="surface-panel overflow-hidden">
         {loading ? (
-          <div className="py-16 text-center text-xs text-slate-400">در حال دریافت کاربران...</div>
+          <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت کاربران...")}</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-right">
+          <div className="table-scroll overflow-x-auto">
+            <table className="data-table w-full text-xs text-start">
               <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="py-3 px-4">نام و نام خانوادگی</th>
-                  <th className="py-3 px-4">نام کاربری</th>
-                  <th className="py-3 px-4">شماره تماس</th>
-                  <th className="py-3 px-4 text-center">نقش سازمانی</th>
-                  <th className="py-3 px-4 text-center">وضعیت</th>
-                  <th className="py-3 px-4 text-center">عملیات</th>
+                  <th className="py-3 px-4">{t("نام و نام خانوادگی")}</th>
+                  <th className="py-3 px-4">{t("نام کاربری")}</th>
+                  <th className="py-3 px-4">{t("شماره تماس")}</th>
+                  <th className="py-3 px-4 text-center">{t("نقش سازمانی")}</th>
+                  <th className="py-3 px-4 text-center">{t("وضعیت")}</th>
+                  <th className="py-3 px-4 text-center">{t("عملیات")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -162,11 +160,11 @@ export const UsersPage: React.FC = () => {
                     <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
                       {u.full_name || u.username}
                       {u.id === currentUser?.id && (
-                        <span className="mr-2 text-[10px] text-brand-600 font-normal">(حساب شما)</span>
+                        <span className="ms-2 text-[10px] text-brand-600 font-normal">{t("(حساب شما)")}</span>
                       )}
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">
-                      {u.username}
+                      <bdi dir="auto">{u.username}</bdi>
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-500">
                       {u.phone_number || '-'}
@@ -181,26 +179,30 @@ export const UsersPage: React.FC = () => {
                             : 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
                         }`}
                       >
-                        {u.role_display || u.role}
+                        {language === 'en' ? t(u.role) : (u.role_display || u.role)}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
                       {u.is_active ? (
-                        <span className="text-emerald-600 font-semibold">فعال</span>
+                        <span className="text-emerald-600 font-semibold">{t("فعال")}</span>
                       ) : (
-                        <span className="text-rose-600 font-semibold">مسدود</span>
+                        <span className="text-rose-600 font-semibold">{t("مسدود")}</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="inline-flex items-center gap-1.5">
                         <button
-                          onClick={() => handleOpenEdit(u)}
+                          aria-label={t("ویرایش کاربر")}
+                            title={t("ویرایش کاربر")}
+                            onClick={() => handleOpenEdit(u)}
                           className="p-1 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         {u.id !== currentUser?.id && (
                           <button
+                            aria-label={t("حذف کاربر")}
+                            title={t("حذف کاربر")}
                             onClick={() => handleDelete(u)}
                             className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                           >
@@ -219,18 +221,18 @@ export const UsersPage: React.FC = () => {
 
       {/* مدال ایجاد/ویرایش کاربر */}
       {showModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                {editingUser ? 'ویرایش حساب کاربر' : 'تعریف کاربر جدید'}
+                {editingUser ? t("ویرایش حساب کاربر") : t("تعریف کاربر جدید")}
               </h2>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-              >
-                ✕
+               aria-label={t("بستن پنجره")}>
+                ×
               </button>
             </div>
 
@@ -243,69 +245,63 @@ export const UsersPage: React.FC = () => {
               )}
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                  نام و نام خانوادگی:
-                </label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام و نام خانوادگی:")}</label>
                 <input
                   type="text"
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="مثلاً: علی صادقی"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+                  placeholder={t("مثلاً: علی صادقی")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">نام کاربری:</label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام کاربری:")}</label>
                 <input
                   type="text"
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="مثلاً: asadeghi"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-left font-mono"
+                  placeholder={t("مثلاً: asadeghi")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end font-mono"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                  {editingUser ? 'تغییر گذرواژه (در صورت نیاز):' : 'کلمه عبور:'}
+                  {editingUser ? t("تغییر گذرواژه (در صورت نیاز):") : t("کلمه عبور:")}
                 </label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={editingUser ? 'خالی بگذارید تا تغییر نکند' : 'حداقل ۸ کاراکتر'}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-left"
+                  placeholder={editingUser ? t("خالی بگذارید تا تغییر نکند") : t("حداقل ۸ کاراکتر")}
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                  شماره موبایل:
-                </label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("شماره موبایل:")}</label>
                 <input
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="09121112233"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-left font-mono"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end font-mono"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                  نقش سازمانی در سامانه:
-                </label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("نقش سازمانی در سامانه:")}</label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as UserRole)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 >
-                  <option value="MANAGER">مدیر کل (MANAGER) - دسترسی کامل</option>
-                  <option value="WAREHOUSE">انباردار (WAREHOUSE) - ورود کالا و انبارداری</option>
-                  <option value="TECHNICIAN">تکنسین (TECHNICIAN) - صدور فاکتور فروش و خدمات</option>
+                  <option value="MANAGER">{t("مدیر کل (MANAGER) - دسترسی کامل")}</option>
+                  <option value="WAREHOUSE">{t("انباردار (WAREHOUSE) - ورود کالا و انبارداری")}</option>
+                  <option value="TECHNICIAN">{t("تکنسین (TECHNICIAN) - صدور فاکتور فروش و خدمات")}</option>
                 </select>
               </div>
 
@@ -317,9 +313,7 @@ export const UsersPage: React.FC = () => {
                   onChange={(e) => setIsActive(e.target.checked)}
                   className="rounded text-brand-600 focus:ring-brand-500"
                 />
-                <label htmlFor="userActive" className="text-xs text-slate-700 dark:text-slate-300">
-                  حساب کاربری فعال باشد
-                </label>
+                <label htmlFor="userActive" className="text-xs text-slate-700 dark:text-slate-300">{t("حساب کاربری فعال باشد")}</label>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -327,15 +321,13 @@ export const UsersPage: React.FC = () => {
                   type="button"
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300"
-                >
-                  انصراف
-                </button>
+                >{t("انصراف")}</button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
+                  className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
                 >
-                  {submitting ? 'در حال ثبت...' : 'ذخیره کاربر'}
+                  {submitting ? t("در حال ثبت...") : t("ذخیره کاربر")}
                 </button>
               </div>
             </form>

@@ -1,9 +1,16 @@
+import { translations } from '../src/utils/i18n.ts';
 import { readFileSync } from 'node:fs';
 
 import { setImmediate } from 'node:timers/promises';
 import React from 'react';
 import ts from 'typescript';
 
+
+const fallbackLanguage = {
+  language: 'fa', direction: 'rtl', isRTL: true,
+  t: (key: string, fallback?: string, values?: Record<string, unknown>) =>
+    (translations[key]?.fa || fallback || key || '').replace(/\{(\w+)\}/g, (match, name) => String(values?.[name] ?? match)),
+};
 
 /** Compile TSX with the already-installed TypeScript; no browser/test dependencies. */
 export function loadComponent(path: string, mocks: Record<string, unknown>, env?: Record<string, string>) {
@@ -15,6 +22,7 @@ export function loadComponent(path: string, mocks: Record<string, unknown>, env?
   const module = { exports: {} as Record<string, any> };
   const mockedRequire = (id: string) => {
     if (id in mocks) return mocks[id];
+    if (id.endsWith('/context/LanguageContext')) return { useLanguage: () => fallbackLanguage };
     if (id === 'react') return React;
     if (id === 'lucide-react') return new Proxy({}, { get: (_target, name) => String(name) });
     throw new Error(`Unmocked component dependency: ${id}`);

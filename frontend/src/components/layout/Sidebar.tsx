@@ -14,10 +14,13 @@ import {
   BarChart3,
   ShieldCheck,
   X,
+  CircleDot,
+  ChevronLeft,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { UserRole } from '../../types';
+import { Modal } from '../ui/Modal';
 
 interface NavItem {
   name: string;
@@ -120,9 +123,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
         case 'MANAGER':
           return 'System Manager';
         case 'TECHNICIAN':
-          return 'Technical Technician';
+          return 'Technician';
         case 'WAREHOUSE':
-          return 'Warehouse Keeper';
+          return 'Warehouse staff';
         default:
           return role || '';
       }
@@ -130,99 +133,93 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     if (display) return display;
     switch (role) {
       case 'MANAGER':
-        return 'مدیر سیستم';
+        return t("مدیر سیستم");
       case 'TECHNICIAN':
-        return 'تکنسین فنی';
+        return t("تکنسین فنی");
       case 'WAREHOUSE':
-        return 'انباردار';
+        return t("انباردار");
       default:
         return role || '';
     }
   };
 
-  return (
-    <>
-      {/* بک‌دراپ تاریک روی موبایل */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-30 md:hidden"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-      )}
+  const groups = [
+    { name: language === 'fa' ? t("نمای کلی") : 'Overview', paths: ['/dashboard', '/reports'] },
+    { name: language === 'fa' ? t("فروش و مشتریان") : 'Sales & customers', paths: ['/invoices/create', '/invoices/sales', '/customers', '/services'] },
+    { name: language === 'fa' ? t("انبار و خرید") : 'Inventory & purchasing', paths: ['/catalog/tires', '/invoices/purchases', '/catalog/movements', '/suppliers'] },
+    { name: language === 'fa' ? t("مالی و مدیریت") : 'Finance & management', paths: ['/treasury', '/users'] },
+  ];
 
-      {/* پنل کشویی سایدبار (ثابت در دسکتاپ و آف‌کانواس در موبایل) */}
-      <aside
-        className={`fixed inset-y-0 rtl:right-0 ltr:left-0 z-40 w-64 bg-slate-900 rtl:border-l ltr:border-r border-slate-800 flex flex-col shrink-0 select-none text-slate-300 transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
-          isOpen ? 'translate-x-0' : 'rtl:translate-x-full ltr:-translate-x-full'
-        }`}
-      >
-        {/* لوگو و نام سامانه */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-slate-800">
+  const content = (
+    <>
+        <div className="sidebar-brand flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-rose-500 flex items-center justify-center shadow-lg shadow-brand-500/20 text-white font-black text-xl">
-              🛞
+            <div className="brand-mark">
+              <CircleDot className="w-6 h-6" aria-hidden="true" />
             </div>
             <div className="flex flex-col">
               <span className="font-extrabold text-white text-base leading-tight">
                 {t('appName', 'تایر منیجر')}
               </span>
-              <span className="text-[11px] text-slate-400 font-medium">
+              <span className="text-[10px] text-slate-300 font-medium mt-1">
                 {t('appSubtitle', 'سامانه هوشمند فروشگاه و خدمات')}
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white md:hidden"
+            className="ui-button flex items-center justify-center text-slate-300 hover:text-white md:hidden"
             aria-label={t('closeMenu', 'بستن منو')}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* لیست آیتم‌های ناوبری */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            {t('operationalMenu', 'منوی عملیاتی')}
-          </div>
-          {filteredNavItems.map((item) => {
+        <nav aria-label={t('operationalMenu', 'منوی عملیاتی')} className="flex-1 overflow-y-auto px-3 py-5">
+          {groups.map((group) => {
+            const items = filteredNavItems.filter((item) => group.paths.includes(item.path));
+            if (!items.length) return null;
+            return <section key={group.name} className="sidebar-section">
+              <h2>{group.name}</h2>
+              {items.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
                 onClick={onClose}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                    isActive
-                      ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30 font-semibold'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  }`
-                }
+                title={item.name}
+                className="sidebar-link"
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                <span className="truncate">{item.name}</span>
+                <span className="min-w-0 whitespace-normal">{item.name}</span>
+                <ChevronLeft className="nav-indicator w-3.5 h-3.5 shrink-0 ltr:rotate-180" aria-hidden="true" />
               </NavLink>
             );
+              })}
+            </section>;
           })}
-        </div>
+        </nav>
 
         {/* وضعیت کاربر جاری در انتهای سایدبار */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/40">
-          <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-800/40 border border-slate-800">
-            <div className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center font-bold text-brand-400 text-sm">
-              {user?.full_name?.charAt(0) || user?.username?.charAt(0) || (language === 'en' ? 'U' : 'ک')}
+        <div className="sidebar-footer">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-brand-300 text-sm">
+              {user?.full_name?.charAt(0) || user?.username?.charAt(0) || (language === 'en' ? 'U' : t("ک"))}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-slate-200 truncate">{user?.full_name || user?.username}</p>
-              <span className="inline-block px-1.5 py-0.5 text-[10px] rounded bg-brand-500/10 text-brand-400 font-medium">
+              <span className="text-[11px] text-slate-300 font-medium">
                 {getRoleLabel(user?.role, user?.role_display)}
               </span>
             </div>
           </div>
         </div>
-      </aside>
     </>
   );
+
+  return <>
+    <aside className="sidebar hidden md:flex flex-col shrink-0 no-print">{content}</aside>
+    {isOpen && <Modal label={t('operationalMenu', 'منوی عملیاتی')} onClose={() => onClose?.()} className="sidebar-drawer no-print">{content}</Modal>}
+  </>;
 };

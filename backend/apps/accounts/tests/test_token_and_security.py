@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from apps.catalog.models import Brand, Size, Tire
 from apps.customers.models import Customer
-from apps.finance.models import ReceiptVoucher
 from apps.invoices.models import SalesInvoice
 from utils.jalali import format_jalali_date
 
@@ -30,7 +29,7 @@ class TestSecurityAndValidations:
             'refresh': old_refresh
         })
         assert refresh_res.status_code == 200
-        new_refresh = refresh_res.data.get('refresh')
+        refresh_res.data.get('refresh')
 
         # ۳. استفاده مجدد از refresh token قدیمی باید به علت بلاک‌لیست رد شود (401)
         reuse_res = api_client.post(refresh_url, {

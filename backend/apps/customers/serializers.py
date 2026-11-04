@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Any
 from rest_framework import serializers
 from .models import Customer, Vehicle
 from utils.persian import normalize_digits
@@ -6,7 +8,7 @@ class PersianNormalizedCharField(serializers.CharField):
     """
     فیلد متنی سفارشی جهت نرمال‌سازی ارقام فارسی به انگلیسی بدون تغییر مستقیم دیکشنری داده‌های اولیه.
     """
-    def to_internal_value(self, data):
+    def to_internal_value(self, data: Any) -> str | None:
         if data is None:
             return None
         val = super().to_internal_value(data)
@@ -41,7 +43,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         fields = ['customer_id', 'full_name', 'phone_number', 'national_code', 'address', 'created_at', 'updated_at', 'vehicles']
         read_only_fields = ['customer_id', 'created_at', 'updated_at']
 
-    def validate_phone_number(self, value):
+    def validate_phone_number(self, value: str | None) -> str | None:
         if not value:
             return None
         norm = normalize_digits(str(value).strip())
@@ -54,7 +56,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("این شماره تماس قبلاً برای مشتری دیگری ثبت شده است.")
         return norm
 
-    def validate_national_code(self, value):
+    def validate_national_code(self, value: str | None) -> str | None:
         if not value:
             return None
         norm = normalize_digits(str(value).strip())

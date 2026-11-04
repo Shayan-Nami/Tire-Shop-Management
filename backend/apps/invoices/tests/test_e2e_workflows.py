@@ -17,18 +17,16 @@ import pytest
 from decimal import Decimal
 from django.urls import reverse
 from django.core.management import call_command, CommandError
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from apps.accounts.models import User, UserRole
 from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementType
 from apps.customers.models import Customer, Vehicle
-from apps.finance.models import ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher
+from apps.finance.models import ReceiptVoucher, CustomerRefundVoucher
 from apps.invoices.models import (
-    SalesInvoice, SalesInvoiceTireItem, InvoiceStatus, PaymentStatus, SalesReturn
+    SalesInvoice, InvoiceStatus, PaymentStatus
 )
-from apps.invoices.services import create_sales_invoice_service, create_sales_return_service
+from apps.invoices.services import create_sales_invoice_service
 
 
 # ---------------------------------------------------------------------------
@@ -224,9 +222,9 @@ class TestFeatureContracts:
         cust1 = Customer.objects.create(full_name='مشتری الف', phone_number='09121110011')
         cust2 = Customer.objects.create(full_name='مشتری ب', phone_number='09121110022')
 
-        veh1 = Vehicle.objects.create(customer=cust1, license_plate='11A111-11', model='پراید')
-        veh2 = Vehicle.objects.create(customer=cust1, license_plate='22A222-22', model='سمند')
-        veh3 = Vehicle.objects.create(customer=cust2, license_plate='33A333-33', model='تارا')
+        Vehicle.objects.create(customer=cust1, license_plate='11A111-11', model='پراید')
+        Vehicle.objects.create(customer=cust1, license_plate='22A222-22', model='سمند')
+        Vehicle.objects.create(customer=cust2, license_plate='33A333-33', model='تارا')
 
         url = reverse('vehicle-list')
         res = auth_client_manager.get(f"{url}?customer={cust1.pk}")

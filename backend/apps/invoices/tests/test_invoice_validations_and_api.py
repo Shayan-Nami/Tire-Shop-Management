@@ -6,7 +6,7 @@ from apps.catalog.models import Brand, Size, Tire
 from apps.customers.models import Customer, Vehicle
 from apps.suppliers.models import Supplier
 from apps.services_app.models import Service
-from apps.invoices.models import SalesInvoice, PurchaseInvoice, InvoiceStatus
+from apps.invoices.models import SalesInvoice, PurchaseInvoice
 from apps.finance.models import ReceiptVoucher, PaymentVoucher
 
 @pytest.fixture

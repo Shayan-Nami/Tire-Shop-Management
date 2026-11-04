@@ -1,3 +1,4 @@
+import { useLanguage } from './context/LanguageContext';
 import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -20,12 +21,15 @@ const SuppliersPage = React.lazy(() => import('./pages/SuppliersPage').then((m) 
 const ReportsPage = React.lazy(() => import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const UsersPage = React.lazy(() => import('./pages/UsersPage').then((m) => ({ default: m.UsersPage })));
 
-const PageLoadingFallback: React.FC = () => (
+const PageLoadingFallback: React.FC = () => {
+  const { t } = useLanguage();
+  return (
   <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-slate-400">
     <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
-    <span className="text-xs font-medium">در حال بارگذاری صفحه...</span>
+    <span className="text-xs font-medium">{t("در حال بارگذاری صفحه...")}</span>
   </div>
 );
+};
 
 const RootRedirect: React.FC = () => {
   const { user } = useAuth();

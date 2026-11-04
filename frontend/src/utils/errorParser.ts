@@ -1,3 +1,4 @@
+import { translateMessage, type Language } from './i18n.ts';
 import axios from 'axios';
 
 const FIELD_LABELS_FA: Record<string, string> = {
@@ -38,9 +39,10 @@ const FIELD_LABELS_FA: Record<string, string> = {
  * استخراج پیام خطای فارسی خوانا از پاسخ‌های استاندارد و سفارشی Django REST Framework
  * ساختار پاسخ سرور: { success: false, status_code: number, errors: ... }
  */
-export function parseApiError(
+function parseRawApiError(
   error: unknown,
-  fallback: string = 'خطایی در انجام عملیات رخ داده است.'
+  fallback: string = 'خطایی در انجام عملیات رخ داده است.',
+  language: Language = 'fa'
 ): string {
   if (!error) return fallback;
 
@@ -75,7 +77,7 @@ export function parseApiError(
 
     const visited = new WeakSet<object>();
     const collectMessages = (value: unknown, depth = 0): string => {
-      if (typeof value === 'string') return isHtml(value) ? serverError : value;
+      if (typeof value === 'string') return isHtml(value) ? serverError : translateMessage(value, language);
       if (value === null || typeof value !== 'object' || depth > 10 || visited.has(value)) return '';
       visited.add(value);
       if (Array.isArray(value)) {
@@ -90,7 +92,7 @@ export function parseApiError(
       }
       return Object.entries(fields).map(([key, val]) => {
         const message = collectMessages(val, depth + 1);
-        return message ? `${FIELD_LABELS_FA[key] || key}: ${message}` : '';
+        return message ? `${language === 'en' ? key.replaceAll('_', ' ') : (FIELD_LABELS_FA[key] || key)}: ${message}` : '';
       }).filter(Boolean).join('\n');
     };
 
@@ -104,4 +106,8 @@ export function parseApiError(
   }
 
   return fallback;
+}
+
+export function parseApiError(error: unknown, fallback?: string, language: Language = 'fa'): string {
+  return translateMessage(parseRawApiError(error, fallback, language), language);
 }

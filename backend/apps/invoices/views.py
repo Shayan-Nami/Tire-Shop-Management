@@ -2,7 +2,7 @@ from decimal import Decimal
 from django.db import models
 from django.db.models import Sum, Subquery, OuterRef, Value, F
 from django.db.models.functions import Coalesce, Greatest
-from rest_framework import viewsets, permissions, filters, status
+from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import MethodNotAllowed

@@ -3,18 +3,20 @@
 Use the [root README](../README.md) for local setup, dependency installation, and
 environment-variable tables. This guide covers release checks and operational
 risks; it is not evidence of a deployed or production-ready installation.
-The repository's WSGI/ASGI entrypoints and Vite build are application components,
-not an installed CI pipeline, container platform, reverse proxy, or managed service.
+The [GitHub Actions workflow](../.github/workflows/ci.yml) validates source changes;
+it does not deploy them. WSGI/ASGI entrypoints and the Vite build still need an
+operator-provided runtime, reverse proxy and hosting.
 
 ## Runtime and topology
 
-- Backend dependencies allow Django `>=5.2.17,<6.2`. The current audit exercised
-  Python **3.14.6** with Django **5.2.17** and **6.1.2**; this is a tested snapshot,
+- Backend dependencies allow Django `>=5.2.17,<6.2`. The latest full verification used
+  Python **3.14.6** with Django **6.1.1**; earlier audits also tested Django 5.2.17
+  and 6.1.2. These are tested snapshots,
   not a claim about every Python/Django combination.
 - [frontend/package.json](../frontend/package.json) requires **Node.js >=22.18.0**
   (Node 24 LTS is a suitable choice). Node 20 is not the documented baseline.
-- SQLite is the default. PostgreSQL and SQL Server have settings/driver support,
-  but their live server behavior must be verified separately. SQL Server also
+- SQLite is the default; the test suite also runs against PostgreSQL. SQL Server
+  has settings/driver support but has not been exercised in this verification. It also
   requires a compatible native ODBC driver and trusted server certificate.
 - Redis is optional caching for shared throttle state, enabled by `REDIS_CACHE_URL`.
   Without it, cache/throttle state is process-local. There is no task broker.
@@ -130,20 +132,18 @@ Verify frontend deep links, API failures, and admin/static routing in a real bro
 - Rehearse rollback with migration compatibility and data recovery in mind;
   reverting frontend/backend files alone cannot undo database changes.
 
-## Audit snapshot and limits
+## Verification and limits
 
-The current audit reported the following on **2026-10-31**:
+The latest [release verification](RELEASE_READINESS.md), dated **2026-11-03**,
+records 519 passing PostgreSQL tests (1 SQLite-only skip), 511 passing SQLite tests
+(9 database-specific skips), and 125 passing frontend tests. Lint, build, OpenAPI,
+system checks and migration-drift checks passed. Older results remain in the
+[historical audit](AUDIT_REPORT.md).
 
-| Check | Result |
-| --- | --- |
-| Python 3.14.6 + Django 5.2.17 | 342 passed; 9 PostgreSQL-specific tests skipped |
-| Python 3.14.6 + Django 6.1.2 | 342 passed; 9 PostgreSQL-specific tests skipped |
-| Frontend | 106 tests passed; typecheck, Oxlint, and production build passed |
-| Dependency audits | npm/pip audits clean for the resolved dependency sets tested |
-
-These results are a point-in-time validation record, not a security certification
-or a guarantee for future dependency resolution. There was no browser end-to-end
-or live external-database verification. The frontend is a client-rendered SPA,
-not SSR. Native ODBC connectivity, production database locking/load behavior,
-Redis connectivity, infrastructure, backups, and actual deployed behavior still
-require environment-specific validation.
+These results are a point-in-time record, not a security certification or a
+guarantee for future dependency resolution. Earlier browser inspections are
+recorded separately from this automated rerun; there is no automated browser
+end-to-end suite. Native ODBC connectivity, production database load behavior,
+live Redis, infrastructure, backup restoration and deployed behavior still need
+environment-specific validation. Investigate the existing stock/ledger discrepancy
+described in the release record before trusting the local shop database.

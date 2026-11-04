@@ -1,3 +1,4 @@
+import { englishMessages } from './englishMessages.ts';
 export type Language = 'fa' | 'en';
 export type Direction = 'rtl' | 'ltr';
 
@@ -18,7 +19,7 @@ export const translations: Record<string, { fa: string; en: string }> = {
   currencyUnitLabel: { fa: 'واحد:', en: 'Unit:' },
   toman: { fa: 'تومان', en: 'Toman' },
   rial: { fa: 'ریال', en: 'Rial' },
-  langToggleTitle: { fa: 'تغییر زبان به انگلیسی (Switch to English)', en: 'Switch language to Persian (تغییر به فارسی)' },
+  langToggleTitle: { fa: 'تغییر زبان به انگلیسی (Switch to English)', en: 'Switch to Persian' },
   langToggleAria: { fa: 'تغییر زبان بین فارسی و انگلیسی (FA / EN)', en: 'Toggle Language between Persian and English (FA / EN)' },
   langLabel: { fa: 'زبان:', en: 'Lang:' },
   langFa: { fa: 'فارسی', en: 'Persian' },
@@ -26,8 +27,8 @@ export const translations: Record<string, { fa: string; en: string }> = {
 
   // User Roles
   roleManager: { fa: 'مدیر سیستم', en: 'System Manager' },
-  roleTechnician: { fa: 'تکنسین فنی', en: 'Technical Technician' },
-  roleWarehouse: { fa: 'انباردار', en: 'Warehouse Keeper' },
+  roleTechnician: { fa: 'تکنسین فنی', en: 'Technician' },
+  roleWarehouse: { fa: 'انباردار', en: 'Warehouse staff' },
 
   // User Dropdown & Profile
   userSettings: { fa: 'حساب کاربری و تنظیمات', en: 'Account Settings' },
@@ -52,3 +53,12 @@ export const translations: Record<string, { fa: string; en: string }> = {
   navReports: { fa: 'گزارش‌های تحلیلی و سودآوری', en: 'Reports & Analytics' },
   navUsers: { fa: 'مدیریت کاربران و نقش‌ها', en: 'User Management' },
 };
+
+// Existing semantic keys and source-copy keys share the same language contract.
+for (const [fa, en] of Object.entries(englishMessages)) translations[fa] = { fa, en };
+
+export function translateMessage(message: string, language: Language): string {
+  return language === 'en' ? (translations[message]?.en || message) : message;
+}
+
+Object.assign(translations, { MANAGER: { fa: 'مدیر سیستم', en: 'Manager' }, TECHNICIAN: { fa: 'تکنسین فنی', en: 'Technician' }, WAREHOUSE: { fa: 'انباردار', en: 'Warehouse staff' } });

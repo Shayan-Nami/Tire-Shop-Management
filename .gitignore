@@ -88,3 +88,9 @@ pnpm-debug.log*
 
 # Environment templates are safe to publish
 !**/.env.example
+
+# Local browser sessions
+.playwright-cli/
+
+# Design reference and internal workspace notes
+.impeccable/

@@ -21,8 +21,8 @@ def manager_user(db):
         defaults={
             'role': UserRole.MANAGER,
             'full_name': 'تست مدیر',
-            'is_staff': True,
-            'is_superuser': True
+            'is_staff': False,
+            'is_superuser': False
         }
     )
     user.set_password('pass123')
@@ -72,3 +72,8 @@ def auth_client_warehouse(warehouse_user):
     client = APIClient()
     client.force_authenticate(user=warehouse_user)
     return client
+
+
+@pytest.fixture
+def superuser(db):
+    return User.objects.create_superuser(username='test_superuser', password='pass123', role=UserRole.MANAGER)

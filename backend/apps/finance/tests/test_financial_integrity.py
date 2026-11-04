@@ -26,19 +26,14 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
-from apps.accounts.models import User, UserRole
 from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementType
 from apps.customers.models import Customer, Vehicle
 from apps.suppliers.models import Supplier
-from apps.invoices.models import SalesInvoice, InvoiceStatus, PaymentStatus, SalesReturn
+from apps.invoices.models import SalesInvoice, InvoiceStatus, PaymentStatus
 from apps.invoices.services import create_sales_invoice_service, create_sales_return_service
-from apps.finance.models import ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher
 from apps.finance.services import (
     create_receipt_voucher_service,
-    cancel_receipt_voucher_service,
-    create_payment_voucher_service,
-    create_customer_refund_voucher_service,
-    cancel_customer_refund_voucher_service
+    create_customer_refund_voucher_service
 )
 
 
@@ -168,7 +163,7 @@ class TestFinancialRemainingAmountAndRefundsLifecycle:
         # New net_amount = 9,000,000. Effective paid = 7,000,000.
         # Remaining debt must become 9,000,000 - 7,000,000 = 2,000,000 IRR.
         sales_item = invoice.tire_items.first()
-        s_return_1 = create_sales_return_service(
+        create_sales_return_service(
             invoice=invoice,
             items_data=[{'sales_invoice_tire_item_id': sales_item.pk, 'quantity': 1}],
             reason='مرجوعی قلم اول به دلیل عدم نیاز',

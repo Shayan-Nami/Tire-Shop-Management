@@ -5,20 +5,17 @@ from django.contrib import admin
 from django.core.management import call_command
 from rest_framework.exceptions import ValidationError
 from apps.invoices.models import (
-    SalesInvoice, PurchaseInvoice, SalesReturn, InvoiceSequence,
+    SalesInvoice, PurchaseInvoice, InvoiceSequence,
     InvoiceStatus, PaymentStatus
 )
-from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementType
+from apps.catalog.models import Brand, Size, Tire
 from apps.customers.models import Customer, Vehicle
 from apps.suppliers.models import Supplier
-from apps.services_app.models import Service
 from apps.invoices.services import (
-    generate_next_invoice_number, create_sales_invoice_service,
-    create_purchase_invoice_service, create_sales_return_service
+    generate_next_invoice_number, create_sales_invoice_service
 )
 from apps.finance.services import (
-    sync_sales_invoice_payment_status, sync_purchase_invoice_payment_status,
-    create_receipt_voucher_service
+    sync_sales_invoice_payment_status, sync_purchase_invoice_payment_status
 )
 
 

@@ -1,3 +1,4 @@
+import { useLanguage } from '../context/LanguageContext';
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -20,6 +21,7 @@ import { createRequestSequence } from '../utils/invoiceRequests';
 import { parseApiError } from '../utils/errorParser';
 
 export const SalesInvoices: React.FC = () => {
+  const { t, language } = useLanguage();
   const { currencyUnit, user } = useAuth();
   const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -66,7 +68,7 @@ export const SalesInvoices: React.FC = () => {
         setInvoices([]);
         setTotalCount(0);
         setTotalPages(1);
-        setLoadError(parseApiError(error, 'خطا در دریافت فاکتورهای فروش'));
+        setLoadError(parseApiError(error, t("خطا در دریافت فاکتورهای فروش"), language));
       } finally {
         if (isCurrent()) setLoading(false);
       }
@@ -74,84 +76,80 @@ export const SalesInvoices: React.FC = () => {
     // oxlint-disable-next-line react/set-state-in-effect -- Query changes intentionally enter the network loading state.
     void loadInvoices();
     return () => requests.invalidate();
-  }, [search, statusFilter, paymentStatusFilter, currentPage, refreshVersion]);
+  }, [search, statusFilter, paymentStatusFilter, currentPage, refreshVersion, t, language]);
 
   return (
-    <div className="space-y-6" aria-busy={loading}>
+    <div className="page-stack" aria-busy={loading}>
       {/* سربرگ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="page-heading">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">
-            فهرست فاکتورهای فروش
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            مدیریت، پیگیری وضعیت تسویه، چاپ رسمی و ثبت مرجوعی فاکتورها (مجموع: {totalCount} فاکتور)
-          </p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("فهرست فاکتورهای فروش")}</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("مدیریت، پیگیری وضعیت تسویه، چاپ رسمی و ثبت مرجوعی فاکتورها (مجموع:")}{totalCount}{' '}{t("فاکتور)")}</p>
         </div>
 
         {(user?.role === 'MANAGER' || user?.role === 'TECHNICIAN') && (
           <Link
             to="/invoices/create"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
+            className="action-primary inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>صدور فاکتور جدید</span>
+            <span>{t("صدور فاکتور جدید")}</span>
           </Link>
         )}
       </div>
 
       {/* فیلترها و نوار جستجو */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+      <div className="filter-bar">
         {/* جستجو */}
         <div className="relative w-full md:w-80">
           <input
             type="text"
-            aria-label="جستجوی فاکتور فروش"
+            aria-label={t("جستجوی فاکتور فروش")}
             value={search}
             onChange={(e) => {
               invoiceRequests.current.invalidate();
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="جستجو در شماره فاکتور، نام، موبایل، پلاک..."
-            className="w-full pl-3 pr-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+            placeholder={t("جستجو در شماره فاکتور، نام، موبایل، پلاک...")}
+            className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />
-          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 right-3" />
+          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-3" />
         </div>
 
         {/* فیلتر وضعیت‌ها */}
         <div className="flex items-center gap-2 w-full md:w-auto">
           <Filter className="w-4 h-4 text-slate-400 shrink-0" />
           <select
-            aria-label="وضعیت فاکتور"
+            aria-label={t("وضعیت فاکتور")}
             value={statusFilter}
             onChange={(e) => {
               invoiceRequests.current.invalidate();
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none"
+            className="ui-field px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none"
           >
-            <option value="">همه وضعیت‌های فاکتور</option>
-            <option value="CONFIRMED">تاییدشده (قطعی)</option>
-            <option value="DRAFT">پیش‌نویس</option>
-            <option value="CANCELLED">لغوشده</option>
+            <option value="">{t("همه وضعیت‌های فاکتور")}</option>
+            <option value="CONFIRMED">{t("تاییدشده (قطعی)")}</option>
+            <option value="DRAFT">{t("پیش‌نویس")}</option>
+            <option value="CANCELLED">{t("لغوشده")}</option>
           </select>
 
           <select
-            aria-label="وضعیت پرداخت"
+            aria-label={t("وضعیت پرداخت")}
             value={paymentStatusFilter}
             onChange={(e) => {
               invoiceRequests.current.invalidate();
               setPaymentStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none"
+            className="ui-field px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs outline-none"
           >
-            <option value="">همه وضعیت‌های پرداخت</option>
-            <option value="PAID">تسویه کامل (PAID)</option>
-            <option value="PARTIAL">پرداخت ناقص (اقساطی)</option>
-            <option value="UNPAID">تسویه‌نشده (UNPAID)</option>
+            <option value="">{t("همه وضعیت‌های پرداخت")}</option>
+            <option value="PAID">{t("تسویه کامل (PAID)")}</option>
+            <option value="PARTIAL">{t("پرداخت ناقص (اقساطی)")}</option>
+            <option value="UNPAID">{t("تسویه‌نشده (UNPAID)")}</option>
           </select>
         </div>
       </div>
@@ -159,44 +157,42 @@ export const SalesInvoices: React.FC = () => {
       {loadError && (
         <div role="alert" className="p-4 text-xs text-rose-700 dark:text-rose-300">
           {loadError}
-          <button type="button" onClick={fetchInvoices} className="mr-3 underline">تلاش مجدد</button>
+          <button type="button" onClick={fetchInvoices} className="ms-3 underline">{t("تلاش مجدد")}</button>
         </div>
       )}
 
       {/* جدول فاکتورها */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="surface-panel overflow-hidden">
         {loading ? (
-          <div className="py-16 text-center text-xs text-slate-400">در حال دریافت فاکتورها...</div>
+          <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت فاکتورها...")}</div>
         ) : loadError ? null : invoices.length === 0 ? (
-          <div className="py-16 text-center text-xs text-slate-400">
-            فاکتوری با مشخصات جستجویافته یافت نشد.
-          </div>
+          <div className="py-16 text-center text-xs text-slate-400">{t("فاکتوری با مشخصات جستجویافته یافت نشد.")}</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-right">
+          <div className="table-scroll overflow-x-auto">
+            <table className="data-table w-full text-xs text-start">
               <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="py-3 px-4">شماره فاکتور</th>
-                  <th className="py-3 px-4">تاریخ صدور</th>
-                  <th className="py-3 px-4">مشتری</th>
-                  <th className="py-3 px-4">خودرو و پلاک</th>
-                  <th className="py-3 px-4">مبلغ قابل پرداخت</th>
-                  <th className="py-3 px-4 text-center">وضعیت فاکتور</th>
-                  <th className="py-3 px-4 text-center">وضعیت تسویه</th>
-                  <th className="py-3 px-4 text-center">عملیات</th>
+                  <th className="py-3 px-4">{t("شماره فاکتور")}</th>
+                  <th className="py-3 px-4">{t("تاریخ صدور")}</th>
+                  <th className="py-3 px-4">{t("مشتری")}</th>
+                  <th className="py-3 px-4">{t("خودرو و پلاک")}</th>
+                  <th className="py-3 px-4">{t("مبلغ قابل پرداخت")}</th>
+                  <th className="py-3 px-4 text-center">{t("وضعیت فاکتور")}</th>
+                  <th className="py-3 px-4 text-center">{t("وضعیت تسویه")}</th>
+                  <th className="py-3 px-4 text-center">{t("عملیات")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {invoices.map((inv) => (
                   <tr key={inv.sales_invoice_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                      {inv.invoice_number}
+                      <bdi dir="auto">{inv.invoice_number}</bdi>
                     </td>
                     <td className="py-3 px-4 text-slate-500">
-                      {inv.jalali_date || formatIsoToJalali(inv.invoice_date)}
+                      {(language === 'fa' && inv.jalali_date) || formatIsoToJalali(inv.invoice_date, language)}
                     </td>
                     <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">
-                      {inv.customer_name}
+                      <bdi dir="auto">{inv.customer_name}</bdi>
                       <span className="block text-[10px] text-slate-400 font-normal">
                         {inv.customer_phone}
                       </span>
@@ -210,7 +206,7 @@ export const SalesInvoices: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4 font-black text-slate-900 dark:text-white tabular-nums">
-                      {formatCurrency(inv.net_amount || inv.total_amount, true, currencyUnit)}
+                      {formatCurrency(inv.net_amount || inv.total_amount, true, currencyUnit, language)}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span
@@ -222,7 +218,7 @@ export const SalesInvoices: React.FC = () => {
                             : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                         }`}
                       >
-                        {inv.status_display || inv.status}
+                        {language === 'en' ? t(inv.status) : (inv.status_display || t(inv.status))}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
@@ -235,14 +231,14 @@ export const SalesInvoices: React.FC = () => {
                             : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                         }`}
                       >
-                        {inv.payment_status_display || inv.payment_status}
+                        {language === 'en' ? t(inv.payment_status) : (inv.payment_status_display || t(inv.payment_status))}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="inline-flex items-center gap-1.5">
                         <button
                           onClick={() => setSelectedInvoice(inv)}
-                          title="مشاهده جزئیات و چاپ"
+                          title={t("مشاهده جزئیات و چاپ")}
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -250,7 +246,7 @@ export const SalesInvoices: React.FC = () => {
                         {user?.role === 'MANAGER' && inv.status === 'CONFIRMED' && inv.payment_status !== 'PAID' && (
                           <button
                             onClick={() => setReceiptInvoice(inv)}
-                            title="ثبت دریافت وجه"
+                            title={t("ثبت دریافت وجه")}
                             className="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 transition-colors"
                           >
                             <CreditCard className="w-3.5 h-3.5" />
@@ -259,7 +255,7 @@ export const SalesInvoices: React.FC = () => {
                         {user?.role === 'MANAGER' && inv.status === 'CONFIRMED' && (
                           <button
                             onClick={() => setReturnInvoice(inv)}
-                            title="ثبت مرجوعی کالا"
+                            title={t("ثبت مرجوعی کالا")}
                             className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition-colors"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
@@ -277,8 +273,7 @@ export const SalesInvoices: React.FC = () => {
         {/* صفحه‌بندی (Pagination) */}
         {totalPages > 1 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>
-              صفحه {currentPage} از {totalPages}
+            <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages}
             </span>
             <div className="flex gap-1">
               <button
@@ -288,9 +283,7 @@ export const SalesInvoices: React.FC = () => {
                   setCurrentPage((page) => page - 1);
                 }}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
-              >
-                قبلی
-              </button>
+              >{t("قبلی")}</button>
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => {
@@ -298,9 +291,7 @@ export const SalesInvoices: React.FC = () => {
                   setCurrentPage((page) => page + 1);
                 }}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
-              >
-                بعدی
-              </button>
+              >{t("بعدی")}</button>
             </div>
           </div>
         )}

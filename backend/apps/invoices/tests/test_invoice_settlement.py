@@ -13,10 +13,8 @@ from apps.invoices.models import (
 )
 from apps.invoices.services import (
     create_sales_invoice_service,
-    cancel_sales_invoice_service,
-    create_sales_return_service
+    cancel_sales_invoice_service
 )
-from apps.finance.models import ReceiptVoucher, CustomerRefundVoucher
 from apps.finance.services import create_receipt_voucher_service
 
 

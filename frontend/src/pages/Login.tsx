@@ -1,10 +1,12 @@
+import { useLanguage } from '../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { KeyRound, User, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { KeyRound, User, ArrowLeft, ShieldAlert, CircleDot, FileText, Package, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { parseApiError } from '../utils/errorParser';
 
 export const Login: React.FC = () => {
+  const { t, language, toggleLanguage } = useLanguage();
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -31,7 +33,7 @@ export const Login: React.FC = () => {
       navigate('/');
     } catch (err: any) {
       setError(
-        parseApiError(err, 'نام کاربری یا کلمه عبور وارد شده نادرست است.')
+        parseApiError(err, t("نام کاربری یا کلمه عبور وارد شده نادرست است."), language)
       );
     } finally {
       setLoading(false);
@@ -39,85 +41,36 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden font-sans selection:bg-brand-600 selection:text-white">
-      {/* هاله‌های نوری پس‌زمینه */}
-      <div className="absolute top-1/4 -right-20 w-96 h-96 bg-brand-600/15 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-1/4 -left-20 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
-
-      {/* پوسته دولایه خارجی (Double-Bezel Shell) */}
-      <div className="w-full max-w-md p-2 rounded-[2rem] bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-xl relative z-10">
-        <div className="p-6 sm:p-8 rounded-[calc(2rem-0.5rem)] bg-slate-900 border border-slate-800/50 space-y-6">
-          {/* لوگو و سربرگ فرم */}
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-rose-500 shadow-xl shadow-brand-600/30 text-3xl mb-2">
-              🛞
-            </div>
-            <h1 className="text-2xl font-black text-white tracking-tight">
-              سامانه جامع فروشگاه لاستیک
-            </h1>
-            <p className="text-xs text-slate-400">
-              ورود امن به پنل مدیریت، صندوق فروش و انبارداری
-            </p>
+    <div className="login-page">
+      <button type="button" onClick={toggleLanguage} className="toolbar-button login-language-toggle" aria-label={t('langToggleAria')}>
+        {language === 'en' ? 'فارسی' : 'English'}
+      </button>
+      <section className="login-brand">
+        <div className="flex items-center gap-3"><div className="brand-mark"><CircleDot size={24} /></div><div><strong className="text-xl">{t("تایر منیجر")}</strong><p className="!mt-0 !text-xs">{t("سامانه فروشگاه و خدمات لاستیک")}</p></div></div>
+        <div className="login-intro">
+          <h2>{t("همهٔ کارهای فروشگاه، در یک نگاه.")}</h2>
+          <p>{t("از صدور فاکتور تا پیگیری موجودی و تسویه؛ فضای کاری روزانهٔ فروشگاه شما.")}</p>
+          <div className="login-document">
+            <div><span>{t("فروش و خدمات")}</span><FileText size={20} /></div>
+            <div><span>{t("موجودی و گردش انبار")}</span><Package size={20} /></div>
+            <div><span>{t("مشتریان و اسناد مالی")}</span><Users size={20} /></div>
           </div>
-
-          {passwordChanged && (
-            <p role="status" className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
-              کلمه عبور با موفقیت تغییر یافت و نشست شما پایان یافت. لطفاً با کلمه عبور جدید دوباره وارد شوید.
-            </p>
-          )}
-
-          {error && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* فرم لاگین */}
-          <form onSubmit={handleLogin} className="space-y-4 text-xs">
-            <div className="space-y-1.5">
-              <label className="font-semibold text-slate-300 block">نام کاربری:</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="نام کاربری شما..."
-                  required
-                  className="w-full px-4 py-3 pr-10 bg-slate-800/60 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
-                />
-                <User className="w-4 h-4 text-slate-400 absolute top-3.5 right-3.5" />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="font-semibold text-slate-300 block">کلمه عبور:</label>
-              <div className="relative">
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="گذرواژه..."
-                  required
-                  className="w-full px-4 py-3 pr-10 bg-slate-800/60 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
-                />
-                <KeyRound className="w-4 h-4 text-slate-400 absolute top-3.5 right-3.5" />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-brand-600 to-rose-600 hover:from-brand-500 hover:to-rose-500 text-white font-bold rounded-xl shadow-lg shadow-brand-600/30 flex items-center justify-center gap-2 text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
-            >
-              <span>{loading ? 'در حال ورود...' : 'ورود به سامانه'}</span>
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          </form>
-
-
         </div>
-      </div>
+        <span className="login-footer text-xs text-slate-300">{t("مدیریت یکپارچهٔ فروشگاه لاستیک")}</span>
+      </section>
+      <main className="login-form-area">
+        <div className="login-form-card space-y-7">
+          <div><h1>{t("ورود به فضای کاری")}</h1><p className="text-sm text-slate-500 dark:text-slate-300 mt-2">{t("برای شروع، اطلاعات حساب خود را وارد کنید.")}</p></div>
+          {passwordChanged && <p role="status" className="p-3 rounded-lg bg-emerald-50 text-emerald-800">{t("کلمه عبور با موفقیت تغییر یافت و نشست شما پایان یافت. لطفاً با کلمه عبور جدید دوباره وارد شوید.")}</p>}
+          {error && <div role="alert" id="login-error" className="p-3 rounded-lg bg-rose-50 text-rose-800 text-sm flex gap-2"><ShieldAlert className="shrink-0 w-5 h-5" /><span>{error}</span></div>}
+          <form onSubmit={handleLogin} className="space-y-5" aria-busy={loading}>
+            <div><label htmlFor="login-username">{t("نام کاربری")}</label><div className="relative"><input id="login-username" autoComplete="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder={t("نام کاربری خود را وارد کنید")} className="ui-field border" /><User className="field-icon w-4 h-4" /></div></div>
+            <div><label htmlFor="login-password">{t("کلمه عبور")}</label><div className="relative"><input id="login-password" autoComplete="current-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder={t("کلمه عبور خود را وارد کنید")} className="ui-field border" /><KeyRound className="field-icon w-4 h-4" /></div></div>
+            <button type="submit" disabled={loading} className="action-primary w-full !min-h-12"><span>{loading ? t("در حال ورود...") : t("ورود به سامانه")}</span><ArrowLeft className="w-4 h-4" /></button>
+          </form>
+          <p className="text-xs text-slate-500 dark:text-slate-300 leading-7">{t("برای دسترسی به سامانه، از حسابی که مدیر فروشگاه در اختیارتان قرار داده استفاده کنید.")}</p>
+        </div>
+      </main>
     </div>
   );
 };

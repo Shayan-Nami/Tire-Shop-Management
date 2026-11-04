@@ -61,10 +61,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
+    const handleEscape = (event: KeyboardEvent) => {
+      if (isDropdownOpen && event.key === 'Escape') {
+        setIsDropdownOpen(false);
+        dropdownRef.current?.querySelector('button')?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
     };
-  }, []);
+  }, [isDropdownOpen]);
 
   const getRoleLabel = (role?: string, display?: string) => {
     if (language === 'en') {
@@ -72,9 +80,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         case 'MANAGER':
           return 'System Manager';
         case 'TECHNICIAN':
-          return 'Technical Technician';
+          return 'Technician';
         case 'WAREHOUSE':
-          return 'Warehouse Keeper';
+          return 'Warehouse staff';
         default:
           return role || '';
       }
@@ -82,44 +90,44 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     if (display) return display;
     switch (role) {
       case 'MANAGER':
-        return 'مدیر سیستم';
+        return t("مدیر سیستم");
       case 'TECHNICIAN':
-        return 'تکنسین فنی';
+        return t("تکنسین فنی");
       case 'WAREHOUSE':
-        return 'انباردار';
+        return t("انباردار");
       default:
         return role || '';
     }
   };
 
   return (
-    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between z-20 shrink-0 no-print">
+    <header className="app-navbar border-b border-slate-200 dark:border-slate-700 flex items-center justify-between z-20 shrink-0 no-print">
       {/* سمت راست در RTL / چپ در LTR: دکمه همبرگری موبایل، نام فروشگاه و وضعیت */}
-      <div className="flex items-center gap-3">
+      <div className="navbar-identity flex items-center gap-2">
         <button
           onClick={onToggleSidebar}
-          className="p-2 rtl:-mr-1 ltr:-ml-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 md:hidden transition-colors"
+          className="toolbar-button md:hidden"
           aria-label={t('openMenu', 'باز کردن منو')}
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <h1 className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 truncate">
-          {t('appTitle', 'سامانه فروشگاه و انبار لاستیک')}
-        </h1>
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>{t('connectedStatus', 'سامانه متصل')}</span>
+        <div className="min-w-0">
+          <p className="font-bold text-slate-900 dark:text-slate-100 text-sm truncate">
+            <span className="hidden xl:inline">{t('appTitle', 'سامانه فروشگاه و انبار لاستیک')}</span>
+            <span className="xl:hidden">{t('appName', 'تایر منیجر')}</span>
+          </p>
+          <p className="navbar-subtitle">{language === 'fa' ? t("فروش، خدمات و موجودی؛ یک فضای کاری") : 'Sales, services and inventory in one workspace'}</p>
         </div>
       </div>
 
       {/* سمت چپ در RTL / راست در LTR: اقدامات سریع، تغییر زبان، دارک‌مود، تغییر واحد پول، اطلاعات کاربر و خروج */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="navbar-tools flex items-center">
         {/* دکمه سریع صدور فاکتور برای مدیر و تکنسین */}
         {(user?.role === 'MANAGER' || user?.role === 'TECHNICIAN') && (
           <Link
             to="/invoices/create"
-            className="hidden lg:inline-flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shadow-sm shadow-brand-500/20 transition-colors"
+            className="action-primary hidden 2xl:inline-flex"
           >
             <PlusCircle className="w-4 h-4" />
             <span>{t('newSaleInvoice', 'فاکتور فروش جدید')}</span>
@@ -130,24 +138,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         <button
           type="button"
           onClick={toggleLanguage}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors"
-          title={language === 'fa' ? 'تغییر زبان به انگلیسی (Switch to English)' : 'Switch language to Persian (تغییر به فارسی)'}
+          className="toolbar-button"
+          title={language === 'fa' ? t("تغییر زبان به انگلیسی (Switch to English)") : t("Switch language to Persian (تغییر به فارسی)")}
           aria-label={t('langToggleAria', 'تغییر زبان بین فارسی و انگلیسی (FA / EN)')}
           data-testid="language-toggle-btn"
         >
-          <Languages className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
+          <Languages className="w-4 h-4 shrink-0 hidden sm:block" aria-hidden="true" />
           <span className="font-bold text-brand-600 dark:text-brand-400 tracking-wider">
             {language === 'fa' ? 'FA' : 'EN'}
-          </span>
-          <span className="text-[10px] text-slate-400 hidden sm:inline">
-            {language === 'fa' ? 'فارسی' : 'English'}
           </span>
         </button>
 
         {/* دکمه تعویض دارک‌مود / لایت‌مود */}
         <button
           onClick={toggleDarkMode}
-          className="flex items-center justify-center p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors"
+          className="toolbar-button"
+          aria-pressed={isDark}
           title={isDark ? t('themeToggleDay', 'تغییر به حالت روز (روشن)') : t('themeToggleNight', 'تغییر به حالت شب (تاریک)')}
           aria-label={t('themeAria', 'تغییر تم تاریک و روشن')}
         >
@@ -161,11 +167,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         {/* سوئیچ واحد پولی بین ریال و تومان */}
         <button
           onClick={toggleCurrencyUnit}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors"
+          className="toolbar-button"
           title={t('currencyUnitTitle', 'تغییر واحد پولی پیش‌فرض نمایش ارقام')}
         >
           <ArrowRightLeft className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
-          <span className="hidden sm:inline">{t('currencyUnitLabel', 'واحد:')}</span>
           <span className="font-bold text-brand-600 dark:text-brand-400">
             {currencyUnit === 'toman' ? t('toman', 'تومان') : t('rial', 'ریال')}
           </span>
@@ -176,13 +181,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen((prev) => !prev)}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors rtl:text-right ltr:text-left"
+              className="toolbar-button"
+              aria-expanded={isDropdownOpen}
+              aria-controls="account-menu"
               title={t('userSettings', 'حساب کاربری و تنظیمات')}
             >
               <div className="w-7 h-7 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center font-bold text-xs">
-                {user.full_name?.charAt(0) || user.username?.charAt(0) || (language === 'en' ? 'U' : 'ک')}
+                {user.full_name?.charAt(0) || user.username?.charAt(0) || (language === 'en' ? 'U' : t("ک"))}
               </div>
-              <div className="hidden sm:block rtl:text-right ltr:text-left">
+              <div className="hidden xl:block rtl:text-right ltr:text-left max-w-32">
                 <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 leading-tight">
                   {user.full_name || user.username}
                 </p>
@@ -190,17 +197,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                   {getRoleLabel(user.role, user.role_display)}
                 </p>
               </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`hidden sm:block w-3.5 h-3.5 transition-transform duration-150 ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isDropdownOpen && (
-              <div className="absolute rtl:left-0 ltr:right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-30">
+              <div id="account-menu" className="profile-menu absolute rtl:left-0 ltr:right-0 mt-2 w-64 shadow-xl border py-1.5 z-30">
                 <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
                   <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                     {user.full_name || user.username}
                   </p>
                   <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
-                    @{user.username}
+                    @<bdi dir="auto">{user.username}</bdi>
                   </p>
                   <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400">
                     {getRoleLabel(user.role, user.role_display)}
@@ -248,15 +255,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           </div>
         )}
 
-        {/* دکمه خروج مستقیم */}
-        <button
-          onClick={logout}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-          title={t('logoutDirect', 'خروج از حساب کاربری')}
-        >
-          <LogOut className="w-4 h-4" />
-          <span className="hidden sm:inline">{t('logoutDirect', 'خروج')}</span>
-        </button>
       </div>
 
       {/* مدال‌های پروفایل و تغییر کلمه عبور */}

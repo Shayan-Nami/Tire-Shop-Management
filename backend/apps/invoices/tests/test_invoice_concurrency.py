@@ -6,16 +6,15 @@ from django.db import connection, models
 
 from apps.accounts.models import User, UserRole
 from apps.customers.models import Customer
-from apps.catalog.models import Tire, Brand, Size, StockMovementType
+from apps.catalog.models import Tire, Brand, Size
 from apps.invoices.models import (
-    SalesInvoice, SalesInvoiceTireItem, InvoiceStatus, PaymentStatus
+    InvoiceStatus, PaymentStatus
 )
 from apps.invoices.services import (
     create_sales_invoice_service,
     cancel_sales_invoice_service,
     create_sales_return_service,
 )
-from apps.finance.models import ReceiptVoucher, CustomerRefundVoucher
 from apps.finance.services import (
     create_receipt_voucher_service,
     create_customer_refund_voucher_service,
@@ -75,7 +74,7 @@ class TestConcurrencyPostgres(TransactionTestCase):
         )
 
         num_threads = 5
-        barrier = threading.Barrier(num_threads)
+        barrier = threading.Barrier(num_threads, timeout=10)
         successes = []
         errors = []
         threads = []
@@ -151,7 +150,7 @@ class TestConcurrencyPostgres(TransactionTestCase):
         # در این لحظه: دریافتی = ۱,۰۰۰,۰۰۰ ، خالص فاکتور = ۰ ، مازاد = ۱,۰۰۰,۰۰۰
         # ۵ نخ به طور همزمان درخواست استرداد کل مبلغ ۱,۰۰۰,۰۰۰ تومان می‌دهند
         num_threads = 5
-        barrier = threading.Barrier(num_threads)
+        barrier = threading.Barrier(num_threads, timeout=10)
         successes = []
         errors = []
         threads = []
@@ -213,7 +212,7 @@ class TestConcurrencyPostgres(TransactionTestCase):
             sale_price=Decimal('850000')
         )
 
-        barrier = threading.Barrier(2)
+        barrier = threading.Barrier(2, timeout=10)
         successes = []
         errors = []
         threads = []
@@ -290,7 +289,7 @@ class TestConcurrencyPostgres(TransactionTestCase):
         )
 
         num_threads = 10
-        barrier = threading.Barrier(num_threads)
+        barrier = threading.Barrier(num_threads, timeout=10)
         invoice_numbers = []
         errors = []
         threads = []
@@ -354,7 +353,7 @@ class TestConcurrencyPostgres(TransactionTestCase):
         )
         tire_item = invoice.tire_items.first()
 
-        barrier = threading.Barrier(2)
+        barrier = threading.Barrier(2, timeout=10)
         results = []
         threads = []
 
@@ -434,7 +433,7 @@ class TestConcurrencyPostgres(TransactionTestCase):
         )
 
         num_threads = 5
-        barrier = threading.Barrier(num_threads)
+        barrier = threading.Barrier(num_threads, timeout=10)
         successes = []
         errors = []
         threads = []

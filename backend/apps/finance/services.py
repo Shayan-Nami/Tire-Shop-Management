@@ -1,13 +1,21 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+from datetime import datetime
+
+if TYPE_CHECKING:
+    from apps.accounts.models import User
+    from apps.invoices.models import SalesInvoice, PurchaseInvoice, SalesReturn
+
 from decimal import Decimal, InvalidOperation
 from django.db import transaction, models
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
+from utils.domain import DomainValidationError as ValidationError, validate_money
 from .models import ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher
 from apps.invoices.models import InvoiceStatus, SalesInvoice, PurchaseInvoice, PaymentStatus
 
 
 @transaction.atomic
-def sync_sales_invoice_payment_status(invoice_or_id) -> str:
+def sync_sales_invoice_payment_status(invoice_or_id: SalesInvoice | int) -> str:
     """
     سرویس مرکزی محاسبه مجدد و به‌روزرسانی payment_status فاکتور فروش بر اساس اسناد مالی ابطال‌نشده
     """
@@ -36,7 +44,7 @@ def sync_sales_invoice_payment_status(invoice_or_id) -> str:
 
 
 @transaction.atomic
-def sync_purchase_invoice_payment_status(invoice_or_id) -> str:
+def sync_purchase_invoice_payment_status(invoice_or_id: PurchaseInvoice | int) -> str:
     """
     سرویس مرکزی محاسبه مجدد و به‌روزرسانی payment_status فاکتور خرید بر اساس اسناد مالی ابطال‌نشده
     """
@@ -59,7 +67,7 @@ def sync_purchase_invoice_payment_status(invoice_or_id) -> str:
     return new_status
 
 
-def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal, payment_method: str = 'کارتخوان / نقدی', notes: str = '', receipt_date=None, user=None, reference_number: str = '') -> ReceiptVoucher:
+def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal, payment_method: str = 'کارتخوان / نقدی', notes: str = '', receipt_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> ReceiptVoucher:
     """
     سرویس ثبت سند دریافت وجه برای فاکتور فروش همراه با قفل ردیف فاکتور و کنترل سقف مانده بدهی خالص
     """
@@ -69,7 +77,7 @@ def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal,
     if amount is None:
         raise ValidationError("مبلغ سند دریافت الزامی است.")
     try:
-        amount_dec = Decimal(str(amount))
+        amount_dec = validate_money(amount)
     except (InvalidOperation, TypeError, ValueError):
         raise ValidationError("مبلغ سند دریافت نامعتبر است.")
 
@@ -110,7 +118,7 @@ def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal,
         return voucher
 
 
-def cancel_receipt_voucher_service(voucher: ReceiptVoucher, reason: str, user=None) -> ReceiptVoucher:
+def cancel_receipt_voucher_service(voucher: ReceiptVoucher, reason: str, user: User | None=None) -> ReceiptVoucher:
     """
     سرویس ابطال سند دریافت وجه با قفل فاکتور فروش و به‌روزرسانی خودکار وضعیت پرداخت فاکتور
     """
@@ -118,11 +126,12 @@ def cancel_receipt_voucher_service(voucher: ReceiptVoucher, reason: str, user=No
         raise ValidationError("ثبت علت ابطال سند الزامی است.")
 
     with transaction.atomic():
+        parent_id = ReceiptVoucher.objects.values_list('sales_invoice_id', flat=True).get(pk=voucher.pk)
+        invoice = SalesInvoice.objects.select_for_update().get(pk=parent_id)
         v = ReceiptVoucher.objects.select_for_update().get(pk=voucher.pk)
         if v.is_cancelled:
             raise ValidationError("این سند دریافت وجه قبلاً ابطال شده است.")
 
-        invoice = SalesInvoice.objects.select_for_update().get(pk=v.sales_invoice_id)
 
         valid_receipts_after = invoice.receipts.filter(is_cancelled=False).exclude(pk=v.pk).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
         valid_refunds = invoice.refunds.filter(is_cancelled=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
@@ -142,7 +151,7 @@ def cancel_receipt_voucher_service(voucher: ReceiptVoucher, reason: str, user=No
         return v
 
 
-def create_payment_voucher_service(purchase_invoice: PurchaseInvoice, amount: Decimal, payment_method: str = 'حواله / چک', notes: str = '', payment_date=None, user=None, reference_number: str = '') -> PaymentVoucher:
+def create_payment_voucher_service(purchase_invoice: PurchaseInvoice, amount: Decimal, payment_method: str = 'حواله / چک', notes: str = '', payment_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> PaymentVoucher:
     """
     سرویس ثبت سند پرداخت وجه برای فاکتور خرید همراه با قفل ردیف فاکتور و کنترل سقف مانده
     """
@@ -152,7 +161,7 @@ def create_payment_voucher_service(purchase_invoice: PurchaseInvoice, amount: De
     if amount is None:
         raise ValidationError("مبلغ سند پرداخت الزامی است.")
     try:
-        amount_dec = Decimal(str(amount))
+        amount_dec = validate_money(amount)
     except (InvalidOperation, TypeError, ValueError):
         raise ValidationError("مبلغ سند پرداخت نامعتبر است.")
 
@@ -191,7 +200,7 @@ def create_payment_voucher_service(purchase_invoice: PurchaseInvoice, amount: De
         return voucher
 
 
-def cancel_payment_voucher_service(voucher: PaymentVoucher, reason: str, user=None) -> PaymentVoucher:
+def cancel_payment_voucher_service(voucher: PaymentVoucher, reason: str, user: User | None=None) -> PaymentVoucher:
     """
     سرویس ابطال سند پرداخت وجه با قفل فاکتور خرید و به‌روزرسانی خودکار وضعیت پرداخت فاکتور
     """
@@ -199,11 +208,12 @@ def cancel_payment_voucher_service(voucher: PaymentVoucher, reason: str, user=No
         raise ValidationError("ثبت علت ابطال سند الزامی است.")
 
     with transaction.atomic():
+        parent_id = PaymentVoucher.objects.values_list('purchase_invoice_id', flat=True).get(pk=voucher.pk)
+        invoice = PurchaseInvoice.objects.select_for_update().get(pk=parent_id)
         v = PaymentVoucher.objects.select_for_update().get(pk=voucher.pk)
         if v.is_cancelled:
             raise ValidationError("این سند پرداخت وجه قبلاً ابطال شده است.")
 
-        invoice = PurchaseInvoice.objects.select_for_update().get(pk=v.purchase_invoice_id)
 
         v.is_cancelled = True
         v.cancelled_at = timezone.now()
@@ -215,7 +225,7 @@ def cancel_payment_voucher_service(voucher: PaymentVoucher, reason: str, user=No
         return v
 
 
-def create_customer_refund_voucher_service(sales_invoice: SalesInvoice, amount: Decimal, sales_return=None, payment_method: str = 'کارتخوان / نقدی', notes: str = '', refund_date=None, user=None, reference_number: str = '') -> CustomerRefundVoucher:
+def create_customer_refund_voucher_service(sales_invoice: SalesInvoice, amount: Decimal, sales_return: SalesReturn | None = None, payment_method: str = 'کارتخوان / نقدی', notes: str = '', refund_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> CustomerRefundVoucher:
     """
     سرویس ثبت سند استرداد وجه به مشتری همراه با کنترل سقف مازاد پرداختی و قفل فاکتور
     """
@@ -225,7 +235,7 @@ def create_customer_refund_voucher_service(sales_invoice: SalesInvoice, amount: 
     if amount is None:
         raise ValidationError("مبلغ سند استرداد وجه الزامی است.")
     try:
-        amount_dec = Decimal(str(amount))
+        amount_dec = validate_money(amount)
     except (InvalidOperation, TypeError, ValueError):
         raise ValidationError("مبلغ سند استرداد وجه نامعتبر است.")
 
@@ -270,7 +280,7 @@ def create_customer_refund_voucher_service(sales_invoice: SalesInvoice, amount: 
         return voucher
 
 
-def cancel_customer_refund_voucher_service(voucher: CustomerRefundVoucher, reason: str, user=None) -> CustomerRefundVoucher:
+def cancel_customer_refund_voucher_service(voucher: CustomerRefundVoucher, reason: str, user: User | None=None) -> CustomerRefundVoucher:
     """
     سرویس ابطال سند استرداد وجه به مشتری همراه با قفل فاکتور فروش و بازگشت خودکار مبلغ مازاد
     """
@@ -278,11 +288,12 @@ def cancel_customer_refund_voucher_service(voucher: CustomerRefundVoucher, reaso
         raise ValidationError("ثبت علت ابطال سند الزامی است.")
 
     with transaction.atomic():
+        parent_id = CustomerRefundVoucher.objects.values_list('sales_invoice_id', flat=True).get(pk=voucher.pk)
+        invoice = SalesInvoice.objects.select_for_update().get(pk=parent_id)
         v = CustomerRefundVoucher.objects.select_for_update().get(pk=voucher.pk)
         if v.is_cancelled:
             raise ValidationError("این سند استرداد وجه قبلاً ابطال شده است.")
 
-        invoice = SalesInvoice.objects.select_for_update().get(pk=v.sales_invoice_id)
 
         v.is_cancelled = True
         v.cancelled_at = timezone.now()

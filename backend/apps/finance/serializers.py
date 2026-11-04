@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Any
 from decimal import Decimal
 from django.db import models
 from rest_framework import serializers
@@ -38,10 +40,10 @@ class ReceiptVoucherSerializer(serializers.ModelSerializer):
         ]
 
     @extend_schema_field(serializers.CharField)
-    def get_jalali_date(self, obj):
+    def get_jalali_date(self, obj: ReceiptVoucher) -> str:
         return format_jalali_date(obj.receipt_date)
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         sales_invoice = attrs.get('sales_invoice') or (self.instance.sales_invoice if self.instance else None)
         amount = attrs.get('amount') if 'amount' in attrs else (self.instance.amount if self.instance else None)
 
@@ -70,7 +72,7 @@ class ReceiptVoucherSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> ReceiptVoucher:
         user = self.context['request'].user if 'request' in self.context else None
         return create_receipt_voucher_service(
             sales_invoice=validated_data['sales_invoice'],
@@ -109,10 +111,10 @@ class PaymentVoucherSerializer(serializers.ModelSerializer):
         ]
 
     @extend_schema_field(serializers.CharField)
-    def get_jalali_date(self, obj):
+    def get_jalali_date(self, obj: PaymentVoucher) -> str:
         return format_jalali_date(obj.payment_date)
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         purchase_invoice = attrs.get('purchase_invoice') or (self.instance.purchase_invoice if self.instance else None)
         amount = attrs.get('amount') if 'amount' in attrs else (self.instance.amount if self.instance else None)
 
@@ -139,7 +141,7 @@ class PaymentVoucherSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> PaymentVoucher:
         user = self.context['request'].user if 'request' in self.context else None
         return create_payment_voucher_service(
             purchase_invoice=validated_data['purchase_invoice'],
@@ -179,10 +181,10 @@ class CustomerRefundVoucherSerializer(serializers.ModelSerializer):
         ]
 
     @extend_schema_field(serializers.CharField)
-    def get_jalali_date(self, obj):
+    def get_jalali_date(self, obj: CustomerRefundVoucher) -> str:
         return format_jalali_date(obj.refund_date)
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         sales_invoice = attrs.get('sales_invoice') or (self.instance.sales_invoice if self.instance else None)
         amount = attrs.get('amount') if 'amount' in attrs else (self.instance.amount if self.instance else None)
         sales_return = attrs.get('sales_return')
@@ -216,7 +218,7 @@ class CustomerRefundVoucherSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> CustomerRefundVoucher:
         user = self.context['request'].user if 'request' in self.context else None
         return create_customer_refund_voucher_service(
             sales_invoice=validated_data['sales_invoice'],
