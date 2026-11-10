@@ -1,4 +1,8 @@
 import { englishMessages } from './englishMessages.ts';
+import { coreMessages } from './messages/core.ts';
+import { operationsMessages } from './messages/operations.ts';
+import { salesMessages } from './messages/sales.ts';
+import { shellMessages } from './messages/shell.ts';
 export type Language = 'fa' | 'en';
 export type Direction = 'rtl' | 'ltr';
 
@@ -49,7 +53,8 @@ export const translations: Record<string, { fa: string; en: string }> = {
   navUsers: { fa: 'مدیریت کاربران و نقش‌ها', en: 'User Management' },
 };
 
-for (const [fa, en] of Object.entries(englishMessages)) translations[fa] = { fa, en };
+const messageTables = [englishMessages, coreMessages, shellMessages, salesMessages, operationsMessages];
+for (const table of messageTables) for (const [fa, en] of Object.entries(table)) translations[fa] = { fa, en };
 
 export function translateMessage(message: string, language: Language): string {
   return language === 'en' ? (translations[message]?.en || message) : message;

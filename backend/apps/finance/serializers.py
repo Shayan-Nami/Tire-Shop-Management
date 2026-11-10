@@ -6,6 +6,7 @@ from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 from .models import ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher
 from .services import (
+    DRAFT_RECEIPT_ERROR,
     create_receipt_voucher_service,
     create_payment_voucher_service,
     create_customer_refund_voucher_service
@@ -52,6 +53,8 @@ class ReceiptVoucherSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     "sales_invoice": "امکان ثبت سند دریافت وجه برای فاکتور لغو شده وجود ندارد."
                 })
+            if sales_invoice.status == InvoiceStatus.DRAFT:
+                raise serializers.ValidationError({"sales_invoice": DRAFT_RECEIPT_ERROR})
 
             existing_receipts = sales_invoice.receipts.filter(is_cancelled=False)
             if self.instance and self.instance.pk:

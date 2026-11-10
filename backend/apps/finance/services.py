@@ -14,6 +14,9 @@ from .models import ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher
 from apps.invoices.models import InvoiceStatus, SalesInvoice, PurchaseInvoice, PaymentStatus
 
 
+DRAFT_RECEIPT_ERROR = "امکان ثبت سند دریافت وجه برای فاکتور پیش‌نویس وجود ندارد. ابتدا فاکتور را تایید کنید."
+
+
 @transaction.atomic
 def sync_sales_invoice_payment_status(invoice_or_id: SalesInvoice | int) -> str:
     invoice_id = invoice_or_id.pk if hasattr(invoice_or_id, 'pk') else int(invoice_or_id)
@@ -64,6 +67,8 @@ def sync_purchase_invoice_payment_status(invoice_or_id: PurchaseInvoice | int) -
 def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal, payment_method: str = 'کارتخوان / نقدی', notes: str = '', receipt_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> ReceiptVoucher:
     if sales_invoice.status == InvoiceStatus.CANCELLED:
         raise ValidationError("امکان ثبت سند دریافت وجه برای فاکتور لغو شده وجود ندارد.")
+    if sales_invoice.status != InvoiceStatus.CONFIRMED:
+        raise ValidationError(DRAFT_RECEIPT_ERROR)
 
     if amount is None:
         raise ValidationError("مبلغ سند دریافت الزامی است.")
@@ -81,6 +86,8 @@ def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal,
         invoice = SalesInvoice.objects.select_for_update().get(pk=invoice_id)
         if invoice.status == InvoiceStatus.CANCELLED:
             raise ValidationError("امکان ثبت سند دریافت وجه برای فاکتور لغو شده وجود ندارد.")
+        if invoice.status != InvoiceStatus.CONFIRMED:
+            raise ValidationError(DRAFT_RECEIPT_ERROR)
 
         valid_received = invoice.receipts.filter(is_cancelled=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
         valid_refunded = invoice.refunds.filter(is_cancelled=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
