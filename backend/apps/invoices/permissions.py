@@ -1,6 +1,14 @@
 from rest_framework.permissions import BasePermission
 from apps.accounts.models import UserRole
 
+
+def can_set_sales_financial_terms(user) -> bool:
+    # Off-catalog prices, discounts and settlement at issue time are manager-only; None = trusted internal caller.
+    if user is None:
+        return True
+    return bool(user.is_superuser or getattr(user, 'role', None) == UserRole.MANAGER)
+
+
 class SalesInvoicePermission(BasePermission):
     message = 'انباردار مجاز به صدور فاکتور فروش نیست.'
 
