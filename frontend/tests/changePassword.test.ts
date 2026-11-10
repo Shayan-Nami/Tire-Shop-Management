@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import { parseApiError } from '../src/utils/errorParser.ts';
+import * as storageModule from '../src/utils/storage.ts';
 import { deferred, loadComponent, mountComponent, nodes, text } from './componentHarness.ts';
 
 type Harness = ReturnType<typeof mountComponent>;
@@ -25,14 +26,19 @@ function browserSession(t: TestContext) {
   const location = { href: '/dashboard', search: '' };
   const descriptors = ['localStorage', 'window'].map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location } });
+  const listeners = new Map<string, (event: any) => void>();
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+    location,
+    addEventListener: (type: string, listener: (event: any) => void) => { listeners.set(type, listener); },
+    removeEventListener: (type: string) => { listeners.delete(type); },
+  } });
   t.after(() => {
     for (const [name, descriptor] of descriptors) {
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
       else Reflect.deleteProperty(globalThis, name);
     }
   });
-  return { values, storage, location };
+  return { values, storage, location, listeners };
 }
 
 async function setup(t: TestContext, changePassword: (payload: any) => Promise<unknown>, logout?: (token: string) => Promise<void>) {
@@ -40,6 +46,7 @@ async function setup(t: TestContext, changePassword: (payload: any) => Promise<u
   const cachedHeaders: Record<string, string> = { Authorization: 'Bearer old-access' };
   const { clearLocalSession } = loadComponent('../src/utils/session.ts', {
     '../api/client': { apiClient: { defaults: { headers: { common: cachedHeaders } } } },
+    './storage': storageModule,
   });
   const logoutTokens: string[] = [];
   const user = JSON.parse(browser.storage.getItem('user_info')!);
@@ -51,6 +58,7 @@ async function setup(t: TestContext, changePassword: (payload: any) => Promise<u
   const provider = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
     '../api/auth': { authApi },
     '../utils/session': { clearLocalSession },
+    '../utils/storage': storageModule,
   });
   await provider.flush();
   let closed = 0;
@@ -167,4 +175,32 @@ test('login explains password-change re-login, but not for ordinary visits', asy
   const message = text(find(changed, (node) => node.props?.role === 'status'));
   assert.match(message, /نشست شما پایان یافت/);
   assert.match(message, /کلمه عبور جدید دوباره وارد شوید/);
+});
+
+test('profile outage at startup keeps the cached session; a rejected session is cleared', async (t) => {
+  const browser = browserSession(t);
+  const initial = new Map(browser.values);
+  for (const [status, keepsSession] of [[undefined, true], [503, true], [401, false]] as const) {
+    for (const [key, value] of initial) browser.values.set(key, value);
+    const failure = Object.assign(new Error('profile failed'), status ? { response: { status } } : {});
+    const provider = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
+      '../api/auth': { authApi: { getCurrentUser: async () => { throw failure; } } },
+      '../utils/session': { clearLocalSession() {} },
+      '../utils/storage': storageModule,
+    });
+    await provider.flush();
+    assert.equal(provider.tree.props.value.isAuthenticated, keepsSession, `status ${status}`);
+    assert.equal(browser.storage.getItem('refresh_token'), keepsSession ? 'old-refresh' : null);
+    provider.unmount();
+  }
+});
+
+test('signing out in another tab ends this tab session', async (t) => {
+  const session = await setup(t, async () => ({}));
+  assert.equal(session.provider.tree.props.value.isAuthenticated, true);
+  for (const key of ['access_token', 'refresh_token', 'user_info']) session.storage.removeItem(key);
+  session.listeners.get('storage')?.({ key: 'access_token', newValue: null });
+  await session.provider.flush();
+  assert.equal(session.provider.tree.props.value.isAuthenticated, false);
+  assert.equal(session.location.href, '/login');
 });

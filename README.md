@@ -83,7 +83,7 @@ Production reverse proxies, database servers, Redis instances, TLS termination, 
 | Styling and UI | Tailwind CSS 3, custom components, Lucide icons and native HTML charts |
 | Quality tools | pytest/pytest-django, pytest-cov, Ruff, scoped strict mypy, Node test runner, TypeScript compiler, Oxlint |
 
-Frontend versions are resolved in [`frontend/package-lock.json`](frontend/package-lock.json). Python dependencies use bounded/minimum requirements rather than a fully locked, hash-pinned environment; resolve, audit, and freeze the deployment environment according to your release process.
+Frontend versions are resolved in [`frontend/package-lock.json`](frontend/package-lock.json). Python dependencies are declared as bounded/minimum requirements in `backend/requirements*.txt` and resolved to exact versions in `backend/requirements*.lock` (generated with `uv pip compile`, not hash-pinned); audit and refresh the locks according to your release process.
 
 ## Backend architecture
 
@@ -393,9 +393,11 @@ python -m venv venv
 source venv/bin/activate
 
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 cp .env.example .env
 ```
+
+`requirements.lock` is the pinned runtime set for SQLite/PostgreSQL. **SQL Server users** (including Windows setups) install `requirements-mssql.lock` instead, which adds `pyodbc` and `mssql-django` to the runtime set. To pick up newer compatible versions, install `requirements.txt` / `requirements-mssql.txt` directly, and regenerate a lock after editing them with `uv pip compile requirements.txt --universal --python-version 3.14 -o requirements.lock` (for the SQL Server lock, pass both `requirements.txt requirements-mssql.txt` and `-o requirements-mssql.lock`).
 
 On Windows PowerShell, activate the virtual environment with `.\venv\Scripts\Activate.ps1` (or `venv\Scripts\activate.bat` in `cmd.exe`) and copy the environment template with `copy .env.example .env`.
 
@@ -457,7 +459,7 @@ Never commit active environment files or real credentials. Templates contain exa
 | Variable | Default / accepted values | Purpose |
 | --- | --- | --- |
 | `DJANGO_DEBUG` | `False` | Enable local debugging explicitly; never enable for production |
-| `DJANGO_SECRET_KEY` | Required outside debug | Unique random signing key; known debug fallback is rejected in production |
+| `DJANGO_SECRET_KEY` | Required outside debug | Unique random signing key; keys starting with `django-insecure-` are rejected in production. In debug without a key, a random per-process key is generated (sessions/tokens reset on restart) |
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1,testserver` | Comma-separated hostnames, without schemes |
 | `ALLOW_DEMO_SEED` | `False` | Additional opt-in for guarded demo seeding |
 | `DB_ENGINE` | Empty / SQLite fallback | `postgres` / `postgresql`, `mssql` / `sqlserver`, or SQLite fallback |
@@ -488,18 +490,18 @@ An unknown `DB_ENGINE` silently falls back to SQLite. Verify the actual selected
 | `REDIS_CACHE_URL` | Empty | Enable Django Redis cache; otherwise cache is process-local |
 | `NUM_PROXIES` | `0` | Number of trusted proxy hops for DRF client-IP handling |
 | `THROTTLE_ANON_RATE` / `THROTTLE_USER_RATE` | `30/minute` / `300/minute` | General API throttle rates |
-| `THROTTLE_LOGIN_IP_RATE` / `THROTTLE_LOGIN_USER_RATE` | `5/minute` each | Login throttles by IP and username |
+| `THROTTLE_LOGIN_IP_RATE` / `THROTTLE_LOGIN_USER_RATE` | `5/minute` each | Login throttles by IP and username; also applied (separate counters) to POST `/admin/login/` |
 | `THROTTLE_TOKEN_REFRESH_RATE` | `15/minute` | Refresh throttle |
 | `SECURE_PROXY_SSL_HEADER` | `False` | Trust proxy-controlled `X-Forwarded-Proto: https` only when enabled |
-| `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` | `False` | Restrict cookies to HTTPS in production |
-| `SECURE_SSL_REDIRECT` | `False` | Redirect HTTP to HTTPS |
-| `SECURE_HSTS_SECONDS` | `0` | HSTS duration; enable only after HTTPS is verified |
+| `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` | `True` unless `DJANGO_DEBUG=True` | Restrict cookies to HTTPS. Admin login over plain HTTP (LAN) requires setting both to `False` explicitly; blank means default |
+| `SECURE_SSL_REDIRECT` | `False` | Redirect HTTP to HTTPS (opt-in; many shops run on plain-HTTP LANs) |
+| `SECURE_HSTS_SECONDS` | `0` | HSTS duration; opt-in, effectively irreversible for browsers that saw it, so enable only after HTTPS is verified everywhere |
 | `SECURE_HSTS_INCLUDE_SUBDOMAINS` / `SECURE_HSTS_PRELOAD` | `False` | Explicit HSTS policy decisions |
 | `ENABLE_DOCS_IN_PROD` | `False` | Explicitly make API docs public outside debug; normally leave off |
 
 `PAGINATION_PAGE_SIZE` is present in REST framework settings, but the current pagination class fixes its default at 20. Use the supported `page_size` request parameter (maximum 100); do not rely on this environment variable to change that default.
 
-Generate a production key with `python -c "import secrets; print(secrets.token_urlsafe(50))"`. Store it through your deployment secret mechanism. Secure cookies, HTTPS redirects, HSTS, proxy trust, and shared Redis are **not automatically configured** by installing this project.
+Generate a production key with `python -c "import secrets; print(secrets.token_urlsafe(50))"`. Store it through your deployment secret mechanism. Secure cookies are on by default outside debug, but HTTPS redirects, HSTS, proxy trust (`SECURE_PROXY_SSL_HEADER` with a matching `NUM_PROXIES`), and shared Redis are **not automatically configured** by installing this project; `python manage.py check --deploy` warns when proxy trust lacks `NUM_PROXIES` or the cache is process-local.
 
 ### Frontend
 
@@ -517,7 +519,7 @@ Restart Vite after configuration changes; rebuild production assets when changin
 Run from `backend/` with the virtual environment active. The verification settings disable `.env` loading and use an in-memory SQLite database and a process-local cache, keeping the existing local database and external cache untouched:
 
 ```bash
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements-dev.lock
 python -m pip check
 python manage.py check --settings=config.verification_settings
 python manage.py makemigrations --check --dry-run --settings=config.verification_settings
@@ -584,8 +586,9 @@ Tire-Shop-Management/
 |   |-- manage.py
 |   |-- pyproject.toml
 |   |-- pytest.ini
-|   |-- requirements.txt
-|   |-- requirements-dev.txt
+|   |-- requirements.txt, requirements.lock
+|   |-- requirements-mssql.txt, requirements-mssql.lock
+|   |-- requirements-dev.txt, requirements-dev.lock
 |   `-- schema.yml
 |-- frontend/
 |   |-- public/

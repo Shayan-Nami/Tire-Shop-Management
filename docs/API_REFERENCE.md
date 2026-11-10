@@ -161,7 +161,15 @@ POST `invoices/sales/`:
   `confirm/` action without a body to deduct stock and finalize tire cost snapshots.
 - Direct creation as `CANCELLED` or with payment status `PARTIAL` is rejected.
   `PAID` creation generates a receipt for a positive total; optional
-  `payment_method` and `reference_number` describe that receipt.
+  `payment_method` and `reference_number` describe that receipt. A `DRAFT` invoice
+  cannot be created `PAID`, and receipt vouchers (`treasury/receipts/`) are accepted
+  only for `CONFIRMED` invoices: confirm the draft first, then record the payment.
+- Only managers (and superusers) may set `payment_status` other than `UNPAID`, a
+  non-zero `discount_amount`/`discount_percent`, or a line `unit_price` different from
+  the catalog price (`Tire.sale_price` / `Service.price`). Technicians sending any of
+  these get HTTP 400 with the offending field in `errors` (for lines:
+  `errors.tire_items[i].unit_price` / `errors.service_items[i].unit_price`); sending
+  the unchanged catalog price is accepted.
 - Create returns the full read representation, including computed `paid_amount`,
   `remaining_amount`, `returned_amount`, `net_amount`, and `excess_amount`.
 - POST `cancel/` without a body. Unlike voucher cancellation, this action does not

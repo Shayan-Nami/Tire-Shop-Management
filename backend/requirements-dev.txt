@@ -1,5 +1,9 @@
+# Development and CI tooling; includes runtime and SQL Server packages (config/test_database_settings.py imports mssql).
+# Pinned install: requirements-dev.lock
 -r requirements.txt
-psycopg[binary]>=3.2.0
+-r requirements-mssql.txt
+pytest>=9.0.3
+pytest-django>=4.9.0
 pytest-cov>=5.0.0
 
 ruff>=0.17.3
