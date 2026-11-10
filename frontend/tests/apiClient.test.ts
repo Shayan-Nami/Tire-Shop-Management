@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import axios, { AxiosError, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios';
+import * as storageModule from '../src/utils/storage.ts';
 import { deferred, loadComponent } from './componentHarness.ts';
 
 function response(config: InternalAxiosRequestConfig, data: any = {}, status = 200) {
@@ -27,7 +28,7 @@ function setup(t: TestContext, adapter: AxiosAdapter, refresh: (url: string, dat
   });
   const { apiClient, API_BASE_URL } = loadComponent('../src/api/client.ts', {
     axios: { create: (config: any) => axios.create({ ...config, adapter }), post: refresh },
-    '../utils/errorParser': { parseApiError: () => 'Request rejected' },
+    '../utils/storage': storageModule,
   }, env);
   return { apiClient, API_BASE_URL, values, location };
 }
@@ -85,7 +86,7 @@ test('refresh rejection rejects queued requests and clears the local session', a
   const { apiClient, values, location } = setup(t, rejectRequest, () => pending.promise);
   const requests = Promise.allSettled([apiClient.get('/auth/profile/'), apiClient.get('/catalog/tires/')]);
   await new Promise<void>((resolve) => setImmediate(resolve));
-  pending.reject(new Error('Refresh revoked'));
+  pending.reject(new AxiosError('Refresh revoked', 'ERR_BAD_REQUEST', undefined, undefined, { status: 401, data: {}, statusText: '401', headers: {}, config: {} as InternalAxiosRequestConfig }));
   assert.deepEqual((await requests).map((result) => result.status), ['rejected', 'rejected']);
   assert.equal(values.size, 0);
   assert.equal(location.href, '/login');
@@ -138,3 +139,17 @@ test('logout after access expiry revokes the rotated refresh token, not its blac
   assert.equal(result.status, 200);
   assert.deepEqual(bodies, [{ refresh: 'old-refresh' }, { refresh: 'new-refresh' }]);
 });
+
+for (const [label, failure] of [
+  ['network outage', () => new AxiosError('Network Error', 'ERR_NETWORK')],
+  ['server error', () => new AxiosError('Server error', 'ERR_BAD_RESPONSE', undefined, undefined, { status: 503, data: {}, statusText: '503', headers: {}, config: {} as InternalAxiosRequestConfig })],
+  ['refresh throttling', () => new AxiosError('Throttled', 'ERR_BAD_REQUEST', undefined, undefined, { status: 429, data: {}, statusText: '429', headers: {}, config: {} as InternalAxiosRequestConfig })],
+] as const) {
+  test(`refresh ${label} rejects the request but keeps the local session`, async (t) => {
+    const { apiClient, values, location } = setup(t, rejectRequest, async () => { throw failure(); });
+    await assert.rejects(apiClient.get('/auth/profile/'));
+    assert.equal(values.get('access_token'), 'old-access');
+    assert.equal(values.get('refresh_token'), 'old-refresh');
+    assert.equal(location.href, '/dashboard');
+  });
+}
