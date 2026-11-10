@@ -30,6 +30,10 @@ def gregorian_to_jalali(gy, gm, gd):
 from django.utils import timezone as dj_timezone
 from utils.persian import normalize_digits
 
+def is_jalali_leap_year(jy):
+    # 33-year arithmetic cycle, the same rule jalali_to_gregorian/gregorian_to_jalali are built on.
+    return jy % 33 in (1, 5, 9, 13, 17, 22, 26, 30)
+
 def jalali_to_gregorian(jy, jm, jd):
     if not (1 <= jm <= 12 and 1 <= jd <= 31):
         raise ValueError(f"ماه ({jm}) یا روز ({jd}) هجری شمسی نامعتبر است.")
@@ -37,6 +41,8 @@ def jalali_to_gregorian(jy, jm, jd):
         raise ValueError(f"ماه‌های نیمه دوم سال هجری شمسی (ماه {jm}) نمی‌توانند ۳۱ روز داشته باشند.")
     if jm == 12 and jd > 30:
         raise ValueError("ماه اسفند نمی‌تواند بیش از ۳۰ روز باشد.")
+    if jm == 12 and jd == 30 and not is_jalali_leap_year(jy):
+        raise ValueError(f"سال {jy} هجری شمسی کبیسه نیست و اسفند آن حداکثر ۲۹ روز دارد.")
     jy += 1595
     days = -355668 + (365 * jy) + ((jy // 33) * 8) + (((jy % 33) + 3) // 4) + jd
     if jm < 7:
