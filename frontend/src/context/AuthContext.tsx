@@ -2,12 +2,25 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { authApi } from '../api/auth';
 import { clearLocalSession } from '../utils/session';
+import { SESSION_KEYS, readStorage, removeStorage, writeStorage } from '../utils/storage';
+
+type CurrencyUnit = 'rial' | 'toman';
+
+function readSavedUser(): User | null {
+  const saved = readStorage('user_info');
+  if (!saved) return null;
+  try {
+    return JSON.parse(saved) as User;
+  } catch {
+    return null;
+  }
+}
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  currencyUnit: 'rial' | 'toman';
+  currencyUnit: CurrencyUnit;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   endLocalSession: (reason?: 'password-changed') => void;
@@ -21,27 +34,30 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [currencyUnit, setCurrencyUnit] = useState<'rial' | 'toman'>(() => {
-    return (localStorage.getItem('preferred_currency') as 'rial' | 'toman') || 'toman';
+  const [currencyUnit, setCurrencyUnit] = useState<CurrencyUnit>(() => {
+    return readStorage('preferred_currency') === 'rial' ? 'rial' : 'toman';
   });
 
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('access_token');
-      const savedUser = localStorage.getItem('user_info');
+      const token = readStorage('access_token');
+      const savedUser = readSavedUser();
 
       if (token && savedUser) {
+        setUser(savedUser);
         try {
-          setUser(JSON.parse(savedUser));
           const freshUser = await authApi.getCurrentUser();
           setUser(freshUser);
-          localStorage.setItem('user_info', JSON.stringify(freshUser));
-        } catch {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('user_info');
-          setUser(null);
+          writeStorage('user_info', JSON.stringify(freshUser));
+        } catch (error) {
+          // A 401 here means the refresh token was rejected; an outage keeps the cached session.
+          if ((error as { response?: { status?: number } })?.response?.status === 401) {
+            removeStorage(...SESSION_KEYS);
+            setUser(null);
+          }
         }
+      } else if (token || savedUser) {
+        removeStorage(...SESSION_KEYS);
       }
       setIsLoading(false);
     };
@@ -49,11 +65,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
+  useEffect(() => {
+    // Mirror sign-out and sign-in performed in another tab.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== 'access_token' && event.key !== 'user_info') return;
+      if (!readStorage('access_token')) {
+        setUser(null);
+        if (!window.location.pathname?.startsWith('/login')) window.location.href = '/login';
+      } else if (event.key === 'user_info') {
+        const saved = readSavedUser();
+        if (saved) setUser(saved);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const login = async (username: string, password: string) => {
     const data = await authApi.login(username, password);
-    localStorage.setItem('access_token', data.access);
-    localStorage.setItem('refresh_token', data.refresh);
-    localStorage.setItem('user_info', JSON.stringify(data.user));
+    writeStorage('access_token', data.access);
+    writeStorage('refresh_token', data.refresh);
+    writeStorage('user_info', JSON.stringify(data.user));
     setUser(data.user);
   };
 
@@ -64,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem('refresh_token');
+    const refreshToken = readStorage('refresh_token');
     try {
       if (refreshToken) {
         await authApi.logout(refreshToken);
@@ -78,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUser = (updated: User) => {
     setUser(updated);
-    localStorage.setItem('user_info', JSON.stringify(updated));
+    writeStorage('user_info', JSON.stringify(updated));
   };
 
   const hasRole = (roles: UserRole[]) => {
@@ -89,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toggleCurrencyUnit = () => {
     setCurrencyUnit((prev) => {
       const next = prev === 'rial' ? 'toman' : 'rial';
-      localStorage.setItem('preferred_currency', next);
+      writeStorage('preferred_currency', next);
       return next;
     });
   };

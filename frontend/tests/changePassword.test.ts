@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import { parseApiError } from '../src/utils/errorParser.ts';
+import * as storageModule from '../src/utils/storage.ts';
 import { deferred, loadComponent, mountComponent, nodes, text } from './componentHarness.ts';
 
 type Harness = ReturnType<typeof mountComponent>;
@@ -40,6 +41,7 @@ async function setup(t: TestContext, changePassword: (payload: any) => Promise<u
   const cachedHeaders: Record<string, string> = { Authorization: 'Bearer old-access' };
   const { clearLocalSession } = loadComponent('../src/utils/session.ts', {
     '../api/client': { apiClient: { defaults: { headers: { common: cachedHeaders } } } },
+    './storage': storageModule,
   });
   const logoutTokens: string[] = [];
   const user = JSON.parse(browser.storage.getItem('user_info')!);
@@ -51,6 +53,7 @@ async function setup(t: TestContext, changePassword: (payload: any) => Promise<u
   const provider = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
     '../api/auth': { authApi },
     '../utils/session': { clearLocalSession },
+    '../utils/storage': storageModule,
   });
   await provider.flush();
   let closed = 0;

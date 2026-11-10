@@ -1,8 +1,7 @@
 import { apiClient } from '../api/client';
+import { SESSION_KEYS, removeStorage } from './storage';
 
 export function clearLocalSession(): void {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user_info');
+  removeStorage(...SESSION_KEYS);
   delete apiClient.defaults.headers.common.Authorization;
 }
