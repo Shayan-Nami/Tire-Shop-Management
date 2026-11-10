@@ -21,13 +21,14 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id: string) {
             if (id.includes('node_modules')) {
-              if (id.includes('react-router')) {
+              // Match package directories exactly; a bare 'react' substring also captures lucide-react.
+              if (/[\\/]node_modules[\\/](react-router|react-router-dom)[\\/]/.test(id)) {
                 return 'react-router';
               }
-              if (id.includes('react') || id.includes('scheduler')) {
+              if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
                 return 'react-core';
               }
-              if (id.includes('axios')) {
+              if (/[\\/]node_modules[\\/]axios[\\/]/.test(id)) {
                 return 'axios';
               }
             }
