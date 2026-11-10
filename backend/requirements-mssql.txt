@@ -1,0 +1,5 @@
+# SQL Server support, needed only when DB_ENGINE=mssql (also needs a native Microsoft ODBC driver).
+# Install together with the runtime set: pip install -r requirements.txt -r requirements-mssql.txt
+# Pinned install: requirements-mssql.lock
+pyodbc>=5.1.0
+mssql-django>=2.0.0

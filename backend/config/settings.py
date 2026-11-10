@@ -1,4 +1,6 @@
 import os
+import secrets
+import warnings
 from pathlib import Path
 from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
@@ -8,22 +10,36 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 dotenv.load_dotenv(BASE_DIR / '.env')
 
+
+def _env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() in ('true', '1', 'yes')
+
+
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in ('true', '1', 'yes')
 ALLOW_DEMO_SEED = os.environ.get('ALLOW_DEMO_SEED', 'False').lower() in ('true', '1', 'yes')
 
-INSECURE_DEFAULT_SECRET = 'django-insecure-tire-shop-production-secret-key-shayan-nami-2026'
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
 
 if not SECRET_KEY:
     if DEBUG:
-        SECRET_KEY = INSECURE_DEFAULT_SECRET
+        # Per-process key: sessions and tokens do not survive a restart, and no secret is ever committed.
+        SECRET_KEY = secrets.token_urlsafe(50)
+        warnings.warn(
+            "DJANGO_SECRET_KEY تنظیم نشده است؛ در حالت DEBUG یک کلید تصادفی موقت ساخته شد "
+            "(نشست‌ها و توکن‌ها پس از هر راه‌اندازی مجدد نامعتبر می‌شوند).",
+            RuntimeWarning,
+            stacklevel=2,
+        )
     else:
         raise ImproperlyConfigured(
             "خطای امنیتی پروداکشن: در حالت DEBUG=False، متغیر محیطی DJANGO_SECRET_KEY باید حتماً با یک کلید امن، یکتا و تصادفی مقداردهی شود."
         )
-elif not DEBUG and SECRET_KEY == INSECURE_DEFAULT_SECRET:
+elif not DEBUG and SECRET_KEY.startswith('django-insecure-'):
     raise ImproperlyConfigured(
-        "خطای امنیتی پروداکشن: استفاده از کلید محرمانه پیش‌فرض و هاردکد شده در محیط پروداکشن مجاز نیست. لطفاً متغیر DJANGO_SECRET_KEY را در فایل .env تنظیم و جایگزین کنید."
+        "خطای امنیتی پروداکشن: استفاده از کلید محرمانه پیش‌فرض و هاردکد شده (با پیشوند django-insecure-) در محیط پروداکشن مجاز نیست. لطفاً متغیر DJANGO_SECRET_KEY را در فایل .env تنظیم و جایگزین کنید."
     )
 
 _allowed_hosts_env = os.environ.get('ALLOWED_HOSTS')
@@ -39,7 +55,7 @@ SYSTEM_CURRENCY_NAME = 'ریال'
 
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    'config.apps.ThrottledAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -209,6 +225,8 @@ REST_FRAMEWORK = {
         'user': os.environ.get('THROTTLE_USER_RATE', '300/minute'),
         'login_ip': os.environ.get('THROTTLE_LOGIN_IP_RATE', '5/minute'),
         'login_username': os.environ.get('THROTTLE_LOGIN_USER_RATE', '5/minute'),
+        'admin_login_ip': os.environ.get('THROTTLE_LOGIN_IP_RATE', '5/minute'),
+        'admin_login_username': os.environ.get('THROTTLE_LOGIN_USER_RATE', '5/minute'),
         'token_refresh': os.environ.get('THROTTLE_TOKEN_REFRESH_RATE', '15/minute'),
     },
     'NUM_PROXIES': NUM_PROXIES,
@@ -239,8 +257,9 @@ if os.environ.get('SECURE_PROXY_SSL_HEADER', 'False').lower() in ('true', '1', '
 else:
     SECURE_PROXY_SSL_HEADER = None
 
-SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')
-CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')
+# Secure cookies default on outside DEBUG; HTTP-only LAN deployments must opt out explicitly.
+SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', default=not DEBUG)
+CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE', default=not DEBUG)
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() in ('true', '1', 'yes')
 SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() in ('true', '1', 'yes')

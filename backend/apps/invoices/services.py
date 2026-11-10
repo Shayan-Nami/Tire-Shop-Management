@@ -20,6 +20,7 @@ from .models import (
 from apps.catalog.models import Tire, StockMovement, StockMovementType
 from apps.catalog.services import record_stock_movements
 from apps.finance.services import create_receipt_voucher_service
+from apps.invoices.permissions import can_set_sales_financial_terms
 from utils.jalali import get_jalali_year
 
 
@@ -31,6 +32,11 @@ def _validate_invoice_total(invoice: SalesInvoice | PurchaseInvoice) -> None:
         raise ValidationError({
             'total_amount': f'مبلغ کل فاکتور باید بین صفر و {maximum:,.2f} باشد.'
         })
+
+
+def _item_error(index: int, count: int, field: str, message: str) -> list[dict[str, list[str]]]:
+    # Mirrors DRF's nested list-serializer error shape: one dict per item, empty for valid rows.
+    return [{field: [message]} if i == index else {} for i in range(count)]
 
 
 @transaction.atomic
@@ -102,6 +108,20 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
     if status == InvoiceStatus.CANCELLED:
         raise ValidationError("امکان صدور فاکتور در وضعیت لغو شده وجود ندارد.")
 
+    if status == InvoiceStatus.DRAFT and payment_status == PaymentStatus.PAID:
+        raise ValidationError({
+            'payment_status': 'امکان ثبت تسویه برای فاکتور پیش‌نویس وجود ندارد. ابتدا فاکتور را تایید کنید و سپس سند دریافت وجه ثبت نمایید.'
+        })
+
+    can_set_terms = can_set_sales_financial_terms(created_by)
+    if not can_set_terms:
+        if payment_status not in (None, PaymentStatus.UNPAID):
+            raise ValidationError({'payment_status': 'ثبت تسویه هنگام صدور فاکتور فقط برای مدیر سیستم مجاز است.'})
+        if discount_amount > 0:
+            raise ValidationError({'discount_amount': 'اعمال تخفیف فقط برای مدیر سیستم مجاز است.'})
+        if discount_percent > 0:
+            raise ValidationError({'discount_percent': 'اعمال تخفیف فقط برای مدیر سیستم مجاز است.'})
+
     init_payment_status = payment_status or PaymentStatus.UNPAID
     inv_number = generate_next_invoice_number('SALES')
     invoice = SalesInvoice.objects.create(
@@ -125,8 +145,9 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
 
     subtotal = Decimal('0.00')
     movements_data = []
+    price_override_error = 'تغییر قیمت واحد نسبت به قیمت کاتالوگ فقط برای مدیر سیستم مجاز است.'
 
-    for item in tire_items_data:
+    for index, item in enumerate(tire_items_data):
         tire_obj = locked_tires[item['tire'].pk]
         try:
             qty = validate_quantity(item['quantity'])
@@ -142,6 +163,8 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
             raise ValidationError("قیمت واحد تایر نامعتبر است.")
         if unit_price < Decimal('0.00'):
             raise ValidationError("قیمت واحد تایر نمی‌تواند منفی باشد.")
+        if not can_set_terms and unit_price != tire_obj.sale_price:
+            raise ValidationError({'tire_items': _item_error(index, len(tire_items_data), 'unit_price', price_override_error)})
 
         try:
             unit_cost = Decimal(str(tire_obj.purchase_price))
@@ -172,7 +195,7 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
     if movements_data:
         record_stock_movements(movements_data, user=created_by)
 
-    for s_item in service_items_data:
+    for index, s_item in enumerate(service_items_data):
         service_obj = s_item['service']
         try:
             qty = validate_quantity(s_item.get('quantity', 1))
@@ -188,6 +211,8 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
             raise ValidationError("قیمت واحد خدمت نامعتبر است.")
         if unit_price < Decimal('0.00'):
             raise ValidationError("قیمت واحد خدمت نمی‌تواند منفی باشد.")
+        if not can_set_terms and unit_price != service_obj.price:
+            raise ValidationError({'service_items': _item_error(index, len(service_items_data), 'unit_price', price_override_error)})
 
         SalesInvoiceServiceItem.objects.create(
             sales_invoice=invoice,

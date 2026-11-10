@@ -356,35 +356,6 @@ class TestThrottlingAndEnvironment:
         assert access_min == 60
         assert refresh_days == 7
 
-    def test_production_guard_raises_improperly_configured_without_secret_key(self, monkeypatch):
-        from django.core.exceptions import ImproperlyConfigured
-
-        insecure_key = 'django-insecure-tire-shop-production-secret-key-shayan-nami-2026'
-
-        def evaluate_production_security(debug_flag: bool, secret_key: str):
-            if not secret_key:
-                if debug_flag:
-                    return insecure_key
-                else:
-                    raise ImproperlyConfigured(
-                        "خطای امنیتی پروداکشن: در حالت DEBUG=False، متغیر محیطی DJANGO_SECRET_KEY باید حتماً با یک کلید امن، یکتا و تصادفی مقداردهی شود."
-                    )
-            elif not debug_flag and secret_key == insecure_key:
-                raise ImproperlyConfigured(
-                    "خطای امنیتی پروداکشن: استفاده از کلید محرمانه پیش‌فرض و هاردکد شده در محیط پروداکشن مجاز نیست."
-                )
-            return secret_key
-
-        with pytest.raises(ImproperlyConfigured) as exc_empty:
-            evaluate_production_security(False, '')
-        assert 'خطای امنیتی پروداکشن' in str(exc_empty.value)
-
-        with pytest.raises(ImproperlyConfigured) as exc_insecure:
-            evaluate_production_security(False, insecure_key)
-        assert 'کلید محرمانه پیش‌فرض' in str(exc_insecure.value)
-
-        assert evaluate_production_security(False, 'secure-random-prod-key-xyz') == 'secure-random-prod-key-xyz'
-
     def test_spoofed_x_forwarded_for_ignored_when_num_proxies_is_zero(self, client):
         login_url = reverse('token_obtain_pair')
         fixed_ip = '192.168.10.55'
