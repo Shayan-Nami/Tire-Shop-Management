@@ -33,12 +33,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (token && savedUser) {
         try {
           setUser(JSON.parse(savedUser));
-          // تایید اعتبار با دریافت پروفایل زنده
           const freshUser = await authApi.getCurrentUser();
           setUser(freshUser);
           localStorage.setItem('user_info', JSON.stringify(freshUser));
         } catch {
-          // در صورت بروز خطا در اعتبارسنجی
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('user_info');
@@ -116,7 +114,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-// oxlint-disable-next-line react/only-export-components -- Keep the existing public context hook API; no auth-module migration in this phase.
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

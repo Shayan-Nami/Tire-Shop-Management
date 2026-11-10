@@ -31,7 +31,6 @@ def test_seed_refuses_before_any_database_access(settings, monkeypatch, debug, o
 
 @pytest.fixture
 def mock_business_seed(monkeypatch):
-    # Exercise the entire command while isolating account safety from business fixtures.
     record = Mock(stock_quantity=0)
     record.sales_invoices.exists.return_value = True
     for model in [
@@ -79,7 +78,6 @@ def test_seed_twice_preserves_passwords(settings, monkeypatch, mock_business_see
             assert not user.is_superuser
         else:
             assert user.check_password(DEMO_PASSWORDS[user.username])
-            # A real password change between runs must not be overwritten by the seed.
             original_set_password(user, f'Changed-{user.username}!8274')
             user.save(update_fields=['password'])
     retained_hashes = dict(User.objects.filter(username__in=DEMO_PASSWORDS).values_list('username', 'password'))

@@ -33,7 +33,6 @@ class ReceiptVoucher(models.Model):
         verbose_name='کاربر صادرکننده'
     )
 
-    # فیلدهای ابطال سند
     is_cancelled = models.BooleanField(default=False, db_index=True, verbose_name='ابطال شده')
     cancelled_at = models.DateTimeField(null=True, blank=True, verbose_name='تاریخ و زمان ابطال')
     cancelled_by = models.ForeignKey(
@@ -89,7 +88,6 @@ class PaymentVoucher(models.Model):
         verbose_name='کاربر صادرکننده'
     )
 
-    # فیلدهای ابطال سند
     is_cancelled = models.BooleanField(default=False, db_index=True, verbose_name='ابطال شده')
     cancelled_at = models.DateTimeField(null=True, blank=True, verbose_name='تاریخ و زمان ابطال')
     cancelled_by = models.ForeignKey(
@@ -153,7 +151,6 @@ class CustomerRefundVoucher(models.Model):
         verbose_name='کاربر صادرکننده'
     )
 
-    # فیلدهای ابطال سند
     is_cancelled = models.BooleanField(default=False, db_index=True, verbose_name='ابطال شده')
     cancelled_at = models.DateTimeField(null=True, blank=True, verbose_name='تاریخ و زمان ابطال')
     cancelled_by = models.ForeignKey(

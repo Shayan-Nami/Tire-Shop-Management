@@ -34,7 +34,6 @@ export const StockMovements: React.FC = () => {
   }, [search, typeFilter, currentPage]);
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Query changes intentionally enter the network loading state.
     void fetchMovements();
   }, [fetchMovements]);
 
@@ -86,7 +85,6 @@ export const StockMovements: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("دفتر حسابرسی گردش انبار (Stock Movement Ledger)")}</h1>
@@ -94,7 +92,6 @@ export const StockMovements: React.FC = () => {
         </div>
       </div>
 
-      {/* فیلترها و جستجو */}
       <div className="filter-bar">
         <div className="relative w-full md:w-80">
           <input
@@ -132,7 +129,6 @@ export const StockMovements: React.FC = () => {
         </div>
       </div>
 
-      {/* جدول گردش انبار */}
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت گردش حساب‌ها...")}</div>

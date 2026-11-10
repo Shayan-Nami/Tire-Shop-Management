@@ -54,7 +54,6 @@ class TestInvoiceAndStockTransactions:
         customer = catalog_setup['customer']
         vehicle = catalog_setup['vehicle']
 
-        # صدور فاکتور برای ۳ حلقه تایر
         invoice = create_sales_invoice_service(
             customer=customer,
             vehicle=vehicle,
@@ -67,10 +66,8 @@ class TestInvoiceAndStockTransactions:
         assert invoice.sales_invoice_id is not None
         assert invoice.status == InvoiceStatus.CONFIRMED
 
-        # مبلغ ۳ * ۱۵۰۰۰۰۰ = ۴۵۰۰۰۰۰ - ۱۰۰۰۰۰ = ۴۴۰۰۰۰۰
         assert invoice.total_amount == Decimal('4400000.00')
 
-        # موجودی تایر باید از ۱۰ به ۷ کاهش یافته باشد
         tire.refresh_from_db()
         assert tire.stock_quantity == 7
 
@@ -78,7 +75,6 @@ class TestInvoiceAndStockTransactions:
         tire = catalog_setup['tire']
         customer = catalog_setup['customer']
 
-        # درخواست ۱۲ حلقه در حالی که فقط ۱۰ حلقه موجود است
         with pytest.raises(ValidationError) as exc_info:
             create_sales_invoice_service(
                 customer=customer,
@@ -90,7 +86,6 @@ class TestInvoiceAndStockTransactions:
 
         assert "موجودی تایر" in str(exc_info.value)
 
-        # هیچ تغییری نباید در موجودی ایجاد شده باشد
         tire.refresh_from_db()
         assert tire.stock_quantity == 10
         assert SalesInvoice.objects.filter(customer=customer).count() == 0
@@ -99,7 +94,6 @@ class TestInvoiceAndStockTransactions:
         tire = catalog_setup['tire']
         customer = catalog_setup['customer']
 
-        # صدور اولیه فاکتور و کسر ۴ حلقه
         invoice = create_sales_invoice_service(
             customer=customer,
             vehicle=None,
@@ -110,13 +104,11 @@ class TestInvoiceAndStockTransactions:
         tire.refresh_from_db()
         assert tire.stock_quantity == 6
 
-        # لغو فاکتور
         cancel_sales_invoice_service(invoice)
 
         invoice.refresh_from_db()
         tire.refresh_from_db()
         assert invoice.status == InvoiceStatus.CANCELLED
-        # موجودی باید به ۱۰ بازگردد
         assert tire.stock_quantity == 10
 
     def test_purchase_invoice_increases_stock(self, catalog_setup, warehouse_user):
@@ -125,7 +117,6 @@ class TestInvoiceAndStockTransactions:
 
         initial_stock = tire.stock_quantity
 
-        # خرید ۲۰ حلقه از تأمین‌کننده
         purchase_inv = create_purchase_invoice_service(
             supplier=supplier,
             tire_items_data=[{'tire': tire, 'quantity': 20, 'unit_cost': Decimal('1100000')}],
@@ -146,7 +137,6 @@ class TestInvoiceAndStockTransactions:
         customer = catalog_setup['customer']
         vehicle = catalog_setup['vehicle']
 
-        # صدور فاکتور فروش نقدی با payment_status=PAID
         invoice = create_sales_invoice_service(
             customer=customer,
             vehicle=vehicle,
@@ -162,7 +152,6 @@ class TestInvoiceAndStockTransactions:
         assert invoice.payment_status == PaymentStatus.PAID
         assert invoice.total_amount == Decimal('3000000.00')
 
-        # بررسی ایجاد خودکار سند دریافت وجه متناظر (ReceiptVoucher)
         receipts = invoice.receipts.filter(is_cancelled=False)
         assert receipts.exists()
         receipt = receipts.first()
@@ -170,13 +159,11 @@ class TestInvoiceAndStockTransactions:
         assert receipt.reference_number == 'POS-TEST-12345'
         assert receipt.payment_method == 'دستگاه کارتخوان'
 
-        # بررسی تسویه کامل در داشبورد (total_receivables == 0)
         dashboard_url = reverse('dashboard-stats')
         res_dash = auth_client_manager.get(dashboard_url)
         assert res_dash.status_code == status.HTTP_200_OK
         assert Decimal(str(res_dash.data['total_receivables'])) == Decimal('0.00')
         assert res_dash.data['unpaid_invoices_count'] == 0
 
-        # تطبیق پرداخت‌ها بدون مغایرت
         call_command('reconcile_payments')
 

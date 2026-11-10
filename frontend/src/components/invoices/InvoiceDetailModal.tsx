@@ -79,7 +79,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4 invoice-modal-overlay">
       <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-4xl w-full overflow-hidden flex flex-col max-h-[90vh] invoice-modal-card">
-        {/* هدر مدال */}
         <div className="flex flex-wrap items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 gap-3 no-print">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <span className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100">{t("فاکتور")}<bdi dir="auto">{invoice.invoice_number}</bdi>
@@ -109,7 +108,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* انتخاب فرمت چاپ بین A4 و فیش حرارتی */}
             <div className="flex items-center bg-slate-200 dark:bg-slate-800 p-0.5 rounded-lg text-xs font-semibold">
               <button
                 type="button"
@@ -161,10 +159,8 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           </div>
         )}
 
-        {/* ۱. بدنه فاکتور در قالب استاندارد A4 */}
         {printFormat === 'A4' && (
           <div className="flex-1 overflow-y-auto p-6 space-y-6 text-slate-800 dark:text-slate-200 font-sans print:p-0">
-            {/* سربرگ رسمی در حالت چاپ */}
             <div className="border-b-2 border-slate-800 pb-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center text-2xl font-black">
@@ -191,7 +187,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               </div>
             </div>
 
-            {/* کارت اطلاعات مشتری و خودرو */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
               <div className="space-y-1.5 text-sm">
                 <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase">
@@ -214,7 +209,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               </div>
             </div>
 
-            {/* جدول اقلام تایرها */}
             {invoice.tire_items && invoice.tire_items.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("اقلام کالا (تایرها)")}</h3>
@@ -257,7 +251,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               </div>
             )}
 
-            {/* جدول خدمات فنی */}
             {invoice.service_items && invoice.service_items.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("خدمات فنی و کارگاهی")}</h3>
@@ -296,7 +289,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               </div>
             )}
 
-            {/* جمع‌ها و مبالغ مالی */}
             <div className="flex flex-col md:flex-row justify-between items-start gap-4 pt-2">
               <div className="flex-1 text-xs text-slate-500 space-y-1">
                 {invoice.notes && (
@@ -342,7 +334,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               </div>
             </div>
 
-            {/* بخش مهر و امضا در حالت پرینت */}
             <div className="pt-12 hidden print:grid grid-cols-2 text-center text-xs">
               <div>
                 <p className="font-bold text-slate-800">{t("امضا و مهر فروشگاه لاستیک")}</p>
@@ -354,18 +345,15 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           </div>
         )}
 
-        {/* ۲. بدنه فاکتور در قالب فیش حرارتی ۸۰ میلی‌متری (Thermal Receipt) */}
         {printFormat === 'THERMAL' && (
           <div className="flex-1 overflow-y-auto p-6 flex justify-center bg-slate-100 dark:bg-slate-950/60 print:bg-white print:p-0">
             <div className="w-[340px] max-w-full bg-white dark:bg-slate-900 p-5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs space-y-3 font-mono shadow-sm thermal-receipt-mode">
-              {/* سربرگ فیش */}
               <div className="text-center space-y-1 pb-2 border-b border-dashed border-slate-300 dark:border-slate-700">
                 <div className="text-2xl mb-1">🛞</div>
                 <h3 className="font-black text-sm text-slate-900 dark:text-white">{t("فروشگاه و خدمات لاستیک")}</h3>
                 <p className="text-[10px] text-slate-500">{t("رسید صندوق و فیش مشتری (۸۰mm)")}</p>
               </div>
 
-              {/* مشخصات سند */}
               <div className="space-y-1 text-[11px] pb-2 border-b border-dashed border-slate-300 dark:border-slate-700">
                 <div className="flex justify-between">
                   <span className="text-slate-500">{t("شماره:")}</span>
@@ -391,7 +379,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 )}
               </div>
 
-              {/* جدول اقلام */}
               <div className="space-y-2 pb-2 border-b border-dashed border-slate-300 dark:border-slate-700 text-[11px]">
                 <div className="flex justify-between font-bold text-slate-600 dark:text-slate-400 pb-1 border-b border-slate-200 dark:border-slate-800">
                   <span>{t("شرح")}</span>
@@ -436,7 +423,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 ))}
               </div>
 
-              {/* سرجمع مالی */}
               <div className="space-y-1.5 text-[11px] pb-2 border-b border-dashed border-slate-300 dark:border-slate-700">
                 <div className="flex justify-between text-slate-500">
                   <span>{t("جمع کل:")}</span>
@@ -466,7 +452,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* پانویس حرارتی */}
               <div className="text-center pt-1 text-[10px] text-slate-400 space-y-1">
                 <p className="font-bold text-slate-600 dark:text-slate-300">{t("از اعتماد و انتخاب شما سپاسگزاریم")}</p>
                 <p>{t("ارائه فیش جهت خدمات گارانتی الزامی است.")}</p>
@@ -475,7 +460,6 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           </div>
         )}
 
-        {/* فوتر اکشن‌ها و دکمه‌های عملیاتی */}
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 flex flex-wrap items-center justify-between gap-3 no-print">
           <div className="flex items-center gap-2">
             {invoice.status === 'DRAFT' && (

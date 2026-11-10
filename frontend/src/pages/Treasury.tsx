@@ -25,7 +25,6 @@ export const Treasury: React.FC = () => {
   const [payments, setPayments] = useState<PaymentVoucher[]>([]);
   const [refunds, setRefunds] = useState<CustomerRefundVoucher[]>([]);
 
-  // ابطال سند
   const [cancelModalOpen, setCancelModalOpen] = useState<boolean>(false);
   const [cancelTarget, setCancelTarget] = useState<{
     id: number;
@@ -60,7 +59,6 @@ export const Treasury: React.FC = () => {
   }, [activeTab, currentPage]);
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Query changes intentionally enter the network loading state.
     void loadData();
   }, [loadData]);
 
@@ -83,7 +81,6 @@ export const Treasury: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("خزانه‌داری و مدیریت اسناد مالی")}</h1>
@@ -91,7 +88,6 @@ export const Treasury: React.FC = () => {
         </div>
       </div>
 
-      {/* تب‌های خزانه‌داری */}
       <div className="tab-bar">
         <button
           onClick={() => {
@@ -139,12 +135,10 @@ export const Treasury: React.FC = () => {
         </button>
       </div>
 
-      {/* محتوای تب فعال */}
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال بارگذاری اسناد مالی...")}</div>
         ) : activeTab === 'receipts' ? (
-          /* جدول دریافت‌ها */
           receipts.length === 0 ? (
             <div className="py-16 text-center text-xs text-slate-400">{t("هیچ سند دریافتی ثبت نشده است.")}</div>
           ) : (
@@ -209,7 +203,6 @@ export const Treasury: React.FC = () => {
             </div>
           )
         ) : activeTab === 'payments' ? (
-          /* جدول پرداخت‌ها */
           payments.length === 0 ? (
             <div className="py-16 text-center text-xs text-slate-400">{t("هیچ سند پرداختی ثبت نشده است.")}</div>
           ) : (
@@ -274,7 +267,6 @@ export const Treasury: React.FC = () => {
             </div>
           )
         ) : (
-          /* جدول استردادها */
           refunds.length === 0 ? (
             <div className="py-16 text-center text-xs text-slate-400">{t("هیچ سند استردادی به مشتریان ثبت نشده است.")}</div>
           ) : (
@@ -338,7 +330,6 @@ export const Treasury: React.FC = () => {
           )
         )}
 
-        {/* صفحه‌بندی (Pagination) */}
         {totalPages > 1 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
             <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("سند)")}</span>
@@ -358,7 +349,6 @@ export const Treasury: React.FC = () => {
         )}
       </div>
 
-      {/* مدال ابطال سند مالی */}
       <CancelVoucherModal
         isOpen={cancelModalOpen}
         title={cancelTarget?.title || t("ابطال سند مالی")}

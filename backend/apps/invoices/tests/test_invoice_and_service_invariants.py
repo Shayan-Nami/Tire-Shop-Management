@@ -41,18 +41,16 @@ def base_catalog(db):
 
 
 @pytest.mark.django_db
-class TestBackendBugFixes:
+class TestInvoiceAndServiceInvariants:
 
-    def test_c1_generate_next_invoice_number_standalone_atomic(self):
-        """تولید شماره فاکتور باید به صورت مستقل با @transaction.atomic بدون خطا اجرا شود"""
+    def test_generate_next_invoice_number_standalone_atomic(self):
         inv_num_sales = generate_next_invoice_number('SALES')
         assert inv_num_sales.startswith('S-')
 
         inv_num_purch = generate_next_invoice_number('PURCHASE')
         assert inv_num_purch.startswith('P-')
 
-    def test_c1_sync_payment_status_standalone_atomic(self, base_catalog, manager_user):
-        """توابع sync_payment_status باید به صورت مستقل خارج از تراکنش دستی با موفقیت اجرا شوند"""
+    def test_sync_payment_status_standalone_atomic(self, base_catalog, manager_user):
         inv = SalesInvoice.objects.create(
             customer=base_catalog['customer'],
             total_amount=Decimal('1000000.00'),
@@ -69,11 +67,9 @@ class TestBackendBugFixes:
         p_status = sync_purchase_invoice_payment_status(p_inv)
         assert p_status == PaymentStatus.UNPAID
 
-    def test_c2_and_h3_sales_invoice_serializer_rejects_cancelled_and_partial(self, auth_client_manager, base_catalog):
-        """رد ثبت مستقیم فاکتور در وضعیت لغو شده یا وضعیت نیمه‌پرداخت در بدو صدور"""
+    def test_sales_invoice_serializer_rejects_cancelled_and_partial(self, auth_client_manager, base_catalog):
         url = reverse('sales-invoice-list')
 
-        # تلاش برای ثبت در وضعیت CANCELLED
         res1 = auth_client_manager.post(url, {
             'customer': base_catalog['customer'].pk,
             'status': InvoiceStatus.CANCELLED,
@@ -82,7 +78,6 @@ class TestBackendBugFixes:
         assert res1.status_code == 400
         assert 'status' in str(res1.data)
 
-        # تلاش برای ثبت در وضعیت PARTIAL
         res2 = auth_client_manager.post(url, {
             'customer': base_catalog['customer'].pk,
             'payment_status': PaymentStatus.PARTIAL,
@@ -91,21 +86,17 @@ class TestBackendBugFixes:
         assert res2.status_code == 400
         assert 'payment_status' in str(res2.data)
 
-    def test_c3_customer_and_vehicle_permission_technician_cannot_delete(self, auth_client_technician, auth_client_manager, base_catalog):
-        """تکنسین می‌تواند مشتری/خودرو ایجاد و مشاهده کند اما نمی‌تواند حذف کند"""
+    def test_customer_and_vehicle_permission_technician_cannot_delete(self, auth_client_technician, auth_client_manager, base_catalog):
         cust = Customer.objects.create(full_name='مشتری تست حذف', phone_number='09129998877')
         detail_url = reverse('customer-detail', kwargs={'pk': cust.pk})
 
-        # تکنسین مسدود است (403)
         res_tech = auth_client_technician.delete(detail_url)
         assert res_tech.status_code == 403
 
-        # مدیر مجاز است
         res_mgr = auth_client_manager.delete(detail_url)
         assert res_mgr.status_code == 204
 
-    def test_c4_sales_return_rejects_cross_invoice_item(self, auth_client_manager, base_catalog, manager_user):
-        """رد مرجوعی آیتم فاکتور الف به اسم فاکتور ب"""
+    def test_sales_return_rejects_cross_invoice_item(self, auth_client_manager, base_catalog, manager_user):
         inv_a = create_sales_invoice_service(
             customer=base_catalog['customer'],
             vehicle=base_catalog['vehicle'],
@@ -122,7 +113,6 @@ class TestBackendBugFixes:
         )
         item_a = inv_a.tire_items.first()
 
-        # ارسال آیتم فاکتور الف برای مرجوعی از فاکتور ب
         url = reverse('sales-return-list')
         payload = {
             'sales_invoice': inv_b.pk,
@@ -133,8 +123,7 @@ class TestBackendBugFixes:
         assert res.status_code == 400
         assert 'متعلق به فاکتور' in str(res.data)
 
-    def test_m12_sales_return_rejects_duplicate_item_in_same_payload(self, auth_client_manager, base_catalog, manager_user):
-        """رد تکرار یک آیتم تایر درون یک پی‌لود مرجوعی"""
+    def test_sales_return_rejects_duplicate_item_in_same_payload(self, auth_client_manager, base_catalog, manager_user):
         inv = create_sales_invoice_service(
             customer=base_catalog['customer'],
             vehicle=base_catalog['vehicle'],
@@ -157,24 +146,21 @@ class TestBackendBugFixes:
         assert res.status_code == 400
         assert 'تکراری' in str(res.data)
 
-    def test_m6_health_check_endpoint(self, api_client):
-        """بررسی سلامت سرور و پایگاه داده از اندپوینت /api/health/"""
+    def test_health_check_endpoint(self, api_client):
         url = reverse('health-check')
         res = api_client.get(url)
         assert res.status_code == 200
         assert res.json()['status'] == 'healthy'
         assert res.json()['database'] == 'connected'
 
-    def test_h10_user_self_deletion_standard_error(self, auth_client_manager, manager_user):
-        """حذف اکانت جاری توسط خود کاربر باید خطای استاندارد اعتبارسنجی بدهد"""
+    def test_user_self_deletion_standard_error(self, auth_client_manager, manager_user):
         url = reverse('user-detail', kwargs={'pk': manager_user.pk})
         res = auth_client_manager.delete(url)
         assert res.status_code == 400
         assert res.data['success'] is False
         assert res.data['status_code'] == 400
 
-    def test_h4_safe_type_conversion_in_sales_invoice(self, manager_user, base_catalog):
-        """ورودی‌های نامعتبر عددی باید خطای اعتبارسنجی فارسی ۴۰۰ بدهند نه ۵۰۰ کرش"""
+    def test_safe_type_conversion_in_sales_invoice(self, manager_user, base_catalog):
         with pytest.raises(ValidationError):
             create_sales_invoice_service(
                 customer=base_catalog['customer'],
@@ -194,17 +180,14 @@ class TestBackendBugFixes:
                 created_by=manager_user
             )
 
-    def test_m10_invoice_sequence_registered_in_admin(self):
-        """مدل InvoiceSequence باید در پنل ادمین جنگو ثبت شده باشد"""
+    def test_invoice_sequence_registered_in_admin(self):
         assert InvoiceSequence in admin.site._registry
 
-    def test_h6_reconcile_commands_run_cleanly(self):
-        """دستورات تطبیق انبار و حسابداری باید بدون خطا و در بلاک اتمیک اجرا شوند"""
+    def test_reconcile_commands_run_cleanly(self):
         call_command('reconcile_stock')
         call_command('reconcile_payments')
 
-    def test_h2_discount_percent_model_validation(self, base_catalog, manager_user):
-        """اعتبارسنجی مدل برای درصد تخفیف منفی یا بیش از ۱۰۰"""
+    def test_discount_percent_model_validation(self, base_catalog, manager_user):
         inv = SalesInvoice(
             customer=base_catalog['customer'],
             discount_percent=Decimal('150.00'),

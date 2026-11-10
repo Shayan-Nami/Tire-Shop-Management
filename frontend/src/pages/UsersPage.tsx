@@ -12,7 +12,6 @@ export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // فرم ایجاد/ویرایش کاربر
   const [showModal, setShowModal] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string>('');
@@ -37,7 +36,6 @@ export const UsersPage: React.FC = () => {
   };
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Mounting intentionally starts the users network load.
     void fetchUsers();
   }, []);
 
@@ -121,7 +119,6 @@ export const UsersPage: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("مدیریت کاربران و سطح دسترسی (RBAC)")}</h1>
@@ -137,7 +134,6 @@ export const UsersPage: React.FC = () => {
         </button>
       </div>
 
-      {/* جدول کاربران */}
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت کاربران...")}</div>
@@ -219,7 +215,6 @@ export const UsersPage: React.FC = () => {
         )}
       </div>
 
-      {/* مدال ایجاد/ویرایش کاربر */}
       {showModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">

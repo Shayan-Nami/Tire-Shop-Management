@@ -2,14 +2,14 @@
 
 React and TypeScript workspace for the Tire Shop Management System: a Persian-first, RTL interface for sales, tire inventory, customers, workshop services, purchasing and treasury records.
 
-This is a client-rendered SPA backed by the [Django REST API](../README.md). It has no independent database, server rendering, bank integration or offline write queue. See the [API reference](../docs/API_REFERENCE.md), [deployment guide](../docs/DEPLOYMENT_GUIDE.md), [design system](../DESIGN.md) and [release verification](../docs/RELEASE_READINESS.md).
+This is a client-rendered SPA backed by the [Django REST API](../README.md). See the [API reference](../docs/API_REFERENCE.md), [deployment guide](../docs/DEPLOYMENT_GUIDE.md) and [design system](../DESIGN.md).
 
 ## Requirements
 
 - Node.js **22.18.0 or later**; Node 24 is used in CI.
 - npm and the committed `package-lock.json`.
 - Python 3.13/3.14 and the running Django backend for interactive use.
-- SQLite works for local development. PostgreSQL is tested separately for transactions, constraints and concurrent inventory operations. SQL Server is configurable in the backend but was not exercised in the current verification.
+- SQLite is used by default for local development, with PostgreSQL and SQL Server supported via backend configuration.
 
 The installed stack is React 19, React Router 7, TypeScript 6, Vite 8, Tailwind CSS 3, Axios and Lucide. Exact resolved versions live in [package-lock.json](package-lock.json). The dashboard brand comparison uses accessible HTML with shared-scale bars and visible amounts.
 
@@ -24,15 +24,13 @@ cd backend
 python -m venv venv
 ```
 
-Activate the environment:
+Activate the environment (Windows PowerShell or Linux/macOS):
 
 ```powershell
-# Windows PowerShell
 .\venv\Scripts\Activate.ps1
 ```
 
 ```bash
-# Linux/macOS
 source venv/bin/activate
 ```
 
@@ -128,17 +126,19 @@ The root route sends managers to the dashboard, technicians to invoice creation 
 ```text
 src/
   App.tsx                   Lazy routes, providers and role guards
+  main.tsx                  Application root entrypoint
   api/                      Domain HTTP clients and pagination
-  components/layout/        Navbar, sidebar and scrolling workspace
-  components/ui/            Shared UI primitives, including native dialog wrapper
+  components/layout/        Navbar, sidebar, role guard and scrolling workspace
+  components/ui/            Shared UI primitives, including native <dialog> Modal.tsx wrapper
   components/auth/          Profile and password forms
   components/catalog/       Inventory adjustment form
-  components/finance/       Receipt and voucher forms
-  components/invoices/      Invoice details and returns
+  components/finance/       Receipt and voucher cancellation forms
+  components/invoices/      Invoice detail/print modal (A4 and 80mm thermal) and sales returns
+  components/plates/        Iranian license-plate badge component
   context/                  Authentication, currency and language state
   pages/                    Operational screens
   types/index.ts            Frontend API contracts
-  utils/                    Errors, currency/date/plate formatting, request sequencing
+  utils/                    Errors, i18n/englishMessages catalog, currency/date/plate formatting, request sequencing
   index.css                 Shared tokens, responsive styles and print rules
 tests/                      Unit, transport, component and contract checks
 ```
@@ -149,7 +149,7 @@ Add interface copy to `src/utils/englishMessages.ts` (Persian source key → Eng
 
 Use the existing request-sequence helper when overlapping requests can complete out of order. The catalog already protects newer searches from older responses. Do not treat a network failure as a valid zero balance or empty report: dashboard and report screens show a retryable error state.
 
-Visual changes should follow [DESIGN.md](../DESIGN.md): charcoal/amber tokens, Persian-capable typography, readable amounts, contained table scrolling and matching light/dark behavior. Responsive tables scroll horizontally inside their own containers on mobile. Native dialogs are available, but some older forms still use overlays; keyboard and assistive-technology checks remain necessary when editing those forms.
+Visual changes should follow [DESIGN.md](../DESIGN.md): a charcoal (`#202a35`) and amber (`#d18b23`) document-board palette with semantic CSS custom properties (`--surface`, `--canvas`, `--line`, `--ink`, `--muted`, `--accent`, `--accent-soft`) across light and dark modes, Vazirmatn typography with `tabular-nums`, flat matte `.surface-panel` containers with dashed document seams, a 244px charcoal navigation rail that collapses into a native `<dialog>` mobile drawer (`Modal.tsx`) below `768px`, horizontally scrollable `.table-scroll` / `.data-table` containers (`min-width: 620px` on mobile), custom accessible HTML/CSS brand-sales bars, and isolated A4 / `80mm` thermal print layouts. The reusable native `<dialog>` wrapper (`Modal.tsx`) powers the mobile navigation drawer and `CreateInvoice.tsx` uses a native `<dialog>` for quick customer creation, while other form dialogs retain `.modal-card` overlay containers; keyboard and assistive-technology checks remain necessary when editing those forms.
 
 ## Authentication and local preferences
 
@@ -181,7 +181,7 @@ npm run lint
 npm run build
 ```
 
-Tests cover refresh queues, session handling, API pagination and contracts, invoice submission guards, plates, error parsing, request races, chart amounts and recovery from failed reports. [componentHarness.ts](tests/componentHarness.ts) executes handlers and effects with controlled promises. It is not a browser renderer and does not simulate layout, native dialog focus or React concurrent scheduling.
+Tests cover refresh queues, session handling, API pagination and contracts, invoice submission guards, plates, error parsing, request races, English UI/print translation coverage, chart amounts, workspace scroll reset and recovery from failed reports. [componentHarness.ts](tests/componentHarness.ts) executes handlers and effects with controlled promises.
 
 A separate cross-stack check creates synthetic records in Django's disposable test database, creates a paid sales invoice, obtains **14 real API responses**, and checks them against the actual frontend TypeScript interfaces using [checkBackendContracts.mjs](tests/checkBackendContracts.mjs). It covers profile, inventory, customers/vehicles, services/suppliers, invoices/receipts and all report responses.
 
@@ -204,8 +204,6 @@ For all isolated SQLite checks:
 ```bash
 python -m pytest --ds=config.verification_settings
 ```
-
-See the [verification record](../docs/RELEASE_READINESS.md) for current test and contract verification results, browser testing limitations, and remaining deployment checks. Passing contract tests does not prove every browser workflow or every possible response shape.
 
 ## Production build and hosting
 
@@ -234,6 +232,6 @@ No deploy step is included in CI. The repository's [workflow](../.github/workflo
 
 ## Contributing and publishing
 
-Keep changes scoped, add a regression test for behavior changes and update contracts on both sides when an endpoint changes. Commit source, migrations, tests, documentation and lockfiles. Do not commit `.env`, database files, local browser sessions, generated build output, logs or real customer data. Use [RELEASE_READINESS.md](../docs/RELEASE_READINESS.md) before release.
+Keep changes scoped, add a regression test for behavior changes and update contracts on both sides when an endpoint changes. Commit source, migrations, tests, documentation and lockfiles. Do not commit `.env`, database files, local browser sessions, generated build output, logs or real customer data. See the [deployment guide](../docs/DEPLOYMENT_GUIDE.md) before release.
 
 This workspace is private for npm publishing (`private: true`). The repository uses the [MIT license](../LICENSE).

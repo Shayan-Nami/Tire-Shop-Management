@@ -16,7 +16,7 @@ def database_settings(monkeypatch):
                 'DJANGO_SECRET_KEY': 'database-settings-test-only-not-a-production-secret-8274',
                 'DB_ENGINE': 'mssql',
                 'USE_SQL_SERVER': 'False',
-                'DB_NAME': 'audit_db',
+                'DB_NAME': 'tire_shop_test_db',
                 'DB_HOST': '127.0.0.1',
                 'DB_PORT': '1433',
                 'DB_USER': '',

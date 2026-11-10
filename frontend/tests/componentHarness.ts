@@ -5,14 +5,12 @@ import { setImmediate } from 'node:timers/promises';
 import React from 'react';
 import ts from 'typescript';
 
-
 const fallbackLanguage = {
   language: 'fa', direction: 'rtl', isRTL: true,
   t: (key: string, fallback?: string, values?: Record<string, unknown>) =>
     (translations[key]?.fa || fallback || key || '').replace(/\{(\w+)\}/g, (match, name) => String(values?.[name] ?? match)),
 };
 
-/** Compile TSX with the already-installed TypeScript; no browser/test dependencies. */
 export function loadComponent(path: string, mocks: Record<string, unknown>, env?: Record<string, string>) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8')
     .replaceAll('import.meta.env', JSON.stringify(env ?? {}));
@@ -34,10 +32,6 @@ export function loadComponent(path: string, mocks: Record<string, unknown>, env?
 
 type Effect = { deps?: unknown[]; cleanup?: () => void };
 
-/**
- * A small hook-level harness: executes real component handlers/effects with controlled
- * transport promises. It deliberately does not simulate DOM layout, focus, or React scheduling.
- */
 export function mountComponent(path: string, exportName: string, mocks: Record<string, unknown>, props: Record<string, unknown> = {}) {
   const state: any[] = [];
   const effects: Effect[] = [];

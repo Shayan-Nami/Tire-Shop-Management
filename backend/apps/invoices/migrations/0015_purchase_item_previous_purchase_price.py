@@ -7,8 +7,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Do not invent a baseline for legacy purchases: without prior stock
-        # history their original catalog price cannot be recovered reliably.
         migrations.AddField(
             model_name='purchaseinvoicetireitem',
             name='previous_purchase_price',

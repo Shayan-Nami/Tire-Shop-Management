@@ -42,31 +42,26 @@ export const CreateInvoice: React.FC = () => {
   const { currencyUnit } = useAuth();
   const navigate = useNavigate();
 
-  // داده‌های پایه بارگذاری‌شده
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerVehicles, setCustomerVehicles] = useState<Vehicle[]>([]);
   const [tires, setTires] = useState<Tire[]>([]);
   const [services, setServices] = useState<TechnicalService[]>([]);
 
-  // انتخاب‌ها
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | ''>('');
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | ''>('');
   const [tireItems, setTireItems] = useState<SelectedTireRow[]>([]);
   const [serviceItems, setServiceItems] = useState<SelectedServiceRow[]>([]);
 
-  // جستجوی زنده مشتری
   const [customerSearch, setCustomerSearch] = useState<string>('');
   const [isSearchingCustomer, setIsSearchingCustomer] = useState<boolean>(false);
   const [loadingVehicles, setLoadingVehicles] = useState<boolean>(false);
 
-  // تخفیف و وضعیت
   const [discountAmount, setDiscountAmount] = useState<string>('0');
   const [discountPercent, setDiscountPercent] = useState<string>('0');
   const [status, setStatus] = useState<'CONFIRMED' | 'DRAFT'>('CONFIRMED');
   const [paymentStatus, setPaymentStatus] = useState<'UNPAID' | 'PAID'>('PAID');
   const [notes, setNotes] = useState<string>('');
 
-  // وضعیت ایجاد مشتری و خودرو جدید
   const [showNewCustomerModal, setShowNewCustomerModal] = useState<boolean>(false);
   const [tempCreatedCustomer, setTempCreatedCustomer] = useState<Customer | null>(null);
   const [newCustomerName, setNewCustomerName] = useState<string>('');
@@ -75,7 +70,6 @@ export const CreateInvoice: React.FC = () => {
   const [newVehiclePlate, setNewVehiclePlate] = useState<string>('');
   const [newVehicleModel, setNewVehicleModel] = useState<string>(t("پژو ۲۰۶"));
 
-  // استیت‌های لودینگ و خطا
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -109,7 +103,6 @@ export const CreateInvoice: React.FC = () => {
   }, []);
 
   const resetCustomerSelection = useCallback((custId: number | '') => {
-    // Invalidate synchronously, before React commits the changed customer.
     vehicleRequests.current.invalidate();
     selectedCustomerIdRef.current = custId;
     setSelectedCustomerId(custId);
@@ -213,7 +206,6 @@ export const CreateInvoice: React.FC = () => {
     setNewVehiclePlate('');
   };
 
-  // افزودن سطر تایر
   const addTireItem = (tireId: number) => {
     const tire = tires.find((t) => t.tire_id === tireId);
     if (!tire) return;
@@ -281,7 +273,6 @@ export const CreateInvoice: React.FC = () => {
     setTireItems(tireItems.filter((item) => item.tireId !== tireId));
   };
 
-  // افزودن سطر خدمات فنی
   const addServiceItem = (serviceId: number) => {
     const service = services.find((s) => s.service_id === serviceId);
     if (!service) return;
@@ -331,7 +322,6 @@ export const CreateInvoice: React.FC = () => {
     setServiceItems(serviceItems.filter((item) => item.serviceId !== serviceId));
   };
 
-  // ثبت سریع مشتری و خودروی جدید
   const handleCreateCustomerAndVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (quickCreateBusy.current || submitBusy.current) return;
@@ -345,7 +335,6 @@ export const CreateInvoice: React.FC = () => {
     quickCreateBusy.current = true;
     setCreatingCustomer(true);
     setQuickCreateError(null);
-    // A prior customer's vehicle request must not overwrite quick creation.
     resetCustomerSelection(selectedCustomerIdRef.current);
     let customerToUse = tempCreatedCustomer;
     try {
@@ -392,7 +381,6 @@ export const CreateInvoice: React.FC = () => {
     }
   };
 
-  // محاسبات مالی
   const tiresSubtotal = tireItems.reduce(
     (acc, curr) => acc + curr.quantity * curr.unitPrice,
     0
@@ -415,7 +403,6 @@ export const CreateInvoice: React.FC = () => {
 
   const netPayable = Math.max(0, grossTotal - calculatedDiscount);
 
-  // ثبت نهایی فاکتور
   const vehicleIsCurrent = isCurrentInvoiceVehicle(selectedCustomerId, selectedVehicleId, customerVehicles, loadingVehicles);
 
   const handleSubmitInvoice = async () => {
@@ -473,7 +460,6 @@ export const CreateInvoice: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("میز کار صندوق و صدور فاکتور فروش")}</h1>
@@ -497,9 +483,7 @@ export const CreateInvoice: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ستون ۲تایی راست: فرم اقلام، مشتری و خدمات */}
         <div className="lg:col-span-2 space-y-6">
-          {/* کارت انتخاب مشتری و خودرو */}
           <div className="p-5 surface-panel space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100 font-bold text-sm">
@@ -518,7 +502,6 @@ export const CreateInvoice: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* انتخاب مشتری با جستجوی زنده */}
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center justify-between">
                   <label htmlFor="invoice-customer" className="font-semibold text-slate-700 dark:text-slate-300 block">{t("مشتری:")}</label>
@@ -558,7 +541,6 @@ export const CreateInvoice: React.FC = () => {
                 </select>
               </div>
 
-              {/* انتخاب خودرو */}
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center justify-between">
                   <label htmlFor="invoice-vehicle" className="font-semibold text-slate-700 dark:text-slate-300 block">{t("خودرو و پلاک:")}</label>
@@ -595,7 +577,6 @@ export const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* پیش‌نمایش گرافیکی پلاک انتخاب‌شده */}
             {selectedVehicleId && (
               <div className="pt-2 flex items-center gap-3">
                 <span className="text-xs text-slate-500">{t("پلاک انتخاب‌شده:")}</span>
@@ -610,7 +591,6 @@ export const CreateInvoice: React.FC = () => {
             )}
           </div>
 
-          {/* انتخاب و اقلام تایر */}
           <div className="p-5 surface-panel space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100 font-bold text-sm">
@@ -642,7 +622,6 @@ export const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* پیام راهنمای نرخ‌گذاری بر اساس تورم و بازار */}
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-300 text-[11px] flex items-center gap-2">
               <span className="font-bold shrink-0">{t("💡 نرخ‌گذاری شناور بازار:")}</span>
               <span>{t("قیمت واحد تایرها بر اساس نوسانات بازار و تورم قابل تعیین است؛ نرخ کاتالوگ صرفاً به عنوان پیشنهاد پیش‌فرض درج می‌شود و می‌توانید آن را در ستون «قیمت واحد فروش» مستقیماً تغییر دهید.")}</span>
@@ -740,7 +719,6 @@ export const CreateInvoice: React.FC = () => {
             )}
           </div>
 
-          {/* انتخاب و اقلام خدمات کارگاهی */}
           <div className="p-5 surface-panel space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100 font-bold text-sm">
@@ -853,12 +831,10 @@ export const CreateInvoice: React.FC = () => {
           </div>
         </div>
 
-        {/* ستون ۱تایی چپ: خلاصه مالی، تخفیف، وضعیت و صدور */}
         <div className="space-y-6">
           <div className="p-5 surface-panel space-y-4">
             <h2 className="font-bold text-slate-900 dark:text-white text-sm">{t("صورتحساب و شرایط تسویه")}</h2>
 
-            {/* ریز مبالغ */}
             <div className="space-y-2 text-xs border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>{t("جمع اقلام تایر:")}</span>
@@ -880,7 +856,6 @@ export const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* تخفیف */}
             <div className="space-y-2 text-xs">
               <label className="font-semibold text-slate-700 dark:text-slate-300 block">{t("تخفیف فاکتور:")}</label>
               <div className="grid grid-cols-2 gap-2">
@@ -916,7 +891,6 @@ export const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* مبلغ خالص قابل پرداخت */}
             <div className="p-3 rounded-xl bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-900/40 text-center space-y-1">
               <span className="text-xs text-brand-700 dark:text-brand-300 font-medium">{t("مبلغ نهایی قابل پرداخت:")}</span>
               <div className="text-xl font-black text-brand-600 dark:text-brand-400 tabular-nums">
@@ -924,7 +898,6 @@ export const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* وضعیت صدور فاکتور */}
             <div className="space-y-2 text-xs">
               <label className="font-semibold text-slate-700 dark:text-slate-300 block">{t("وضعیت فاکتور:")}</label>
               <div className="grid grid-cols-2 gap-2">
@@ -957,7 +930,6 @@ export const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* وضعیت پرداخت */}
             <div className="space-y-2 text-xs">
               <label className="font-semibold text-slate-700 dark:text-slate-300 block">{t("وضعیت تسویه اولیه:")}</label>
               <div className="grid grid-cols-2 gap-2">
@@ -982,7 +954,6 @@ export const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* یادداشت */}
             <div className="space-y-1.5 text-xs">
               <label className="font-semibold text-slate-700 dark:text-slate-300 block">{t("توضیحات فاکتور:")}</label>
               <textarea
@@ -997,7 +968,6 @@ export const CreateInvoice: React.FC = () => {
             <p id="invoice-submit-help" role="status" className="text-xs text-slate-500 dark:text-slate-400">
               {creatingCustomer ? t("ثبت مشتری و خودرو در حال انجام است.") : loadingVehicles ? t("منتظر دریافت خودروهای مشتری باشید.") : !vehicleIsCurrent ? t("برای ثبت فاکتور، مشتری و خودروی متعلق به او را انتخاب کنید.") : status === 'DRAFT' ? t("پیش‌نویس ذخیره می‌شود؛ موجودی انبار کسر نمی‌شود.") : t("فاکتور قطعی صادر و موجودی انبار کسر می‌شود.")}
             </p>
-            {/* دکمه ثبت نهایی */}
             <button
               type="button"
               onClick={handleSubmitInvoice}
@@ -1012,7 +982,6 @@ export const CreateInvoice: React.FC = () => {
         </div>
       </div>
 
-      {/* مدال ثبت سریع مشتری و خودرو جدید */}
       {showNewCustomerModal && (
         <dialog
           ref={quickCreateDialog}

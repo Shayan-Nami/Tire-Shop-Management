@@ -47,7 +47,6 @@ def setup_reconcile_data(db, manager_user):
 class TestReconcilePaymentsCommand:
 
     def test_reconcile_payments_clean_database_success(self, setup_reconcile_data):
-        """تطبیق موفق در صورتی که هیچ مغایرتی وجود نداشته باشد"""
         out = io.StringIO()
         call_command('reconcile_payments', stdout=out)
         output = out.getvalue()
@@ -55,7 +54,6 @@ class TestReconcilePaymentsCommand:
         assert 'کاملاً منطبق است' in output
 
     def test_reconcile_payments_detects_sales_invoice_discrepancy(self, setup_reconcile_data):
-        """تشخیص مغایرت وضعیت فاکتور فروش و خروج با خطای CommandError"""
         data = setup_reconcile_data
         inv = create_sales_invoice_service(
             customer=data['customer'],
@@ -64,7 +62,6 @@ class TestReconcilePaymentsCommand:
             service_items_data=[],
             created_by=data['manager']
         )
-        # وضعیت ذخیره‌شده UNPAID است. عمداً وضعیت ذخیره‌شده را به PAID تغییر می‌دهیم بدون سند دریافت:
         inv.payment_status = PaymentStatus.PAID
         inv.save(update_fields=['payment_status'])
 
@@ -79,19 +76,16 @@ class TestReconcilePaymentsCommand:
         assert '1 مغایرت در وضعیت پرداخت یافت شد' in str(exc_info.value)
 
     def test_reconcile_payments_detects_purchase_invoice_discrepancy(self, setup_reconcile_data):
-        """تشخیص مغایرت وضعیت فاکتور خرید و خروج با خطای CommandError"""
         data = setup_reconcile_data
         p_inv = create_purchase_invoice_service(
             supplier=data['supplier'],
             tire_items_data=[{'tire': data['tire'], 'quantity': 2, 'unit_cost': Decimal('400000.00')}],
             created_by=data['manager']
         )
-        # پرداخت کامل ثبت می‌کنیم -> وضعیت PAID می‌شود
         create_payment_voucher_service(p_inv, Decimal('800000.00'), user=data['manager'])
         p_inv.refresh_from_db()
         assert p_inv.payment_status == PaymentStatus.PAID
 
-        # عمداً وضعیت ذخیره‌شده را به UNPAID تحریف می‌کنیم
         p_inv.payment_status = PaymentStatus.UNPAID
         p_inv.save(update_fields=['payment_status'])
 

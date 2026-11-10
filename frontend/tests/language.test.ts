@@ -99,7 +99,6 @@ test('LanguageProvider defaults to Persian (fa) with rtl direction when storage 
     children: null,
   });
 
-  // Check state directly
   assert.ok(provider.tree.props.value);
   const ctx = provider.tree.props.value;
   assert.equal(ctx.language, 'fa');
@@ -107,7 +106,6 @@ test('LanguageProvider defaults to Persian (fa) with rtl direction when storage 
   assert.equal(ctx.isRTL, true);
   assert.equal(ctx.t('appName'), 'تایر منیجر');
 
-  // Verify document was updated
   assert.equal(env.attrs.get('dir'), 'rtl');
   assert.equal(env.attrs.get('lang'), 'fa');
   assert.equal(env.storage.getItem('language'), 'fa');
@@ -143,7 +141,6 @@ test('LanguageProvider toggles language between FA and EN and syncs localStorage
   assert.equal(provider.tree.props.value.language, 'fa');
   assert.equal(env.attrs.get('dir'), 'rtl');
 
-  // Toggle to EN
   provider.tree.props.value.toggleLanguage();
   await provider.flush();
 
@@ -155,7 +152,6 @@ test('LanguageProvider toggles language between FA and EN and syncs localStorage
   assert.equal(env.attrs.get('lang'), 'en');
   assert.equal(provider.tree.props.value.t('navDashboard'), 'Dashboard');
 
-  // Toggle back to FA
   provider.tree.props.value.toggleLanguage();
   await provider.flush();
 
@@ -203,11 +199,9 @@ test('Navbar renders language toggle button and responds to click', async (t) =>
   const langBtn = find(nav, (node) => node.type === 'button' && node.props?.['data-testid'] === 'language-toggle-btn');
   assert.ok(langBtn, 'Language toggle button should exist in Navbar');
 
-  // Initial state is FA
   const btnContent = text(langBtn);
   assert.ok(btnContent.includes('FA'));
 
-  // Click toggle
   langBtn.props.onClick({ preventDefault: () => {} });
   nav.render();
 

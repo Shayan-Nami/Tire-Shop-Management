@@ -27,19 +27,16 @@ class TestServicesAPI:
 
     def test_manager_can_create_update_delete_service(self, auth_client_manager):
         url = reverse('service-list')
-        # Create
         payload = {'service_name': 'تنظیم باد دیجیتال', 'price': '30000.00', 'description': 'با نیتروژن'}
         res = auth_client_manager.post(url, payload, format='json')
         assert res.status_code == 201
         service_id = res.data['service_id']
 
-        # Update
         detail_url = reverse('service-detail', kwargs={'pk': service_id})
         update_res = auth_client_manager.patch(detail_url, {'price': '40000.00'}, format='json')
         assert update_res.status_code == 200
         assert Decimal(str(update_res.data['price'])) == Decimal('40000.00')
 
-        # Delete
         delete_res = auth_client_manager.delete(detail_url)
         assert delete_res.status_code == 204
         assert not Service.objects.filter(pk=service_id).exists()

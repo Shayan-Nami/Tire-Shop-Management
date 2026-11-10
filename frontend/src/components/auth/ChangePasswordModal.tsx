@@ -19,10 +19,8 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-
   useEffect(() => {
     if (isOpen) {
-      // oxlint-disable-next-line react/set-state-in-effect -- Reopening must clear password fields; preserve the existing modal lifecycle.
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -36,7 +34,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-
 
     if (!oldPassword) {
       setErrorMessage(t("لطفاً کلمه عبور فعلی را وارد نمایید."));
@@ -69,7 +66,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
         old_password: oldPassword,
         new_password: newPassword,
       });
-      // Password changes revoke the current tokens; do not call logout or refresh.
       endLocalSession('password-changed');
     } catch (err: unknown) {
       setErrorMessage(parseApiError(err, t("خطا در تغییر کلمه عبور"), language));
@@ -80,7 +76,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
       <div className="relative w-full max-w-md bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-        {/* هدر مدال */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
@@ -99,7 +94,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
           </button>
         </div>
 
-        {/* فرم */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMessage && (
             <div role="alert" className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs">
@@ -108,8 +102,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
             </div>
           )}
 
-
-          {/* کلمه عبور فعلی */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">{t("کلمه عبور فعلی")}</label>
             <div className="relative">
@@ -125,7 +117,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
             </div>
           </div>
 
-          {/* کلمه عبور جدید */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">{t("کلمه عبور جدید")}</label>
             <div className="relative">
@@ -142,7 +133,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
             <p className="mt-1 text-[11px] text-slate-400">{t("حداقل ۸ کاراکتر شامل حروف و اعداد")}</p>
           </div>
 
-          {/* تکرار کلمه عبور جدید */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">{t("تکرار کلمه عبور جدید")}</label>
             <div className="relative">
@@ -158,7 +148,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
             </div>
           </div>
 
-          {/* دکمه‌های اقدام */}
           <div className="pt-2 flex items-center justify-end gap-2.5">
             <button
               type="button"

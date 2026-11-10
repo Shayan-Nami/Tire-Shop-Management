@@ -6,9 +6,6 @@ PERSIAN_ARABIC_DIGIT_MAP = str.maketrans({
 })
 
 def normalize_digits(value):
-    """
-    تبدیل ارقام فارسی و عربی به ارقام استاندارد انگلیسی و حذف فاصله‌های اضافی
-    """
     if value is None:
         return None
     return str(value).translate(PERSIAN_ARABIC_DIGIT_MAP)

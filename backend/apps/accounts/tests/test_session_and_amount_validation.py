@@ -25,7 +25,7 @@ def test_logout_cannot_revoke_another_users_refresh(api_client, technician_user,
     api_client.force_authenticate(technician_user)
     response = api_client.post('/api/v1/auth/logout/', {'refresh': str(refresh)})
     assert response.status_code == 400
-    RefreshToken(str(refresh))  # The other session must remain valid.
+    RefreshToken(str(refresh))
 
 
 @pytest.mark.parametrize('amount', ['NaN', 'Infinity', '-Infinity', '0.001'])

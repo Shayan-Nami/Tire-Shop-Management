@@ -7,7 +7,6 @@ import {
 } from '../types';
 
 export const financeApi = {
-  // اسناد دریافت وجه از مشتری
   getReceipts: async (params?: {
     sales_invoice?: number;
     is_cancelled?: boolean;
@@ -34,7 +33,6 @@ export const financeApi = {
     return response.data;
   },
 
-  // اسناد پرداخت به تأمین‌کننده
   getPayments: async (params?: {
     purchase_invoice?: number;
     is_cancelled?: boolean;
@@ -61,7 +59,6 @@ export const financeApi = {
     return response.data;
   },
 
-  // اسناد استرداد وجه به مشتری (مازاد مرجوعی)
   getCustomerRefunds: async (params?: {
     sales_invoice?: number;
     is_cancelled?: boolean;

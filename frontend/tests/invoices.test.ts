@@ -376,7 +376,6 @@ test('unmount invalidates pending catalog, customer, vehicle and quick-create op
   pendingVehicles.resolve(page([vehicle(1)]));
   pendingCreation.resolve(customer(4));
   await sending;
-  // The harness throws on any state setter after unmount.
   await h.flush();
 });
 

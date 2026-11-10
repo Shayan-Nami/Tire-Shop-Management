@@ -39,8 +39,6 @@ class Command(BaseCommand):
                 raise CommandError(f'Unknown tire IDs: {sorted(missing)}')
 
         if repair_mode:
-            # Every stock writer locks these same tire rows. Do not combine FOR UPDATE
-            # with a grouped aggregate; lock first, then read the ledger under the lock.
             tire_ids = list(tires.select_for_update().values_list('pk', flat=True))
             repaired = 0
             try:

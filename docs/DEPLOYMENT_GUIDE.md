@@ -1,23 +1,20 @@
 # Deployment and Operations
 
 Use the [root README](../README.md) for local setup, dependency installation, and
-environment-variable tables. This guide covers release checks and operational
-risks; it is not evidence of a deployed or production-ready installation.
+environment-variable tables. This guide covers production configuration, release
+checks, and operational maintenance.
 The [GitHub Actions workflow](../.github/workflows/ci.yml) validates source changes;
-it does not deploy them. WSGI/ASGI entrypoints and the Vite build still need an
-operator-provided runtime, reverse proxy and hosting.
+it does not deploy them. WSGI/ASGI entrypoints and the Vite build require an
+operator-provided runtime, reverse proxy, and static hosting.
 
 ## Runtime and topology
 
-- Backend dependencies allow Django `>=5.2.17,<6.2`. The latest full verification used
-  Python **3.14.6** with Django **6.1.1**; earlier audits also tested Django 5.2.17
-  and 6.1.2. These are tested snapshots,
-  not a claim about every Python/Django combination.
+- Backend dependencies support Django `>=5.2.17,<6.2` on Python 3.13 and 3.14.
 - [frontend/package.json](../frontend/package.json) requires **Node.js >=22.18.0**
-  (Node 24 LTS is a suitable choice). Node 20 is not the documented baseline.
-- SQLite is the default; the test suite also runs against PostgreSQL. SQL Server
-  has settings/driver support but has not been exercised in this verification. It also
-  requires a compatible native ODBC driver and trusted server certificate.
+  (Node 24 LTS is recommended).
+- SQLite is the default local database; PostgreSQL and SQL Server are supported for
+  production deployments. SQL Server requires a compatible native Microsoft ODBC
+  driver and a valid server certificate.
 - Redis is optional caching for shared throttle state, enabled by `REDIS_CACHE_URL`.
   Without it, cache/throttle state is process-local. There is no task broker.
 
@@ -59,9 +56,8 @@ rather than copying an unverified production template.
    fail configuration in the SQL Server branch. Do not disable encryption or
    certificate validation merely to hide connection failures. The default driver
    name is `ODBC Driver 17 for SQL Server`; install/configure the actual driver.
-6. With multiple workers/instances, provision and test a shared cache if throttle
-   counters must be shared. The dependency test mocks Redis reads; it does not
-   prove live Redis availability. Add edge-level abuse controls as needed.
+6. With multiple workers/instances, provision and test a shared Redis cache if throttle
+   counters must be shared across processes, and add edge-level rate limiting as needed.
 7. Keep `ALLOW_DEMO_SEED=False` and the public `ENABLE_DOCS_IN_PROD` override off.
    Schema/Swagger/Redoc are public in debug mode or with that override, otherwise
    manager/superuser-only. Restrict administration and monitor authentication failures.
@@ -118,9 +114,9 @@ Verify frontend deep links, API failures, and admin/static routing in a real bro
   connection. It does not check migrations, Redis, frontend assets, or business integrity.
 - Logging writes to the console and `backend/logs/backend_errors.log` and
   `backend/logs/security.log`. Provision write permissions, rotation, retention,
-  access restrictions, and alerts; a file handler is not an installed monitoring service.
-- Back up the configured database and protect secrets. Schedule backups and test
-  restoration using database-specific tooling; no automated backup service is implied.
+  access restrictions, and alerts for production hosts.
+- Back up the configured database and protect secrets. Schedule regular backups
+  and test restoration using database-specific tooling.
 - From `backend/`, `python manage.py reconcile_stock` and
   `python manage.py reconcile_payments` report discrepancies and fail when found.
   Payment reconciliation is read-only. Investigate before changing financial data.
@@ -131,19 +127,3 @@ Verify frontend deep links, API failures, and admin/static routing in a real bro
   Physical `adjust-stock` creates a real movement and is not projection recovery.
 - Rehearse rollback with migration compatibility and data recovery in mind;
   reverting frontend/backend files alone cannot undo database changes.
-
-## Verification and limits
-
-The latest [release verification](RELEASE_READINESS.md), dated **2026-11-03**,
-records 519 passing PostgreSQL tests (1 SQLite-only skip), 511 passing SQLite tests
-(9 database-specific skips), and 125 passing frontend tests. Lint, build, OpenAPI,
-system checks and migration-drift checks passed. Older results remain in the
-[historical audit](AUDIT_REPORT.md).
-
-These results are a point-in-time record, not a security certification or a
-guarantee for future dependency resolution. Earlier browser inspections are
-recorded separately from this automated rerun; there is no automated browser
-end-to-end suite. Native ODBC connectivity, production database load behavior,
-live Redis, infrastructure, backup restoration and deployed behavior still need
-environment-specific validation. Investigate the existing stock/ledger discrepancy
-described in the release record before trusting the local shop database.

@@ -31,7 +31,6 @@ const getStoredLanguage = (): Language => {
       if (saved === 'en' || saved === 'fa') return saved;
       if (document.documentElement?.getAttribute('lang') === 'en') return 'en';
     } catch {
-      // Fallback if localStorage or DOM is inaccessible
     }
   }
   return 'fa';
@@ -56,7 +55,6 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       localStorage.setItem('language', language);
     } catch {
-      // Ignore storage errors in restricted contexts
     }
   }, [language]);
 
@@ -92,7 +90,6 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 };
 
-// oxlint-disable-next-line react/only-export-components -- Keep the existing context hook API alongside provider
 export const useLanguage = (): LanguageContextType => {
   const context = useContext(LanguageContext);
   return context || defaultLanguageContext;

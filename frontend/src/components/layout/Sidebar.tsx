@@ -201,7 +201,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
           })}
         </nav>
 
-        {/* وضعیت کاربر جاری در انتهای سایدبار */}
         <div className="sidebar-footer">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-brand-300 text-sm">

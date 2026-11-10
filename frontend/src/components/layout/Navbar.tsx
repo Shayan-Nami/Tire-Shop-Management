@@ -29,7 +29,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // تم تیره / روشن با ماندگاری در localStorage و کلاس dark روی documentElement
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme');
@@ -102,7 +101,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
   return (
     <header className="app-navbar border-b border-slate-200 dark:border-slate-700 flex items-center justify-between z-20 shrink-0 no-print">
-      {/* سمت راست در RTL / چپ در LTR: دکمه همبرگری موبایل، نام فروشگاه و وضعیت */}
       <div className="navbar-identity flex items-center gap-2">
         <button
           onClick={onToggleSidebar}
@@ -121,9 +119,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         </div>
       </div>
 
-      {/* سمت چپ در RTL / راست در LTR: اقدامات سریع، تغییر زبان، دارک‌مود، تغییر واحد پول، اطلاعات کاربر و خروج */}
       <div className="navbar-tools flex items-center">
-        {/* دکمه سریع صدور فاکتور برای مدیر و تکنسین */}
         {(user?.role === 'MANAGER' || user?.role === 'TECHNICIAN') && (
           <Link
             to="/invoices/create"
@@ -134,7 +130,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           </Link>
         )}
 
-        {/* دکمه تغییر زبان بین فارسی و انگلیسی (FA / EN) */}
         <button
           type="button"
           onClick={toggleLanguage}
@@ -149,7 +144,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           </span>
         </button>
 
-        {/* دکمه تعویض دارک‌مود / لایت‌مود */}
         <button
           onClick={toggleDarkMode}
           className="toolbar-button"
@@ -164,7 +158,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           )}
         </button>
 
-        {/* سوئیچ واحد پولی بین ریال و تومان */}
         <button
           onClick={toggleCurrencyUnit}
           className="toolbar-button"
@@ -176,7 +169,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           </span>
         </button>
 
-        {/* منوی پروفایل کاربر */}
         {user && (
           <div className="relative" ref={dropdownRef}>
             <button
@@ -257,7 +249,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
       </div>
 
-      {/* مدال‌های پروفایل و تغییر کلمه عبور */}
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}

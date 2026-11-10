@@ -178,7 +178,6 @@ class SalesInvoiceCreateSerializer(serializers.ModelSerializer):
         if discount_amount and discount_percent and Decimal(str(discount_amount)) > 0 and Decimal(str(discount_percent)) > 0:
             raise serializers.ValidationError("امکان اعمال هم‌زمان تخفیف مبلغی و درصدی وجود ندارد.")
 
-        # بررسی عدم تجاوز تخفیف مبلغی از جمع کل اقلام
         if discount_amount and Decimal(str(discount_amount)) > 0:
             subtotal = Decimal('0.00')
             for item in tire_items:

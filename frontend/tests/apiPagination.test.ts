@@ -5,7 +5,6 @@ import { loadComponent, page } from './componentHarness.ts';
 
 function loadApi(path: string, get: (url: string, config?: any) => Promise<any>) {
   const client = { apiClient: { get } };
-  // The API modules and pagination adapter both use the same controlled transport.
   const pagination = loadComponent('../src/api/pagination.ts', {
     './client': client,
     '../utils/invoiceRequests': { fetchAllPages },

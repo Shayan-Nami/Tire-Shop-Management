@@ -62,7 +62,6 @@ class TireSerializer(serializers.ModelSerializer):
         read_only_fields = ['stock_quantity']
 
     def update(self, instance: Tire, validated_data: dict[str, Any]) -> Tire:
-        # Purchase cost is initialized on creation, then owned by purchase services.
         writable_fields = {'tire_name', 'brand', 'size', 'sale_price', 'min_stock_alert'}
         update_fields = writable_fields.intersection(validated_data)
         for field in update_fields:

@@ -43,7 +43,6 @@ export const PurchaseInvoices: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
 
-  // فرم ثبت فاکتور خرید جدید
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | ''>('');
   const [purchaseItems, setPurchaseItems] = useState<
@@ -96,7 +95,6 @@ export const PurchaseInvoices: React.FC = () => {
   }, [t, language]);
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Query changes intentionally enter the network loading state.
     void fetchPurchases();
   }, [fetchPurchases]);
 
@@ -207,7 +205,6 @@ export const PurchaseInvoices: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("فاکتورهای خرید و ورود به انبار")}</h1>
@@ -231,7 +228,6 @@ export const PurchaseInvoices: React.FC = () => {
         <p role="status" className="text-xs text-slate-500">{t("در حال دریافت فهرست کامل تأمین‌کنندگان و تایرها...")}</p>
       )}
 
-      {/* جستجو */}
       <div className="filter-bar">
         <div className="relative w-full md:w-80">
           <input
@@ -248,7 +244,6 @@ export const PurchaseInvoices: React.FC = () => {
         </div>
       </div>
 
-      {/* جدول فاکتورهای خرید */}
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت فاکتورهای خرید...")}</div>
@@ -350,7 +345,6 @@ export const PurchaseInvoices: React.FC = () => {
         )}
       </div>
 
-      {/* مدال ثبت فاکتور خرید */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
@@ -383,7 +377,6 @@ export const PurchaseInvoices: React.FC = () => {
                 </select>
               </div>
 
-              {/* افزودن تایر */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-slate-700 dark:text-slate-300">{t("اقلام تایر خریداری‌شده:")}</label>

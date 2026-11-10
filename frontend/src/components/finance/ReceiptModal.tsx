@@ -26,7 +26,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
         : invoice.net_amount || invoice.total_amount || 0)
     : 0;
   const defaultAmount = Math.max(0, Math.round(parseFloat(String(rawAmount)) || 0));
-  
+
   const [amount, setAmount] = useState<string>(defaultAmount.toString());
   const [paymentMethod, setPaymentMethod] = useState<'POS' | 'CASH' | 'CARD_TO_CARD' | 'CHEQUE'>('POS');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
@@ -41,7 +41,6 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
         ? invoice.remaining_amount
         : invoice.net_amount || invoice.total_amount || 0;
       const def = Math.max(0, Math.round(parseFloat(String(raw)) || 0));
-      // oxlint-disable-next-line react/set-state-in-effect -- A changed invoice resets the editable suggested receipt amount.
       setAmount(def.toString());
     }
   }, [invoice]);

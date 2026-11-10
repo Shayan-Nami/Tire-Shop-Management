@@ -13,7 +13,6 @@ class Command(BaseCommand):
 
         discrepancies = []
         with transaction.atomic():
-            # ۱. بررسی فاکتورهای فروش
             sales_invoices = SalesInvoice.objects.all().order_by('sales_invoice_id')
             total_sales_count = sales_invoices.count()
 
@@ -43,7 +42,6 @@ class Command(BaseCommand):
                         'expected_status': expected_status,
                     })
 
-            # ۲. بررسی فاکتورهای خرید
             purchase_invoices = PurchaseInvoice.objects.all().order_by('purchase_invoice_id')
             total_purchase_count = purchase_invoices.count()
 

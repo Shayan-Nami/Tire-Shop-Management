@@ -29,7 +29,7 @@ def test_financial_document_admin_disallows_direct_writes(model, superuser):
 @pytest.mark.django_db
 def test_admin_post_cannot_change_invoice_or_delete_it(client, superuser):
     invoice = SalesInvoice.objects.create(
-        invoice_number='AUDIT-ADMIN',
+        invoice_number='S-1404-00001',
         customer=Customer.objects.create(full_name='آزمون پنل مدیریت'),
         total_amount='1000.00',
     )

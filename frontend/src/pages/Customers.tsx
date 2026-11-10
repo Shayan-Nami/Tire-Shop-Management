@@ -16,14 +16,12 @@ export const Customers: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
 
-  // افزودن مشتری
   const [showAddCustomerModal, setShowAddCustomerModal] = useState<boolean>(false);
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [nationalCode, setNationalCode] = useState<string>('');
   const [address, setAddress] = useState<string>('');
 
-  // افزودن خودرو برای مشتری
   const [selectedCustomerForVehicle, setSelectedCustomerForVehicle] = useState<Customer | null>(null);
   const [plate, setPlate] = useState<string>('');
   const [model, setModel] = useState<string>(t("پژو ۲۰۶"));
@@ -53,7 +51,6 @@ export const Customers: React.FC = () => {
   }, [debouncedSearch, currentPage]);
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Query changes intentionally enter the network loading state.
     void fetchCustomers();
   }, [fetchCustomers]);
 
@@ -96,7 +93,6 @@ export const Customers: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("مشتریان و وسایل نقلیه (CRM)")}</h1>
@@ -112,7 +108,6 @@ export const Customers: React.FC = () => {
         </button>
       </div>
 
-      {/* جستجو */}
       <div className="filter-bar">
         <div className="relative w-full md:w-80">
           <input
@@ -129,7 +124,6 @@ export const Customers: React.FC = () => {
         </div>
       </div>
 
-      {/* جدول مشتریان */}
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت مشتریان...")}</div>
@@ -196,7 +190,6 @@ export const Customers: React.FC = () => {
           </div>
         )}
 
-        {/* صفحه‌بندی (Pagination) */}
         {totalPages > 1 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
             <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("پرونده)")}</span>
@@ -216,7 +209,6 @@ export const Customers: React.FC = () => {
         )}
       </div>
 
-      {/* مدال افزودن مشتری */}
       {showAddCustomerModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
@@ -294,7 +286,6 @@ export const Customers: React.FC = () => {
         </div>
       )}
 
-      {/* مدال افزودن خودرو برای مشتری */}
       {selectedCustomerForVehicle && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">

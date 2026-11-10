@@ -1,6 +1,5 @@
 import { apiClient } from '../api/client';
 
-/** Clear local credentials without contacting endpoints that may now reject them. */
 export function clearLocalSession(): void {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');

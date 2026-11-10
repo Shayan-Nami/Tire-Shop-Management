@@ -32,7 +32,6 @@ class ReceiptVoucherViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSet
 
     @action(detail=True, methods=['post'], url_path='cancel', permission_classes=[IsManager])
     def cancel(self, request, pk=None):
-        """ابطال سند دریافت وجه با ذکر دلیل الزامی"""
         voucher = self.get_object()
         serializer = CancelVoucherSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -58,7 +57,6 @@ class PaymentVoucherViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSet
 
     @action(detail=True, methods=['post'], url_path='cancel', permission_classes=[IsManager])
     def cancel(self, request, pk=None):
-        """ابطال سند پرداخت وجه با ذکر دلیل الزامی"""
         voucher = self.get_object()
         serializer = CancelVoucherSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -84,7 +82,6 @@ class CustomerRefundVoucherViewSet(ImmutableDocumentViewSetMixin, viewsets.Model
 
     @action(detail=True, methods=['post'], url_path='cancel', permission_classes=[IsManager])
     def cancel(self, request, pk=None):
-        """ابطال سند استرداد وجه به مشتری با ذکر دلیل الزامی"""
         voucher = self.get_object()
         serializer = CancelVoucherSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

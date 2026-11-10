@@ -28,9 +28,6 @@ def auth_client_manager(db):
 class TestCustomerUniqueAndSanitization:
 
     def test_customer_duplicate_phone_number_returns_400_persian_error(self, auth_client_manager):
-        """
-        شماره تماس تکراری برای مشتری جدید باید خطای ۴۰۰ با پیام فارسی صادر کند (نه خطای دیتابیسی ۵۰۰).
-        """
         Customer.objects.create(full_name='مشتری اول', phone_number='09121112233')
 
         url = reverse('customer-list')
@@ -43,9 +40,6 @@ class TestCustomerUniqueAndSanitization:
         assert any(msg in str(res.data) for msg in ['از قبل موجود است', 'قبلاً برای مشتری دیگری ثبت شده است'])
 
     def test_customer_duplicate_national_code_returns_400_persian_error(self, auth_client_manager):
-        """
-        کد ملی تکراری برای مشتری جدید باید خطای ۴۰۰ با پیام فارسی صادر کند.
-        """
         Customer.objects.create(full_name='مشتری الف', phone_number='09121110001', national_code='0011223344')
 
         url = reverse('customer-list')
@@ -59,25 +53,17 @@ class TestCustomerUniqueAndSanitization:
         assert any(msg in str(res.data) for msg in ['از قبل موجود است', 'قبلاً برای مشتری دیگری ثبت شده است'])
 
     def test_customer_multiple_null_or_empty_phone_and_national_code_allowed(self, auth_client_manager):
-        """
-        بررسی یکتایی شرطی: ثبت چندین مشتری بدون شماره تماس یا بدون کد ملی (NULL یا رشته خالی) کاملاً مجاز است.
-        رشته‌های خالی نیز باید به صورت خودکار به NULL تبدیل شوند.
-        """
         url = reverse('customer-list')
 
-        # مشتری ۱: با فیلدهای تهی (None)
         res1 = auth_client_manager.post(url, {'full_name': 'مشتری ناشناس ۱', 'phone_number': None, 'national_code': None}, format='json')
         assert res1.status_code == 201
 
-        # مشتری ۲: با رشته‌های خالی ('')
         res2 = auth_client_manager.post(url, {'full_name': 'مشتری ناشناس ۲', 'phone_number': '', 'national_code': ''}, format='json')
         assert res2.status_code == 201
 
-        # مشتری ۳: ترکیبی
         res3 = auth_client_manager.post(url, {'full_name': 'مشتری ناشناس ۳', 'phone_number': '   ', 'national_code': None}, format='json')
         assert res3.status_code == 201
 
-        # تأیید اینکه در دیتابیس همگی به عنوان NULL ذخیره شده‌اند
         c1 = Customer.objects.get(pk=res1.data['customer_id'])
         c2 = Customer.objects.get(pk=res2.data['customer_id'])
         c3 = Customer.objects.get(pk=res3.data['customer_id'])
@@ -87,9 +73,6 @@ class TestCustomerUniqueAndSanitization:
         assert c3.phone_number is None and c3.national_code is None
 
     def test_user_duplicate_phone_number_returns_400_persian_error(self, auth_client_manager):
-        """
-        شماره موبایل تکراری برای کاربر سیستم در اندپوینت ایجاد کاربر باید خطای ۴۰۰ با پیام فارسی دهد.
-        """
         User.objects.create_user(username='user_existing', password='Password123!', phone_number='09129998877')
 
         url = reverse('user-list')
@@ -105,9 +88,6 @@ class TestCustomerUniqueAndSanitization:
         assert any(msg in str(res.data) for msg in ['از قبل موجود است', 'قبلاً برای کاربر دیگری ثبت شده است'])
 
     def test_user_multiple_null_or_empty_phone_allowed(self, auth_client_manager):
-        """
-        امکان ایجاد چندین کاربر بدون شماره موبایل (NULL یا خالی) بدون تداخل قید یکتایی.
-        """
         url = reverse('user-list')
 
         res1 = auth_client_manager.post(url, {
@@ -132,9 +112,6 @@ class TestCustomerUniqueAndSanitization:
         assert u2.phone_number is None
 
     def test_model_full_clean_raises_validation_error_on_duplicate(self):
-        """
-        اعتبارسنجی در متد clean() مدل: فراخوانی full_clean خطای ValidationError با پیام فارسی صادر می‌کند.
-        """
         Customer.objects.create(full_name='مشتری الف', phone_number='09123334455')
         dup_customer = Customer(full_name='مشتری ب', phone_number='09123334455')
 

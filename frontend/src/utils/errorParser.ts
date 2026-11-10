@@ -35,10 +35,6 @@ const FIELD_LABELS_FA: Record<string, string> = {
   detail: 'پیام',
 };
 
-/**
- * استخراج پیام خطای فارسی خوانا از پاسخ‌های استاندارد و سفارشی Django REST Framework
- * ساختار پاسخ سرور: { success: false, status_code: number, errors: ... }
- */
 function parseRawApiError(
   error: unknown,
   fallback: string = 'خطایی در انجام عملیات رخ داده است.',
@@ -47,7 +43,6 @@ function parseRawApiError(
   if (!error) return fallback;
 
   if (axios.isAxiosError(error)) {
-    // خطای عدم برقراری ارتباط با شبکه / قطعی سرور
     if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
       return 'خطا در برقراری ارتباط با سرور. لطفاً اتصال اینترنت یا فعال بودن سرور را بررسی فرمایید.';
     }
@@ -72,7 +67,6 @@ function parseRawApiError(
       return error.message || fallback;
     }
 
-    // بررسی وجود آبجکت errors در ساختار پاسخ DRF
     const rawErrors = data.errors !== undefined ? data.errors : data;
 
     const visited = new WeakSet<object>();

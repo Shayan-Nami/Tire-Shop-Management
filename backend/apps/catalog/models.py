@@ -50,7 +50,6 @@ class Tire(models.Model):
     min_stock_alert = models.PositiveIntegerField(default=5, verbose_name='حداقل موجودی جهت هشدار')
 
     class Meta:
-        # نگهداری نام جدول Tier برای سازگاری کامل با اسکریپت‌های SQL قبلی
         db_table = 'Tier'
         verbose_name = 'تایر'
         verbose_name_plural = 'تایرها'
@@ -167,7 +166,6 @@ class StockMovement(models.Model):
 
 
 class StockProjectionRepair(models.Model):
-    """Audit a projection rebuild without inventing physical stock movements."""
 
     tire = models.ForeignKey(Tire, on_delete=models.PROTECT, related_name='projection_repairs')
     stock_before = models.PositiveIntegerField()

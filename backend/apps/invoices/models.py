@@ -116,7 +116,6 @@ class SalesInvoice(models.Model):
 
     @property
     def returned_amount(self) -> Decimal:
-        """مجموع مبالغ مرجوعی فاکتور فروش (محاسباتی، بدون ذخیره در دیتابیس)"""
         if hasattr(self, 'returned_amount_annotated') and self.returned_amount_annotated is not None:
             return self.returned_amount_annotated
         total = self.returns.aggregate(total=models.Sum('total_refund_amount'))['total']
@@ -124,14 +123,12 @@ class SalesInvoice(models.Model):
 
     @property
     def net_amount(self) -> Decimal:
-        """مبلغ خالص فاکتور پس از کسر مرجوعی‌ها (محاسباتی)"""
         if hasattr(self, 'net_amount_annotated') and self.net_amount_annotated is not None:
             return self.net_amount_annotated
         return max(self.total_amount - self.returned_amount, Decimal('0.00'))
 
     @property
     def excess_amount(self) -> Decimal:
-        """مبلغ مازاد پرداختی توسط مشتری که قابل استرداد است (محاسباتی)"""
         if hasattr(self, 'excess_amount_annotated') and self.excess_amount_annotated is not None:
             return self.excess_amount_annotated
         valid_received = self.receipts.filter(is_cancelled=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
@@ -141,7 +138,6 @@ class SalesInvoice(models.Model):
 
     @property
     def paid_amount(self) -> Decimal:
-        """مبلغ خالص دریافتی فاکتور فروش پس از کسر استردادها (محاسباتی)"""
         if hasattr(self, 'paid_amount_annotated') and self.paid_amount_annotated is not None:
             return self.paid_amount_annotated
         valid_received = self.receipts.filter(is_cancelled=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
@@ -150,7 +146,6 @@ class SalesInvoice(models.Model):
 
     @property
     def remaining_amount(self) -> Decimal:
-        """مانده بدهی فاکتور فروش (محاسباتی: net_amount - paid_amount)"""
         if hasattr(self, 'remaining_amount_annotated') and self.remaining_amount_annotated is not None:
             return self.remaining_amount_annotated
         return max(self.net_amount - self.paid_amount, Decimal('0.00'))
@@ -448,7 +443,6 @@ class SalesReturnItem(models.Model):
         return f"{self.quantity}x {self.tire.tire_name} (استرداد: {self.refund_amount:,.0f})"
 
 class LegacyInvoiceItem(models.Model):
-    """مدل جدول قدیمی Invoice_items جهت حفظ در دیتابیس بدون دخالت در میگریشن"""
     item_id = models.AutoField(primary_key=True)
     quantity = models.IntegerField()
     unit_price = models.DecimalField(max_digits=18, decimal_places=2)

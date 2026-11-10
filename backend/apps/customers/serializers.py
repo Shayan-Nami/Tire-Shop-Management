@@ -5,9 +5,6 @@ from .models import Customer, Vehicle
 from utils.persian import normalize_digits
 
 class PersianNormalizedCharField(serializers.CharField):
-    """
-    فیلد متنی سفارشی جهت نرمال‌سازی ارقام فارسی به انگلیسی بدون تغییر مستقیم دیکشنری داده‌های اولیه.
-    """
     def to_internal_value(self, data: Any) -> str | None:
         if data is None:
             return None

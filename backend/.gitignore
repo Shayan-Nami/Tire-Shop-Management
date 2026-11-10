@@ -1,4 +1,3 @@
-# Python environments and generated files
 __pycache__/
 *.py[cod]
 venv/
@@ -9,7 +8,6 @@ ENV/
 build/
 dist/
 
-# Tests, static analysis, and coverage
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
@@ -20,7 +18,6 @@ dist/
 htmlcov/
 coverage.xml
 
-# Local data, collected assets, and logs
 *.sqlite3
 *.sqlite3-*
 *.db
@@ -31,12 +28,9 @@ media/
 logs/
 *.log
 
-# Secrets (keep the dummy template)
 .env
 .env.*
 !.env.example
 
-# Local editor configuration
 .vscode/
 .idea/
-.zed/

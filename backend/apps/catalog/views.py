@@ -36,7 +36,6 @@ class TireViewSet(viewsets.ModelViewSet):
 
     @property
     def ordering_fields(self):
-        # جلوگیری از امکان مرتب‌سازی بر اساس قیمت خرید برای تکنسین‌ها
         fields = ['stock_quantity', 'sale_price', 'purchase_price']
         request = getattr(self, 'request', None)
         if request and hasattr(request, 'user') and getattr(request.user, 'role', None) == UserRole.TECHNICIAN:
@@ -48,7 +47,6 @@ class TireViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='low-stock')
     def low_stock(self, request):
-        """فهرست تایرهایی که موجودی آنها به حداقل یا کمتر از حداقل رسیده است"""
         low_stock_tires = Tire.objects.select_related('brand', 'size').filter(
             stock_quantity__lte=F('min_stock_alert')
         ).order_by('stock_quantity')
@@ -61,7 +59,6 @@ class TireViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='adjust-stock', permission_classes=[IsWarehouse])
     def adjust_stock(self, request, pk=None):
-        """اصلاح دستی و انبارگردانی موجودی تایر توسط انباردار یا مدیر با ثبت دلیل الزامی"""
         tire = self.get_object()
         serializer = StockAdjustmentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -83,10 +80,6 @@ class TireViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
 
 class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    دفتر گردش انبار (کاملاً فقط‌خواندنی بدون امکان ویرایش، حذف یا ایجاد مستقیم)
-    دسترسی منحصراً برای انباردار و مدیر مجاز است؛ تکنسین خطای ۴۰۳ دریافت می‌کند.
-    """
     queryset = StockMovement.objects.all()
     serializer_class = StockMovementSerializer
     permission_classes = [IsWarehouse]

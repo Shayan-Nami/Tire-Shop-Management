@@ -16,9 +16,6 @@ from apps.invoices.models import InvoiceStatus, SalesInvoice, PurchaseInvoice, P
 
 @transaction.atomic
 def sync_sales_invoice_payment_status(invoice_or_id: SalesInvoice | int) -> str:
-    """
-    سرویس مرکزی محاسبه مجدد و به‌روزرسانی payment_status فاکتور فروش بر اساس اسناد مالی ابطال‌نشده
-    """
     invoice_id = invoice_or_id.pk if hasattr(invoice_or_id, 'pk') else int(invoice_or_id)
     invoice = SalesInvoice.objects.select_for_update().get(pk=invoice_id)
 
@@ -45,9 +42,6 @@ def sync_sales_invoice_payment_status(invoice_or_id: SalesInvoice | int) -> str:
 
 @transaction.atomic
 def sync_purchase_invoice_payment_status(invoice_or_id: PurchaseInvoice | int) -> str:
-    """
-    سرویس مرکزی محاسبه مجدد و به‌روزرسانی payment_status فاکتور خرید بر اساس اسناد مالی ابطال‌نشده
-    """
     invoice_id = invoice_or_id.pk if hasattr(invoice_or_id, 'pk') else int(invoice_or_id)
     invoice = PurchaseInvoice.objects.select_for_update().get(pk=invoice_id)
 
@@ -68,9 +62,6 @@ def sync_purchase_invoice_payment_status(invoice_or_id: PurchaseInvoice | int) -
 
 
 def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal, payment_method: str = 'کارتخوان / نقدی', notes: str = '', receipt_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> ReceiptVoucher:
-    """
-    سرویس ثبت سند دریافت وجه برای فاکتور فروش همراه با قفل ردیف فاکتور و کنترل سقف مانده بدهی خالص
-    """
     if sales_invoice.status == InvoiceStatus.CANCELLED:
         raise ValidationError("امکان ثبت سند دریافت وجه برای فاکتور لغو شده وجود ندارد.")
 
@@ -119,9 +110,6 @@ def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal,
 
 
 def cancel_receipt_voucher_service(voucher: ReceiptVoucher, reason: str, user: User | None=None) -> ReceiptVoucher:
-    """
-    سرویس ابطال سند دریافت وجه با قفل فاکتور فروش و به‌روزرسانی خودکار وضعیت پرداخت فاکتور
-    """
     if not reason or not str(reason).strip():
         raise ValidationError("ثبت علت ابطال سند الزامی است.")
 
@@ -152,9 +140,6 @@ def cancel_receipt_voucher_service(voucher: ReceiptVoucher, reason: str, user: U
 
 
 def create_payment_voucher_service(purchase_invoice: PurchaseInvoice, amount: Decimal, payment_method: str = 'حواله / چک', notes: str = '', payment_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> PaymentVoucher:
-    """
-    سرویس ثبت سند پرداخت وجه برای فاکتور خرید همراه با قفل ردیف فاکتور و کنترل سقف مانده
-    """
     if purchase_invoice.status == InvoiceStatus.CANCELLED:
         raise ValidationError("امکان ثبت سند پرداخت وجه برای فاکتور خرید لغو شده وجود ندارد.")
 
@@ -201,9 +186,6 @@ def create_payment_voucher_service(purchase_invoice: PurchaseInvoice, amount: De
 
 
 def cancel_payment_voucher_service(voucher: PaymentVoucher, reason: str, user: User | None=None) -> PaymentVoucher:
-    """
-    سرویس ابطال سند پرداخت وجه با قفل فاکتور خرید و به‌روزرسانی خودکار وضعیت پرداخت فاکتور
-    """
     if not reason or not str(reason).strip():
         raise ValidationError("ثبت علت ابطال سند الزامی است.")
 
@@ -226,9 +208,6 @@ def cancel_payment_voucher_service(voucher: PaymentVoucher, reason: str, user: U
 
 
 def create_customer_refund_voucher_service(sales_invoice: SalesInvoice, amount: Decimal, sales_return: SalesReturn | None = None, payment_method: str = 'کارتخوان / نقدی', notes: str = '', refund_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> CustomerRefundVoucher:
-    """
-    سرویس ثبت سند استرداد وجه به مشتری همراه با کنترل سقف مازاد پرداختی و قفل فاکتور
-    """
     if sales_invoice.status == InvoiceStatus.CANCELLED:
         raise ValidationError("امکان ثبت استرداد وجه برای فاکتور فروش لغو شده وجود ندارد.")
 
@@ -281,9 +260,6 @@ def create_customer_refund_voucher_service(sales_invoice: SalesInvoice, amount: 
 
 
 def cancel_customer_refund_voucher_service(voucher: CustomerRefundVoucher, reason: str, user: User | None=None) -> CustomerRefundVoucher:
-    """
-    سرویس ابطال سند استرداد وجه به مشتری همراه با قفل فاکتور فروش و بازگشت خودکار مبلغ مازاد
-    """
     if not reason or not str(reason).strip():
         raise ValidationError("ثبت علت ابطال سند الزامی است.")
 

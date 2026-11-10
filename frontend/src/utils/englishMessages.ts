@@ -1,4 +1,3 @@
-// Source-language keys preserve Persian interface copy. Do not translate customer data.
 export const englishMessages: Record<string, string> = {
   "در حال بارگذاری صفحه...": "Loading page…",
   "لطفاً کلمه عبور فعلی را وارد نمایید.": "Enter your current password.",

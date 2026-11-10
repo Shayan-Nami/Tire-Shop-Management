@@ -1,8 +1,3 @@
-"""Disposable SQLite and process-local cache for repository verification only.
-
-Usage: python -m pytest --ds=config.verification_settings
-Never use this settings module to serve the application.
-"""
 import os
 
 os.environ['PYTHON_DOTENV_DISABLED'] = '1'
@@ -11,7 +6,7 @@ os.environ['DJANGO_DEBUG'] = 'False'
 os.environ['DB_ENGINE'] = 'sqlite'
 os.environ['USE_SQL_SERVER'] = 'False'
 
-from .settings import *  # noqa: F403 -- inherit application settings, override external resources below
+from .settings import *
 
 DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}}
 CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}

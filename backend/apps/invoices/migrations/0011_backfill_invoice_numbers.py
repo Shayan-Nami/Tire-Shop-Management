@@ -22,7 +22,6 @@ def backfill_invoice_numbers(apps, schema_editor):
     PurchaseInvoice = apps.get_model('invoices', 'PurchaseInvoice')
     InvoiceSequence = apps.get_model('invoices', 'InvoiceSequence')
 
-    # ۱. تخصیص شماره پیوسته به فاکتورهای فروش موجود بر اساس ترتیب تاریخ و شناسه
     sales_invoices = SalesInvoice.objects.filter(
         models_q_filter(invoice_number__isnull=True)
     ).order_by('invoice_date', 'sales_invoice_id')
@@ -40,7 +39,6 @@ def backfill_invoice_numbers(apps, schema_editor):
             inv.invoice_number = f"S-{year}-{seq.last_number:05d}"
             inv.save(update_fields=['invoice_number'])
 
-    # ۲. تخصیص شماره پیوسته به فاکتورهای خرید موجود بر اساس ترتیب تاریخ و شناسه
     purchase_invoices = PurchaseInvoice.objects.filter(
         models_q_filter(invoice_number__isnull=True)
     ).order_by('invoice_date', 'purchase_invoice_id')

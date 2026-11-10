@@ -10,14 +10,12 @@ export const apiClient = axios.create({
   },
 });
 
-// اینترسپتور ارسال توکن دسترسی JWT در تمام درخواست‌ها
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    // A 401 retry may have rotated and blacklisted the refresh token in the original logout body.
     if (config.url === '/auth/logout/') {
       const refresh = localStorage.getItem('refresh_token');
       if (refresh) config.data = { refresh };
@@ -27,7 +25,6 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// اینترسپتور مدیریت خطای ۴۰۱ و تمدید خودکار توکن (Silent Refresh)
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (value?: unknown) => void;
@@ -66,7 +63,6 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // Queued requests also get only one replay, even if the new access token is rejected.
       originalRequest._retry = true;
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

@@ -1,4 +1,3 @@
-"""Role matrix uses persisted ordinary users, never superuser-backed managers."""
 import pytest
 from django.urls import reverse
 from apps.accounts.models import User, UserRole

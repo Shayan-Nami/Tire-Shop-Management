@@ -2,13 +2,6 @@ from rest_framework.permissions import BasePermission
 from apps.accounts.models import UserRole
 
 class SalesInvoicePermission(BasePermission):
-    """
-    مجوزهای دسترسی به فاکتور فروش (جلوگیری از BOLA/IDOR):
-    - مشاهده (GET/HEAD/OPTIONS): مجاز برای همه کاربران احراز هویت شده (مدیر، انباردار، تکنسین)
-      (فیلتر دسترسی اشیاء در get_queryset اعمال می‌شود تا تکنسین فقط فاکتورهای خودش را ببیند)
-    - ایجاد (POST): فقط تکنسین و مدیر مجازند؛ انباردار مسدود است (403)
-    - سایر متدها (PUT/PATCH/DELETE): مسدود
-    """
     message = 'انباردار مجاز به صدور فاکتور فروش نیست.'
 
     def has_permission(self, request, view):

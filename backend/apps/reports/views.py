@@ -11,9 +11,6 @@ from .serializers import (
 )
 
 class DashboardStatsView(APIView):
-    """
-    آمار کلی و شاخص‌های کلیدی عملکرد (KPI) جهت نمایش در کارت‌های داشبورد اصلی با لحاظ مرجوعی‌ها
-    """
     permission_classes = [IsManager]
 
     @extend_schema(responses={200: DashboardStatsResponseSerializer})
@@ -21,7 +18,6 @@ class DashboardStatsView(APIView):
         return Response(dashboard_stats())
 
 class SalesByBrandReportView(APIView):
-    """گزارش تفکیکی فروش بر اساس برندهای لاستیک با کسر مرجوعی‌ها"""
     permission_classes = [IsManager]
 
     @extend_schema(parameters=[SalesByBrandQuerySerializer], responses={200: SalesByBrandItemSerializer(many=True)})
@@ -32,16 +28,13 @@ class SalesByBrandReportView(APIView):
         return Response(sales_by_brand(brand_id=brand_id))
 
 class ProfitabilityReportView(APIView):
-    """گزارش سودآوری تایرها بر اساس مابه‌التفاوت نرخ خرید و فروش با کسر مرجوعی‌ها و احتساب تخفیف فاکتور"""
     permission_classes = [IsManager]
 
     @extend_schema(responses={200: ProfitabilityItemSerializer(many=True)})
     def get(self, request):
-        # تجمیع محاسبات در سطح پایگاه داده با ORM aggregation جهت بهینه‌سازی مصرف حافظه
         return Response(profitability())
 
 class InventoryValueReportView(APIView):
-    """گزارش ارزش ریالی موجودی انبار بر اساس قیمت خرید"""
     permission_classes = [IsManager]
 
     @extend_schema(responses={200: InventoryValueResponseSerializer})
@@ -49,7 +42,6 @@ class InventoryValueReportView(APIView):
         return Response(inventory_value())
 
 class SalesByDateRangeReportView(APIView):
-    """گزارش فروش بر اساس بازه تاریخ میلادی / شمسی با احتساب مرجوعی‌ها (مبنای مرجوعی: تاریخ ثبت مرجوعی)"""
     permission_classes = [IsManager]
 
     @extend_schema(parameters=[SalesByDateQuerySerializer], responses={200: SalesByDateRangeResponseSerializer})

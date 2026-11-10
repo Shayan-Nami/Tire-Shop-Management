@@ -55,7 +55,6 @@ def test_password_change_revokes_every_session(technician_user, manager_user, re
             'old_password': 'pass123', 'new_password': NEW_PASSWORD,
         }, format='json')
     else:
-        # A role-based manager must be able to reset another manager too.
         manager_user.is_superuser = False
         manager_user.save(update_fields=['is_superuser'])
         response = bearer(manager_tokens['access']).patch(
@@ -90,7 +89,6 @@ def test_refresh_checks_password_hash_even_without_outstanding_record(technician
     tokens = {'refresh': str(refresh), 'access': str(refresh.access_token)}
     OutstandingToken.objects.filter(user=technician_user).delete()
     if not missing_claim:
-        # Isolate the hash check from the blacklist, including externally changed passwords.
         technician_user.set_password(NEW_PASSWORD)
         technician_user.save(update_fields=['password'])
     assert_rejected(tokens)

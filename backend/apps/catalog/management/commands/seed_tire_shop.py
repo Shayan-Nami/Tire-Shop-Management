@@ -19,7 +19,6 @@ class Command(BaseCommand):
             raise CommandError('Demo seeding requires DEBUG=True and ALLOW_DEMO_SEED=True.')
 
         self.stdout.write("در حال ایجاد کاربران اولیه...")
-        # کاربران پیش‌فرض با ۳ نقش
         admin_user, created = User.objects.get_or_create(
             username='admin',
             defaults={
@@ -58,20 +57,17 @@ class Command(BaseCommand):
             wh_user.save(update_fields=['password'])
 
         self.stdout.write("در حال ایجاد برندها و سایزهای تایر...")
-        # برندها
         barez, _ = Brand.objects.get_or_create(brand_name='بارز')
         kavir, _ = Brand.objects.get_or_create(brand_name='کویر تایر')
         yazd, _ = Brand.objects.get_or_create(brand_name='یزد تایر')
         michelin, _ = Brand.objects.get_or_create(brand_name='میشلن (Michelin)')
         hankook, _ = Brand.objects.get_or_create(brand_name='هانکوک (Hankook)')
 
-        # سایزها
         s13, _ = Size.objects.get_or_create(size_name='165/65R13')
         s14, _ = Size.objects.get_or_create(size_name='185/65R14')
         s15, _ = Size.objects.get_or_create(size_name='185/65R15')
         s16, _ = Size.objects.get_or_create(size_name='205/55R16')
 
-        # تایرها
         t1, _ = Tire.objects.get_or_create(
             tire_name='بارز پریمیوم گریپ P648',
             brand=barez,
@@ -101,7 +97,7 @@ class Command(BaseCommand):
             brand=yazd,
             size=s15,
             defaults={
-                'stock_quantity': 4,  # هشدار کمبود موجودی
+                'stock_quantity': 4,
                 'purchase_price': Decimal('2400000'),
                 'sale_price': Decimal('3000000'),
                 'min_stock_alert': 6
@@ -131,7 +127,6 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write("در حال ایجاد خدمات و تعرفه‌ها...")
-        # خدمات
         srv1, _ = Service.objects.get_or_create(
             service_name='تعویض و جا انداختن هر حلقه لاستیک',
             defaults={'price': Decimal('80000'), 'description': 'شامل باز و بست چرخ و سوار کردن تایر'}
@@ -196,7 +191,6 @@ class Command(BaseCommand):
             }
         )
 
-        # ایجاد یک فاکتور فروش نمونه برای تست اولیه
         if not c1.sales_invoices.exists():
             self.stdout.write("در حال صدور یک فاکتور فروش نمونه با تراکنش اتمیک...")
             create_sales_invoice_service(

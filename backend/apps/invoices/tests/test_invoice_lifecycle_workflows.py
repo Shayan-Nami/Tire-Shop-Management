@@ -17,12 +17,12 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def shop():
-    brand = Brand.objects.create(brand_name='Audit')
+    brand = Brand.objects.create(brand_name='Barez')
     size = Size.objects.create(size_name='195/65R15')
-    customer = Customer.objects.create(full_name='Audit customer')
+    customer = Customer.objects.create(full_name='Sample customer')
     service = Service.objects.create(service_name='Mount and balance', price=Decimal('20'))
     def tire(number):
-        return Tire.objects.create(tire_name=f'Audit {number}', brand=brand, size=size,
+        return Tire.objects.create(tire_name=f'Sample tire {number}', brand=brand, size=size,
                                    stock_quantity=10, sale_price=Decimal('100'), purchase_price=Decimal('50'))
     return customer, service, tire
 

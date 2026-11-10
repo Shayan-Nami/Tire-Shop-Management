@@ -67,22 +67,10 @@ def settlement_setup(db):
 
 @pytest.mark.django_db
 class TestInvoiceSettlement:
-    """
-    مجموعه آزمون‌های تجربی و تنش‌زا برای راستی‌آزمایی جامع فاکتورهای نقدی،
-    تخفیف‌های مرزی (۱۰۰٪، جزئی)، کاراکترهای یونیکد، آمارهای داشبورد و ابزار تطبیق پرداخت‌ها
-    """
 
     def test_cash_sale_100_percent_discount_boundary(
         self, settlement_setup, auth_client_manager
     ):
-        """
-        سناریو ۱: فاکتور فروش نقدی با ۱۰۰٪ تخفیف درصدی (مبلغ نهایی صفر)
-        - نباید خطا بدهد
-        - نباید سند دریافت صفر ریالی ایجاد شود (چون مبالغ <= 0 در سند مالی ممنوع است)
-        - وضعیت پرداخت باید PAID باشد
-        - مانده بدهی در داشبورد باید دقیقاً 0.00 باشد
-        - دستور تطبیق پرداخت‌ها باید بدون مغایرت تایید کند
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
@@ -105,30 +93,23 @@ class TestInvoiceSettlement:
         assert invoice.remaining_amount == Decimal('0.00')
         assert invoice.paid_amount == Decimal('0.00')
 
-        # نباید سند دریافت ایجاد شده باشد چون مبلغ صفر است
         assert invoice.receipts.count() == 0
 
-        # استعلام از داشبورد
         dash_res = auth_client_manager.get(reverse('dashboard-stats'))
         assert dash_res.status_code == status.HTTP_200_OK
         assert Decimal(str(dash_res.data['total_receivables'])) == Decimal('0.00')
         assert dash_res.data['unpaid_invoices_count'] == 0
 
-        # تطبیق پرداخت‌ها
         call_command('reconcile_payments')
 
     def test_cash_sale_100_percent_amount_discount_boundary(
         self, settlement_setup, auth_client_manager
     ):
-        """
-        سناریو ۲: فاکتور فروش نقدی با تخفیف مبلغی دقیقاً معادل جمع کل فاکتور
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
         manager = settlement_setup['manager']
 
-        # ۲ حلقه با قیمت ۳,۰۰۰,۰۰۰ = ۶,۰۰۰,۰۰۰ جمع کل
         subtotal = Decimal('6000000.00')
         invoice = create_sales_invoice_service(
             customer=customer,
@@ -157,9 +138,6 @@ class TestInvoiceSettlement:
     def test_cash_sale_discount_exceeding_subtotal_rejected(
         self, settlement_setup
     ):
-        """
-        سناریو ۳: تخفیف بیش از جمع کل فاکتور باید صریحاً با ValidationError رد شود
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
@@ -181,16 +159,11 @@ class TestInvoiceSettlement:
     def test_cash_sale_partial_discounts_exact_auto_receipt(
         self, settlement_setup, auth_client_manager
     ):
-        """
-        سناریو ۴: فاکتورهای فروش نقدی با تخفیف‌های درصدی و مبلغی متنوع
-        بررسی تطابق دقیق ریالی سند دریافت با مبلغ نهایی فاکتور
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
         manager = settlement_setup['manager']
 
-        # الف) تخفیف ۲۵٪ روی ۶,۰۰۰,۰۰۰ تومان -> مبلغ کل = ۴,۵۰۰,۰۰۰ تومان
         inv1 = create_sales_invoice_service(
             customer=customer,
             vehicle=vehicle,
@@ -210,7 +183,6 @@ class TestInvoiceSettlement:
         assert inv1.remaining_amount == Decimal('0.00')
         assert inv1.paid_amount == Decimal('4500000.00')
 
-        # ب) تخفیف مبلغی ۱,۲۰۰,۰۰۰ تومان روی ۶,۰۰۰,۰۰۰ تومان -> مبلغ کل = ۴,۸۰۰,۰۰۰ تومان
         inv2 = create_sales_invoice_service(
             customer=customer,
             vehicle=vehicle,
@@ -228,7 +200,6 @@ class TestInvoiceSettlement:
         assert rcpt2.amount == Decimal('4800000.00')
         assert inv2.remaining_amount == Decimal('0.00')
 
-        # ج) تخفیف ۳۳.۳۳٪
         inv3 = create_sales_invoice_service(
             customer=customer,
             vehicle=vehicle,
@@ -245,7 +216,6 @@ class TestInvoiceSettlement:
         assert inv3.receipts.first().amount == expected_total
         assert inv3.remaining_amount == Decimal('0.00')
 
-        # استعلام داشبورد پس از هر ۳ فاکتور نقدی
         dash_res = auth_client_manager.get(reverse('dashboard-stats'))
         assert dash_res.status_code == status.HTTP_200_OK
         assert Decimal(str(dash_res.data['total_receivables'])) == Decimal('0.00')
@@ -256,21 +226,14 @@ class TestInvoiceSettlement:
     def test_extreme_unicode_reference_numbers(
         self, settlement_setup, auth_client_manager
     ):
-        """
-        سناریو ۵: ذخیره و بازیابی کاراکترهای یونیکد پیچیده، کاراکترهای کنترلی نیم‌فاصله،
-        ایموجی، نشانه‌های خاص و مرز ۱۰۰ کاراکتر در reference_number
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
 
-        # دقیقا ۱۰۰ کاراکتر با حروف فارسی، نیم‌فاصله، نمادها و اعداد
         complex_ref = "پیگیری‌کارتخوان-مرکزی-۱۲۳۴۵۶-!@#$%^&*()_+{}[]:;<>?,./~-شعبه‌اصلی-تست-نهایی-مرحله۱-۹۹۸۸۷۷"
-        # برش یا تطبیق با طول دقیق ۱۰۰ کاراکتر
         exact_100_ref = (complex_ref + ("X" * 100))[:100]
         assert len(exact_100_ref) == 100
 
-        # ارسال از طریق API فاکتور فروش
         url = reverse('sales-invoice-list')
         payload = {
             'customer': customer.pk,
@@ -290,13 +253,11 @@ class TestInvoiceSettlement:
         assert Decimal(str(res.data['remaining_amount'])) == Decimal('0.00')
         assert Decimal(str(res.data['paid_amount'])) == tire.sale_price
 
-        # بررسی در پایگاه داده
         inv = SalesInvoice.objects.get(pk=inv_id)
         rcpt = inv.receipts.first()
         assert rcpt is not None
         assert rcpt.reference_number == exact_100_ref
 
-        # استعلام از طریق جستجوی رسیدها در API مالی
         receipts_url = reverse('receipt-voucher-list')
         search_res = auth_client_manager.get(f"{receipts_url}?search={exact_100_ref[:20]}")
         assert search_res.status_code == status.HTTP_200_OK
@@ -308,9 +269,6 @@ class TestInvoiceSettlement:
     def test_oversized_reference_number_rejected(
         self, settlement_setup, auth_client_manager
     ):
-        """
-        سناریو ۶: شماره مرجع با طول بیش از ۱۰۰ کاراکتر باید رد شود
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
@@ -334,9 +292,6 @@ class TestInvoiceSettlement:
     def test_cash_sale_prevents_manual_overpayment(
         self, settlement_setup
     ):
-        """
-        سناریو ۷: تلاش برای ثبت رسید دستی مازاد بر فاکتور نقدی تسویه‌شده باید رد شود
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
@@ -362,9 +317,6 @@ class TestInvoiceSettlement:
     def test_cash_sale_prevents_invoice_cancellation_with_active_receipt(
         self, settlement_setup
     ):
-        """
-        سناریو ۸: فاکتور نقدی دارای رسید خودکار نمی‌تواند پیش از ابطال رسید لغو گردد
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
@@ -386,19 +338,11 @@ class TestInvoiceSettlement:
     def test_cash_sale_partial_return_and_dashboard_balance(
         self, settlement_setup, auth_client_manager
     ):
-        """
-        سناریو ۹: مرجوعی یک قلم از فاکتور نقدی تسویه‌شده
-        - مرجوعی ثبت می‌شود
-        - سند استرداد به مشتری صادر می‌شود
-        - مانده مطالبات داشبورد همچنان 0.00 باقی می‌ماند
-        - دستور تطبیق پرداخت‌ها صفر مغایرت گزارش می‌دهد
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
         manager = settlement_setup['manager']
 
-        # خرید ۲ حلقه نقدی به قیمت ۳,۰۰۰,۰۰۰ = ۶,۰۰۰,۰۰۰ تومان
         inv = create_sales_invoice_service(
             customer=customer,
             vehicle=vehicle,
@@ -410,7 +354,6 @@ class TestInvoiceSettlement:
         )
         tire_item = inv.tire_items.first()
 
-        # ثبت مرجوعی ۱ حلقه
         return_url = reverse('sales-return-list')
         payload = {
             'sales_invoice': inv.sales_invoice_id,
@@ -429,22 +372,16 @@ class TestInvoiceSettlement:
         assert inv.net_amount == Decimal('3000000.00')
         assert inv.remaining_amount == Decimal('0.00')
 
-        # بررسی داشبورد
         dash_res = auth_client_manager.get(reverse('dashboard-stats'))
         assert dash_res.status_code == status.HTTP_200_OK
         assert Decimal(str(dash_res.data['total_receivables'])) == Decimal('0.00')
         assert dash_res.data['unpaid_invoices_count'] == 0
 
-        # تطبیق پرداخت‌ها
         call_command('reconcile_payments')
 
     def test_multi_invoice_stress_suite_dashboard_and_reconciliation(
         self, settlement_setup, auth_client_manager
     ):
-        """
-        سناریو ۱۰: استرس تست با ترکیبی از ۱۰ فاکتور نقدی با تخفیف‌های مختلف و پرداخت‌های گوناگون
-        تایید عملکرد دقیق و بدون مغایرت DashboardStatsView و reconcile_payments
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
@@ -477,31 +414,21 @@ class TestInvoiceSettlement:
                 created_by=manager
             )
 
-        # بررسی نهایی داشبورد
         dash_res = auth_client_manager.get(reverse('dashboard-stats'))
         assert dash_res.status_code == status.HTTP_200_OK
         assert Decimal(str(dash_res.data['total_receivables'])) == Decimal('0.00')
         assert dash_res.data['unpaid_invoices_count'] == 0
 
-        # اجرای دستور تطبیق پرداخت‌ها روی کل پایگاه داده
         call_command('reconcile_payments')
 
     def test_mixed_cash_and_credit_sales_receivables_isolation(
         self, settlement_setup, auth_client_manager
     ):
-        """
-        سناریو ۱۱: تفکیک دقیق مطالبات نسیه از نقدی در داشبورد
-        - یک فاکتور نسیه (UNPAID) به مبلغ ۳,۰۰۰,۰۰۰ تومان صادر می‌شود
-        - پنج فاکتور نقدی (PAID) به مجموع ۱۵,۰۰۰,۰۰۰ تومان صادر می‌شود
-        - داشبورد باید دقیقاً ۳,۰۰۰,۰۰۰ تومان مطالبات معوق و دقیقاً ۱ فاکتور پرداخت‌نشده نشان دهد
-        - فاکتورهای نقدی به هیچ وجه نباید در مانده مطالبات اثر بگذارند یا مبلغی اضافه کنند
-        """
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
         manager = settlement_setup['manager']
 
-        # فاکتور نسیه (UNPAID)
         credit_inv = create_sales_invoice_service(
             customer=customer,
             vehicle=vehicle,
@@ -512,7 +439,6 @@ class TestInvoiceSettlement:
         )
         assert credit_inv.remaining_amount == tire.sale_price
 
-        # ۵ فاکتور نقدی (PAID)
         for i in range(5):
             create_sales_invoice_service(
                 customer=customer,
@@ -527,7 +453,6 @@ class TestInvoiceSettlement:
 
         dash_res = auth_client_manager.get(reverse('dashboard-stats'))
         assert dash_res.status_code == status.HTTP_200_OK
-        # مطالبات باید دقیقاً معادل تنها فاکتور نسیه باشد (۳,۰۰۰,۰۰۰ تومان)
         assert Decimal(str(dash_res.data['total_receivables'])) == tire.sale_price
         assert dash_res.data['unpaid_invoices_count'] == 1
 
@@ -536,17 +461,12 @@ class TestInvoiceSettlement:
     def test_reconcile_payments_command_output_and_zero_discrepancies(
         self, settlement_setup
     ):
-        """
-        سناریو ۱۲: اجرای مستقیم دستور reconcile_payments در محیط با تراکنش‌های مختلف
-        و اعتبارسنجی خروجی متنی موفقیت‌آمیز
-        """
         from io import StringIO
         tire = settlement_setup['tire']
         customer = settlement_setup['customer']
         vehicle = settlement_setup['vehicle']
         manager = settlement_setup['manager']
 
-        # صدور فاکتور نقدی با رسید خودکار
         create_sales_invoice_service(
             customer=customer,
             vehicle=vehicle,

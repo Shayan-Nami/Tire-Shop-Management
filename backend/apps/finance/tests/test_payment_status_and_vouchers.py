@@ -70,12 +70,6 @@ class TestPaymentStatusAndVouchers:
     def test_sales_invoice_payment_status_transitions_and_voucher_cancellation(
         self, setup_finance_data, manager_user
     ):
-        """
-        تست گذار وضعیت پرداخت فاکتور فروش:
-        UNPAID -> PARTIAL -> PAID
-        سپس با ابطال اسناد دریافت:
-        PAID -> PARTIAL -> UNPAID
-        """
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
 
@@ -90,7 +84,6 @@ class TestPaymentStatusAndVouchers:
         assert invoice.total_amount == Decimal('1000000.00')
         assert invoice.payment_status == PaymentStatus.UNPAID
 
-        # ۱. پرداخت جزئی ۳۰۰,۰۰۰ -> وضعیت PARTIAL
         r1 = create_receipt_voucher_service(
             sales_invoice=invoice,
             amount=Decimal('300000.00'),
@@ -99,7 +92,6 @@ class TestPaymentStatusAndVouchers:
         invoice.refresh_from_db()
         assert invoice.payment_status == PaymentStatus.PARTIAL
 
-        # ۲. پرداخت مانده ۷۰۰,۰۰۰ -> وضعیت PAID
         r2 = create_receipt_voucher_service(
             sales_invoice=invoice,
             amount=Decimal('700000.00'),
@@ -108,12 +100,10 @@ class TestPaymentStatusAndVouchers:
         invoice.refresh_from_db()
         assert invoice.payment_status == PaymentStatus.PAID
 
-        # ۳. ابطال سند دوم (۷۰۰,۰۰۰) -> بازگشت وضعیت به PARTIAL
         cancel_receipt_voucher_service(r2, reason='اشتباه در درج کارتخوان', user=manager_user)
         invoice.refresh_from_db()
         assert invoice.payment_status == PaymentStatus.PARTIAL
 
-        # ۴. ابطال سند اول (۳۰۰,۰۰۰) -> بازگشت وضعیت به UNPAID
         cancel_receipt_voucher_service(r1, reason='برگشت تراکنش بانکی', user=manager_user)
         invoice.refresh_from_db()
         assert invoice.payment_status == PaymentStatus.UNPAID
@@ -121,7 +111,6 @@ class TestPaymentStatusAndVouchers:
     def test_payment_exceeding_remaining_rejected_in_service_and_api(
         self, setup_finance_data, manager_user, auth_client_manager
     ):
-        """پرداخت بیشتر از مانده بدهی فاکتور در سطح سرویس و API رد می‌شود"""
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
 
@@ -137,9 +126,7 @@ class TestPaymentStatusAndVouchers:
             amount=Decimal('600000.00'),
             user=manager_user
         )
-        # مانده بدهی: ۴۰۰,۰۰۰
 
-        # تلاش برای ثبت ۵۰۰,۰۰۰ در لایه سرویس -> ValidationError
         with pytest.raises(ValidationError) as exc:
             create_receipt_voucher_service(
                 sales_invoice=invoice,
@@ -148,7 +135,6 @@ class TestPaymentStatusAndVouchers:
             )
         assert 'بیشتر باشد' in str(exc.value)
 
-        # تلاش برای ثبت ۵۰۰,۰۰۰ از طریق API -> 400 Bad Request
         url = reverse('receipt-voucher-list')
         res = auth_client_manager.post(url, {
             'sales_invoice': invoice.pk,
@@ -160,7 +146,6 @@ class TestPaymentStatusAndVouchers:
     def test_sales_return_after_full_payment_creates_excess_amount(
         self, setup_finance_data, manager_user, auth_client_manager
     ):
-        """مرجوعی پس از تسویه کامل فاکتور، فیلد محاسباتی excess_amount ایجاد می‌کند"""
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
 
@@ -173,13 +158,11 @@ class TestPaymentStatusAndVouchers:
         )
         sales_item = invoice.tire_items.first()
 
-        # تسویه کامل
         create_receipt_voucher_service(invoice, Decimal('1000000.00'), user=manager_user)
         invoice.refresh_from_db()
         assert invoice.payment_status == PaymentStatus.PAID
         assert invoice.excess_amount == Decimal('0.00')
 
-        # مرجوعی ۱ حلقه (۵۰۰,۰۰۰ تومان)
         create_sales_return_service(
             invoice=invoice,
             items_data=[{'sales_invoice_tire_item_id': sales_item.pk, 'quantity': 1}],
@@ -191,7 +174,6 @@ class TestPaymentStatusAndVouchers:
         assert invoice.excess_amount == Decimal('500000.00')
         assert invoice.payment_status == PaymentStatus.PAID
 
-        # تأیید وجود excess_amount در خروجی سریالایزر فاکتور
         detail_url = reverse('sales-invoice-detail', kwargs={'pk': invoice.pk})
         res = auth_client_manager.get(detail_url)
         assert res.status_code == 200
@@ -200,11 +182,6 @@ class TestPaymentStatusAndVouchers:
     def test_customer_refund_voucher_and_over_refund_rejected(
         self, setup_finance_data, manager_user, auth_client_manager
     ):
-        """
-        ثبت سند استرداد وجه به مشتری:
-        ۱. استرداد بیشتر از مازاد پرداخت رد می‌شود
-        ۲. استرداد معتبر excess_amount را صفر می‌کند
-        """
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
 
@@ -226,7 +203,6 @@ class TestPaymentStatusAndVouchers:
         invoice.refresh_from_db()
         assert invoice.excess_amount == Decimal('500000.00')
 
-        # ۱. تلاش برای استرداد ۶۰۰,۰۰۰ تومان (بیشتر از ۵۰۰,۰۰۰) -> رد
         with pytest.raises(ValidationError) as exc:
             create_customer_refund_voucher_service(
                 sales_invoice=invoice,
@@ -235,7 +211,6 @@ class TestPaymentStatusAndVouchers:
             )
         assert 'بیشتر باشد' in str(exc.value)
 
-        # ۲. استرداد معتبر ۳۰۰,۰۰۰ تومان از طریق API
         refund_url = reverse('customer-refund-voucher-list')
         res1 = auth_client_manager.post(refund_url, {
             'sales_invoice': invoice.pk,
@@ -247,7 +222,6 @@ class TestPaymentStatusAndVouchers:
         invoice.refresh_from_db()
         assert invoice.excess_amount == Decimal('200000.00')
 
-        # ۳. استرداد ۲۰۰,۰۰۰ مانده از طریق سرویس
         create_customer_refund_voucher_service(
             sales_invoice=invoice,
             amount=Decimal('200000.00'),
@@ -256,7 +230,6 @@ class TestPaymentStatusAndVouchers:
         invoice.refresh_from_db()
         assert invoice.excess_amount == Decimal('0.00')
 
-        # ۴. تلاش برای استرداد مجدد زمانی که مازاد ۰ است -> رد
         with pytest.raises(ValidationError) as exc2:
             create_customer_refund_voucher_service(
                 sales_invoice=invoice,
@@ -268,7 +241,6 @@ class TestPaymentStatusAndVouchers:
     def test_cancel_customer_refund_restores_excess_amount(
         self, setup_finance_data, manager_user
     ):
-        """ابطال سند استرداد وجه، مبلغ مازاد فاکتور را دوباره احیا می‌کند"""
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
 
@@ -298,7 +270,6 @@ class TestPaymentStatusAndVouchers:
         invoice.refresh_from_db()
         assert invoice.excess_amount == Decimal('0.00')
 
-        # ابطال سند استرداد
         cancel_customer_refund_voucher_service(
             voucher=refund,
             reason='خطا در عودت وجه',
@@ -310,10 +281,6 @@ class TestPaymentStatusAndVouchers:
     def test_purchase_invoice_payment_status_transitions_and_cancel(
         self, setup_finance_data, manager_user
     ):
-        """
-        تست گذار وضعیت پرداخت فاکتور خرید (UNPAID -> PARTIAL -> PAID)،
-        ابطال اسناد پرداخت و امکان لغو فاکتور خرید پس از ابطال پرداخت‌ها
-        """
         tire = setup_finance_data['tire']
         supplier = setup_finance_data['supplier']
 
@@ -326,32 +293,26 @@ class TestPaymentStatusAndVouchers:
         assert p_inv.total_amount == Decimal('2000000.00')
         assert p_inv.payment_status == PaymentStatus.UNPAID
 
-        # ۱. پرداخت جزئی ۱,۰۰۰,۰۰۰ -> PARTIAL
         pv1 = create_payment_voucher_service(p_inv, Decimal('1000000.00'), user=manager_user)
         p_inv.refresh_from_db()
         assert p_inv.payment_status == PaymentStatus.PARTIAL
 
-        # ۲. پرداخت مابقی ۱,۰۰۰,۰۰۰ -> PAID
         pv2 = create_payment_voucher_service(p_inv, Decimal('1000000.00'), user=manager_user)
         p_inv.refresh_from_db()
         assert p_inv.payment_status == PaymentStatus.PAID
 
-        # تلاش برای لغو فاکتور در حضور پرداخت فعال -> رد با خطا
         with pytest.raises(ValidationError) as exc_cancel:
             cancel_purchase_invoice_service(p_inv, user=manager_user)
         assert 'سند پرداخت وجه' in str(exc_cancel.value)
 
-        # ۳. ابطال پرداخت دوم -> وضعیت PARTIAL
         cancel_payment_voucher_service(pv2, reason='ابطال چک صیادی', user=manager_user)
         p_inv.refresh_from_db()
         assert p_inv.payment_status == PaymentStatus.PARTIAL
 
-        # ۴. ابطال پرداخت اول -> وضعیت UNPAID
         cancel_payment_voucher_service(pv1, reason='ابطال حواله بانکی', user=manager_user)
         p_inv.refresh_from_db()
         assert p_inv.payment_status == PaymentStatus.UNPAID
 
-        # حالا که تمام اسناد پرداخت ابطال شده‌اند، لغو فاکتور خرید باید با موفقیت انجام شود
         cancel_purchase_invoice_service(p_inv, user=manager_user)
         p_inv.refresh_from_db()
         assert p_inv.status == InvoiceStatus.CANCELLED
@@ -359,7 +320,6 @@ class TestPaymentStatusAndVouchers:
     def test_vouchers_api_blocks_put_patch_delete_with_405(
         self, setup_finance_data, manager_user, auth_client_manager
     ):
-        """متدهای PUT, PATCH و DELETE روی تمام اسناد مالی باید 405 MethodNotAllowed باشند"""
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
         supplier = setup_finance_data['supplier']
@@ -393,9 +353,6 @@ class TestPaymentStatusAndVouchers:
     def test_saved_payment_status_matches_recalculated_status_at_every_step(
         self, setup_finance_data, manager_user
     ):
-        """
-        بررسی یکپارچگی داده: در تمام مراحل فاکتور فروش، وضعیت ذخیره‌شده با محاسبه مجدد از روی اسناد دقیقاً برابر است
-        """
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
 
@@ -414,18 +371,14 @@ class TestPaymentStatusAndVouchers:
             assert invoice.payment_status == recalc
             return recalc
 
-        # گام ۱: صدور فاکتور -> UNPAID
         assert assert_in_sync() == PaymentStatus.UNPAID
 
-        # گام ۲: پرداخت جزئی ۵۰۰,۰۰۰ -> PARTIAL
         create_receipt_voucher_service(invoice, Decimal('500000.00'), user=manager_user)
         assert assert_in_sync() == PaymentStatus.PARTIAL
 
-        # گام ۳: پرداخت مابقی ۷۰۰,۰۰۰ -> PAID
         r2 = create_receipt_voucher_service(invoice, Decimal('700000.00'), user=manager_user)
         assert assert_in_sync() == PaymentStatus.PAID
 
-        # گام ۴: مرجوعی ۱ حلقه (۶۰۰,۰۰۰) -> همچنان PAID (با مازاد ۶۰۰,۰۰۰)
         create_sales_return_service(
             invoice=invoice,
             items_data=[{'sales_invoice_tire_item_id': sales_item.pk, 'quantity': 1}],
@@ -435,23 +388,19 @@ class TestPaymentStatusAndVouchers:
         assert assert_in_sync() == PaymentStatus.PAID
         assert invoice.excess_amount == Decimal('600000.00')
 
-        # گام ۵: استرداد ۶۰۰,۰۰۰ مازاد -> همچنان PAID
         refund = create_customer_refund_voucher_service(invoice, Decimal('600000.00'), user=manager_user)
         assert assert_in_sync() == PaymentStatus.PAID
         assert invoice.excess_amount == Decimal('0.00')
 
-        # گام ۶: تلاش برای ابطال سند دریافت ۷۰۰,۰۰۰ در حالی که استرداد فعال ۶۰۰,۰۰۰ است -> باید مسدود شود (Fix 1)
         with pytest.raises(ValidationError) as exc_info:
             cancel_receipt_voucher_service(r2, reason='تست ابطال مستقیم', user=manager_user)
         assert 'کمتر خواهد شد' in str(exc_info.value)
         assert 'ابتدا اسناد استرداد وجه مربوطه را ابطال نمایید' in str(exc_info.value)
 
-        # گام ۷: ابتدا ابطال سند استرداد ۶۰۰,۰۰۰
         cancel_customer_refund_voucher_service(refund, reason='ابطال استرداد برای اصلاح اسناد', user=manager_user)
         assert assert_in_sync() == PaymentStatus.PAID
         assert invoice.excess_amount == Decimal('600000.00')
 
-        # گام ۸: اکنون ابطال سند دریافت ۷۰۰,۰۰۰ موفقیت‌آمیز است -> دریافتی ۵۰۰,۰۰۰ در برابر خالص ۶۰۰,۰۰۰ -> PARTIAL
         cancel_receipt_voucher_service(r2, reason='تست ابطال سند دریافت', user=manager_user)
         assert assert_in_sync() == PaymentStatus.PARTIAL
         assert invoice.excess_amount == Decimal('0.00')
@@ -459,10 +408,6 @@ class TestPaymentStatusAndVouchers:
     def test_cancel_receipt_voucher_blocked_when_receipts_less_than_refunds(
         self, setup_finance_data, manager_user
     ):
-        """
-        بررسی دقیق عدم امکان ابطال ReceiptVoucher در صورتی که دریافتی‌های معتبر باقی‌مانده
-        کمتر از استردادهای معتبر شود (با قفل ردیف فاکتور و خطای مشخص فارسی).
-        """
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
 
@@ -475,19 +420,15 @@ class TestPaymentStatusAndVouchers:
         )
         sales_item = invoice.tire_items.first()
 
-        # ثبت دریافتی ۱,۰۰۰,۰۰۰
         r1 = create_receipt_voucher_service(invoice, Decimal('1000000.00'), user=manager_user)
-        # مرجوعی کامل
         create_sales_return_service(
             invoice=invoice,
             items_data=[{'sales_invoice_tire_item_id': sales_item.pk, 'quantity': 1}],
             reason='مرجوعی جهت تست ابطال',
             user=manager_user
         )
-        # استرداد ۶۰۰,۰۰۰ به مشتری
         create_customer_refund_voucher_service(invoice, Decimal('600000.00'), user=manager_user)
 
-        # تلاش برای ابطال سند دریافت وجه: بعد از ابطال دریافتی 0 می‌شود در حالی که استرداد معتبر 600,000 است -> باید رد شود
         with pytest.raises(ValidationError) as exc:
             cancel_receipt_voucher_service(r1, reason='ابطال غیرمجاز', user=manager_user)
         assert 'کمتر خواهد شد' in str(exc.value)
@@ -496,12 +437,6 @@ class TestPaymentStatusAndVouchers:
     def test_voucher_cancellation_validation_and_permissions(
         self, setup_finance_data, manager_user, auth_client_manager, auth_client_warehouse, auth_client_technician
     ):
-        """
-        اعتبارسنجی ابطال سند:
-        - نیاز به دلیل غیرخالی
-        - رد ابطال مجدد
-        - مجوز دسترسی فقط برای مدیر (تکنسین و انباردار 403)
-        """
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
 
@@ -516,23 +451,18 @@ class TestPaymentStatusAndVouchers:
 
         cancel_url = reverse('receipt-voucher-cancel', kwargs={'pk': receipt.pk})
 
-        # تکنسین 403
         assert auth_client_technician.post(cancel_url, {'reason': 'تست'}).status_code == 403
-        # انباردار 403
         assert auth_client_warehouse.post(cancel_url, {'reason': 'تست'}).status_code == 403
 
-        # مدیر بدون ذکر دلیل -> 400
         res_no_reason = auth_client_manager.post(cancel_url, {'reason': ''})
         assert res_no_reason.status_code == 400
         assert 'reason' in res_no_reason.data['errors']
 
-        # مدیر با دلیل معتبر -> 200
         res_ok = auth_client_manager.post(cancel_url, {'reason': 'دلیل معتبر ابطال'})
         assert res_ok.status_code == 200
         assert res_ok.data['is_cancelled'] is True
         assert res_ok.data['cancellation_reason'] == 'دلیل معتبر ابطال'
 
-        # تلاش مجدد برای ابطال سند باطل‌شده -> 400
         res_double = auth_client_manager.post(cancel_url, {'reason': 'ابطال دوباره'})
         assert res_double.status_code == 400
         assert 'قبلاً ابطال شده' in str(res_double.data)
@@ -540,15 +470,10 @@ class TestPaymentStatusAndVouchers:
     def test_reference_number_persisted_and_returned_across_vouchers_and_api(
         self, setup_finance_data, manager_user, auth_client_manager
     ):
-        """
-        تست جامع ذخیره و بازخوانی reference_number (شماره پیگیری / مرجع بانکی)
-        در اسناد دریافت، پرداخت و استرداد وجه در لایه سرویس و اندپوینت‌های API
-        """
         tire = setup_finance_data['tire']
         customer = setup_finance_data['customer']
         supplier = setup_finance_data['supplier']
 
-        # ۱. تست سند دریافت وجه (ReceiptVoucher)
         invoice = create_sales_invoice_service(
             customer=customer,
             vehicle=None,
@@ -567,13 +492,11 @@ class TestPaymentStatusAndVouchers:
         )
         assert receipt.reference_number == 'POS-REF-100200'
 
-        # واکشی از طریق API
         r_url = reverse('receipt-voucher-detail', kwargs={'pk': receipt.pk})
         res_r = auth_client_manager.get(r_url)
         assert res_r.status_code == 200
         assert res_r.data['reference_number'] == 'POS-REF-100200'
 
-        # ثبت دریافت وجه از طریق API با شماره پیگیری
         res_post_r = auth_client_manager.post(reverse('receipt-voucher-list'), {
             'sales_invoice': invoice.pk,
             'amount': '300000.00',
@@ -584,13 +507,11 @@ class TestPaymentStatusAndVouchers:
         assert res_post_r.status_code == 201
         assert res_post_r.data['reference_number'] == 'POS-REF-MEL-300400'
 
-        # جستجو بر اساس reference_number
         res_search_r = auth_client_manager.get(f"{reverse('receipt-voucher-list')}?search=MEL-300400")
         assert res_search_r.status_code == 200
         assert res_search_r.data['count'] == 1
         assert res_search_r.data['results'][0]['reference_number'] == 'POS-REF-MEL-300400'
 
-        # ۲. تست سند پرداخت وجه (PaymentVoucher)
         p_inv = create_purchase_invoice_service(
             supplier=supplier,
             tire_items_data=[{'tire': tire, 'quantity': 2, 'unit_cost': Decimal('400000.00')}],
@@ -625,8 +546,6 @@ class TestPaymentStatusAndVouchers:
         assert res_search_p.status_code == 200
         assert res_search_p.data['count'] == 1
 
-        # ۳. تست سند استرداد وجه به مشتری (CustomerRefundVoucher)
-        # تکمیل تسویه فاکتور فروش اول (۳۰۰,۰۰۰ باقی‌مانده)
         create_receipt_voucher_service(invoice, Decimal('300000.00'), user=manager_user)
         sales_item = invoice.tire_items.first()
         s_return = create_sales_return_service(

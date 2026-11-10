@@ -3,7 +3,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-// Backend tests supply real, synthetic API responses from their disposable database.
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
 const fixtures = JSON.parse(input);

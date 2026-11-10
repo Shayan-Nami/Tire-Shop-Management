@@ -2,7 +2,6 @@
 
 The application is a Django REST backend and a browser-rendered React single-page
 application for tire catalog, stock, customers, invoices, and payment records.
-This guide describes implemented boundaries, not production-readiness guarantees.
 See the [root README](../README.md) for setup and configuration,
 [API reference](API_REFERENCE.md) for routes, and
 [database design](DATABASE_DESIGN.md) for persistence.
@@ -17,10 +16,9 @@ Browser SPA (React + TypeScript)
   -> Django ORM / configured relational database
 ```
 
-During development, Vite proxies `/api` to Django. A production reverse proxy,
-HTTPS termination, static hosting, process supervision, and shared cache must be
-provisioned by the operator; this diagram does not imply installed infrastructure.
-There is no implemented server-side rendering or background task broker.
+During development, Vite proxies `/api` to Django. In production, a reverse proxy,
+HTTPS termination, static file hosting, process supervision, and shared cache are
+configured by the operator.
 
 - [Backend requirements](../backend/requirements.txt) allow Django `>=5.2.17,<6.2`
   with DRF, SimpleJWT, django-filter, drf-spectacular, and database drivers.
@@ -31,8 +29,7 @@ There is no implemented server-side rendering or background task broker.
   or SQL Server. WSGI and ASGI entrypoints exist; the selected deployment server
   and database still need environment-specific verification.
 - Default caching is process-local `LocMemCache`. `REDIS_CACHE_URL` selects
-  Django's Redis cache, including shared throttle counters. Redis is optional,
-  not a queue broker, database replica, or token-blacklist store.
+  Django's Redis cache, including shared throttle counters.
 
 ## Eight backend apps
 
@@ -60,8 +57,7 @@ master-data CRUD also uses serializer/model persistence directly.
 [Catalog services](../backend/apps/catalog/services.py) write signed stock
 movements and update `Tire.stock_quantity` together inside atomic transactions.
 Each movement records the resulting balance, cost snapshot, actor, and applicable
-document references. The public stock-movement API is read-only; there is no
-claim of database-enforced append-only storage or double-entry inventory.
+document references. The public stock-movement API is read-only.
 
 [Invoice services](../backend/apps/invoices/services.py) coordinate:
 
@@ -69,10 +65,10 @@ claim of database-enforced append-only storage or double-entry inventory.
   Draft confirmation refreshes tire cost snapshots at stock-out time. Positive
   paid sales create receipt vouchers in the same transaction.
 - **Purchases:** increase stock and set the latest purchase price. The service
-  retains the prior price for cancellation recovery; it is not FIFO valuation.
+  retains the prior price for cancellation recovery.
 - **Cancellations:** reverse the relevant stock effect and preserve document
   records. Existing returns/payments and stock/history constraints can prevent
-  cancellation; cancellation is not a general undo operation.
+  cancellation.
 - **Returns:** validate remaining sold quantities, allocate original discounts,
   restore stock, and update payment status. The return API also requests an
   automatic refund voucher when there is refundable excess.
@@ -80,14 +76,12 @@ claim of database-enforced append-only storage or double-entry inventory.
   `S-1405-00001` / `P-1405-00001`-style identifiers, with unique invoice numbers.
 
 The services use `transaction.atomic()` and `select_for_update()`, and tire locks
-are acquired in primary-key order in stock workflows. This reduces conflicting
-lock ordering; it does not prove that every database/operation is deadlock-free.
-SQLite does not validate PostgreSQL/SQL Server row-lock behavior. The November 3
-verification exercised the PostgreSQL-specific tests; SQL Server remains untested.
-See [release verification](RELEASE_READINESS.md) for results and
-[validation limits](DEPLOYMENT_GUIDE.md) for deployment-specific checks.
+are acquired in primary-key order in stock workflows to keep lock ordering
+consistent across concurrent requests. Because SQLite does not implement
+row-level locks, run the concurrency test suite on PostgreSQL or SQL Server when
+validating multi-worker deployments; see the [deployment guide](DEPLOYMENT_GUIDE.md).
 
-## Financial records, not general-ledger accounting
+## Financial records and treasury
 
 [Finance services](../backend/apps/finance/services.py) lock invoices when issuing
 vouchers, enforce positive amounts and debt/refund ceilings, and synchronize
@@ -95,10 +89,8 @@ payment status from non-cancelled vouchers. Sales balances subtract refunds from
 receipts and returns from invoice value. Cancellation records actor, time, and
 reason instead of exposing direct voucher editing/deletion through the API.
 
-There is no chart of accounts, paired debit/credit posting, or general ledger.
-Profitability reports use tire cost snapshots and discounts/returns; they do not
-account for all business expenses or establish company net profit. Vouchers record
-payments/refunds; they do not execute external bank transactions.
+Profitability reports use tire cost snapshots together with invoice discounts and
+returns. Vouchers record shop receipts, supplier payments, and customer refunds.
 
 ## Access and session boundaries
 

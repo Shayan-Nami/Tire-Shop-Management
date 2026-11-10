@@ -33,7 +33,6 @@ export interface CreateSalesReturnPayload {
 }
 
 export const invoicesApi = {
-  // فاکتورهای فروش
   getSalesInvoices: async (params?: {
     search?: string;
     status?: string;
@@ -66,7 +65,6 @@ export const invoicesApi = {
     return response.data;
   },
 
-  // فاکتورهای خرید (ورود به انبار)
   getPurchaseInvoices: async (params?: {
     search?: string;
     status?: string;
@@ -92,7 +90,6 @@ export const invoicesApi = {
     return response.data;
   },
 
-  // مرجوعی فروش
   getSalesReturns: async (params?: { page?: number }): Promise<PaginatedResponse<SalesReturn>> => {
     const response = await apiClient.get<PaginatedResponse<SalesReturn>>('/invoices/returns/', { params });
     return response.data;

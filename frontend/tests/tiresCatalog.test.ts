@@ -104,7 +104,6 @@ test('new tire creation retains an editable initial purchase cost and sends its 
   }]);
 });
 
-
 test('an older catalog response cannot overwrite a newer search result', async (t) => {
   const initial = deferred<any>();
   const filtered = deferred<any>();

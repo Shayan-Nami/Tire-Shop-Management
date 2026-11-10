@@ -8,8 +8,6 @@ paths:
   /api/v1/analytics/dashboard-stats/:
     get:
       operationId: v1_analytics_dashboard_stats_retrieve
-      description: آمار کلی و شاخص‌های کلیدی عملکرد (KPI) جهت نمایش در کارت‌های داشبورد
-        اصلی با لحاظ مرجوعی‌ها
       tags:
       - v1
       security:
@@ -25,7 +23,6 @@ paths:
   /api/v1/analytics/inventory-value/:
     get:
       operationId: v1_analytics_inventory_value_retrieve
-      description: گزارش ارزش ریالی موجودی انبار بر اساس قیمت خرید
       tags:
       - v1
       security:
@@ -41,8 +38,6 @@ paths:
   /api/v1/analytics/profitability/:
     get:
       operationId: v1_analytics_profitability_list
-      description: گزارش سودآوری تایرها بر اساس مابه‌التفاوت نرخ خرید و فروش با کسر
-        مرجوعی‌ها و احتساب تخفیف فاکتور
       tags:
       - v1
       security:
@@ -60,7 +55,6 @@ paths:
   /api/v1/analytics/sales-by-brand/:
     get:
       operationId: v1_analytics_sales_by_brand_list
-      description: گزارش تفکیکی فروش بر اساس برندهای لاستیک با کسر مرجوعی‌ها
       parameters:
       - in: query
         name: brand_id
@@ -84,8 +78,6 @@ paths:
   /api/v1/analytics/sales-by-date/:
     get:
       operationId: v1_analytics_sales_by_date_retrieve
-      description: 'گزارش فروش بر اساس بازه تاریخ میلادی / شمسی با احتساب مرجوعی‌ها
-        (مبنای مرجوعی: تاریخ ثبت مرجوعی)'
       parameters:
       - in: query
         name: end_date
@@ -112,7 +104,6 @@ paths:
   /api/v1/auth/change-password/:
     post:
       operationId: v1_auth_change_password_create
-      description: تغییر رمز عبور توسط کاربر جاری با دریافت رمز قبلی
       tags:
       - v1
       requestBody:
@@ -168,7 +159,6 @@ paths:
   /api/v1/auth/logout/:
     post:
       operationId: v1_auth_logout_create
-      description: خروج از حساب کاربری و قرار دادن توکن در لیست سیاه
       tags:
       - v1
       requestBody:
@@ -211,7 +201,6 @@ paths:
           description: ''
     put:
       operationId: v1_auth_profile_update
-      description: پشتیبانی از متد PUT برای ویرایش مشخصات فردی کاربر جاری
       tags:
       - v1
       requestBody:
@@ -237,7 +226,6 @@ paths:
           description: ''
     patch:
       operationId: v1_auth_profile_partial_update
-      description: ویرایش مشخصات فردی (نام و شماره تماس) توسط خود کاربر
       tags:
       - v1
       requestBody:
@@ -789,9 +777,6 @@ paths:
   /api/v1/catalog/stock-movements/:
     get:
       operationId: v1_catalog_stock_movements_list
-      description: |-
-        دفتر گردش انبار (کاملاً فقط‌خواندنی بدون امکان ویرایش، حذف یا ایجاد مستقیم)
-        دسترسی منحصراً برای انباردار و مدیر مجاز است؛ تکنسین خطای ۴۰۳ دریافت می‌کند.
       parameters:
       - in: query
         name: movement_type
@@ -865,9 +850,6 @@ paths:
   /api/v1/catalog/stock-movements/{movement_id}/:
     get:
       operationId: v1_catalog_stock_movements_retrieve
-      description: |-
-        دفتر گردش انبار (کاملاً فقط‌خواندنی بدون امکان ویرایش، حذف یا ایجاد مستقیم)
-        دسترسی منحصراً برای انباردار و مدیر مجاز است؛ تکنسین خطای ۴۰۳ دریافت می‌کند.
       parameters:
       - in: path
         name: movement_id
@@ -1068,8 +1050,6 @@ paths:
   /api/v1/catalog/tires/{tire_id}/adjust-stock/:
     post:
       operationId: v1_catalog_tires_adjust_stock_create
-      description: اصلاح دستی و انبارگردانی موجودی تایر توسط انباردار یا مدیر با ثبت
-        دلیل الزامی
       parameters:
       - in: path
         name: tire_id
@@ -1104,7 +1084,6 @@ paths:
   /api/v1/catalog/tires/low-stock/:
     get:
       operationId: v1_catalog_tires_low_stock_retrieve
-      description: فهرست تایرهایی که موجودی آنها به حداقل یا کمتر از حداقل رسیده است
       tags:
       - v1
       security:
@@ -1464,8 +1443,6 @@ paths:
   /api/v1/invoices/purchases/:
     get:
       operationId: v1_invoices_purchases_list
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - name: ordering
         required: false
@@ -1535,8 +1512,6 @@ paths:
           description: ''
     post:
       operationId: v1_invoices_purchases_create
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       tags:
       - v1
       requestBody:
@@ -1564,8 +1539,6 @@ paths:
   /api/v1/invoices/purchases/{purchase_invoice_id}/:
     get:
       operationId: v1_invoices_purchases_retrieve
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - in: path
         name: purchase_invoice_id
@@ -1588,8 +1561,6 @@ paths:
   /api/v1/invoices/purchases/{purchase_invoice_id}/cancel/:
     post:
       operationId: v1_invoices_purchases_cancel_create
-      description: لغو فاکتور خرید، کسر خودکار اقلام از انبار و اصلاح نرخ خرید تایر
-        (فقط مدیر)
       parameters:
       - in: path
         name: purchase_invoice_id
@@ -1612,8 +1583,6 @@ paths:
   /api/v1/invoices/returns/:
     get:
       operationId: v1_invoices_returns_list
-      description: مدیریت اسناد مرجوعی فروش (ایجاد و مشاهده فقط برای مدیر، غیرقابل
-        ویرایش یا حذف)
       parameters:
       - name: ordering
         required: false
@@ -1657,8 +1626,6 @@ paths:
           description: ''
     post:
       operationId: v1_invoices_returns_create
-      description: مدیریت اسناد مرجوعی فروش (ایجاد و مشاهده فقط برای مدیر، غیرقابل
-        ویرایش یا حذف)
       tags:
       - v1
       requestBody:
@@ -1686,8 +1653,6 @@ paths:
   /api/v1/invoices/returns/{sales_return_id}/:
     get:
       operationId: v1_invoices_returns_retrieve
-      description: مدیریت اسناد مرجوعی فروش (ایجاد و مشاهده فقط برای مدیر، غیرقابل
-        ویرایش یا حذف)
       parameters:
       - in: path
         name: sales_return_id
@@ -1710,8 +1675,6 @@ paths:
   /api/v1/invoices/sales/:
     get:
       operationId: v1_invoices_sales_list
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - in: query
         name: customer
@@ -1799,8 +1762,6 @@ paths:
           description: ''
     post:
       operationId: v1_invoices_sales_create
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       tags:
       - v1
       requestBody:
@@ -1828,8 +1789,6 @@ paths:
   /api/v1/invoices/sales/{sales_invoice_id}/:
     get:
       operationId: v1_invoices_sales_retrieve
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - in: path
         name: sales_invoice_id
@@ -1852,7 +1811,6 @@ paths:
   /api/v1/invoices/sales/{sales_invoice_id}/cancel/:
     post:
       operationId: v1_invoices_sales_cancel_create
-      description: لغو فاکتور فروش و بازگرداندن خودکار موجودی به انبار
       parameters:
       - in: path
         name: sales_invoice_id
@@ -1875,8 +1833,6 @@ paths:
   /api/v1/invoices/sales/{sales_invoice_id}/confirm/:
     post:
       operationId: v1_invoices_sales_confirm_create
-      description: تایید فاکتور فروش در وضعیت پیش‌نویس، کسر موجودی انبار و نهایی‌سازی
-        فاکتور
       parameters:
       - in: path
         name: sales_invoice_id
@@ -2063,8 +2019,6 @@ paths:
   /api/v1/treasury/customer-refunds/:
     get:
       operationId: v1_treasury_customer_refunds_list
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - in: query
         name: is_cancelled
@@ -2110,8 +2064,6 @@ paths:
           description: ''
     post:
       operationId: v1_treasury_customer_refunds_create
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       tags:
       - v1
       requestBody:
@@ -2139,8 +2091,6 @@ paths:
   /api/v1/treasury/customer-refunds/{refund_id}/:
     get:
       operationId: v1_treasury_customer_refunds_retrieve
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - in: path
         name: refund_id
@@ -2164,7 +2114,6 @@ paths:
   /api/v1/treasury/customer-refunds/{refund_id}/cancel/:
     post:
       operationId: v1_treasury_customer_refunds_cancel_create
-      description: ابطال سند استرداد وجه به مشتری با ذکر دلیل الزامی
       parameters:
       - in: path
         name: refund_id
@@ -2200,8 +2149,6 @@ paths:
   /api/v1/treasury/payments/:
     get:
       operationId: v1_treasury_payments_list
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - in: query
         name: is_cancelled
@@ -2243,8 +2190,6 @@ paths:
           description: ''
     post:
       operationId: v1_treasury_payments_create
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       tags:
       - v1
       requestBody:
@@ -2272,8 +2217,6 @@ paths:
   /api/v1/treasury/payments/{payment_id}/:
     get:
       operationId: v1_treasury_payments_retrieve
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - in: path
         name: payment_id
@@ -2296,7 +2239,6 @@ paths:
   /api/v1/treasury/payments/{payment_id}/cancel/:
     post:
       operationId: v1_treasury_payments_cancel_create
-      description: ابطال سند پرداخت وجه با ذکر دلیل الزامی
       parameters:
       - in: path
         name: payment_id
@@ -2331,8 +2273,6 @@ paths:
   /api/v1/treasury/receipts/:
     get:
       operationId: v1_treasury_receipts_list
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - in: query
         name: is_cancelled
@@ -2374,8 +2314,6 @@ paths:
           description: ''
     post:
       operationId: v1_treasury_receipts_create
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       tags:
       - v1
       requestBody:
@@ -2403,8 +2341,6 @@ paths:
   /api/v1/treasury/receipts/{receipt_id}/:
     get:
       operationId: v1_treasury_receipts_retrieve
-      description: میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای
-        اسناد مالی، فاکتورها و مرجوعی‌ها
       parameters:
       - in: path
         name: receipt_id
@@ -2427,7 +2363,6 @@ paths:
   /api/v1/treasury/receipts/{receipt_id}/cancel/:
     post:
       operationId: v1_treasury_receipts_cancel_create
-      description: ابطال سند دریافت وجه با ذکر دلیل الزامی
       parameters:
       - in: path
         name: receipt_id
@@ -2650,7 +2585,6 @@ components:
       - tires_count
     ChangePassword:
       type: object
-      description: سریالایزر تغییر رمز عبور توسط خود کاربر
       properties:
         old_password:
           type: string
@@ -2890,7 +2824,6 @@ components:
       - total_inventory_value
     Logout:
       type: object
-      description: سریالایزر خروج و ابطال توکن
       properties:
         refresh:
           type: string
@@ -3445,7 +3378,6 @@ components:
             جای حذف کاربر این تیک را بردارید.
     PatchedUserProfileUpdate:
       type: object
-      description: سریالایزر ویرایش مشخصات فردی توسط خود کاربر
       properties:
         full_name:
           type: string
@@ -4651,7 +4583,6 @@ components:
       - username
     UserProfileUpdate:
       type: object
-      description: سریالایزر ویرایش مشخصات فردی توسط خود کاربر
       properties:
         full_name:
           type: string

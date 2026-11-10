@@ -33,7 +33,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        # SimpleJWT 5.5.1 only checks active status on refresh, not password revocation.
         refresh = self.token_class(attrs['refresh'])
         JWTAuthentication().get_user(refresh)
         return super().validate(attrs)
@@ -73,11 +72,9 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         attrs = super().validate(attrs)
-        # کلمه عبور در هنگام ایجاد کاربر الزامی است
         if not self.instance and not attrs.get('password'):
             raise serializers.ValidationError({'password': 'وارد کردن کلمه عبور برای ایجاد کاربر الزامی است.'})
 
-        # جلوگیری از غیرفعال‌سازی یا تغییر نقش حساب کاربری خود توسط کاربر جاری
         request = self.context.get('request')
         if self.instance and request and getattr(request, 'user', None) == self.instance:
             if 'is_active' in attrs and attrs['is_active'] is False:
@@ -89,7 +86,6 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate_password(self, value: str) -> str:
         if value:
-            # ارائه کانتکست کاربر جهت اعتبارسنجی مشابهت رمز با نام کاربری
             user = self.instance
             if not user:
                 username = None
@@ -122,7 +118,6 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance: User, validated_data: dict[str, Any]) -> User:
-        # استفاده از super().update() به جای انتساب دستی
         password = validated_data.pop('password', None)
         instance = super().update(instance, validated_data)
         if password:
@@ -131,7 +126,6 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
-    """سریالایزر ویرایش مشخصات فردی توسط خود کاربر"""
     class Meta:
         model = User
         fields = ['full_name', 'phone_number']
@@ -149,7 +143,6 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    """سریالایزر تغییر رمز عبور توسط خود کاربر"""
     old_password = serializers.CharField(write_only=True, required=True)
     new_password = serializers.CharField(write_only=True, required=True)
 
@@ -171,5 +164,4 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class LogoutSerializer(serializers.Serializer):
-    """سریالایزر خروج و ابطال توکن"""
     refresh = serializers.CharField(required=True, help_text='توکن تجدید (Refresh Token) جهت قرارگیری در لیست سیاه')

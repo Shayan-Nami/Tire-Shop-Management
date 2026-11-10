@@ -60,7 +60,6 @@ test('configured API base is used for both ordinary requests and token refresh',
   assert.deepEqual(refreshes, ['https://api.example.test/api/v1/auth/token/refresh/']);
 });
 
-// These tests execute the actual Axios interceptor chain; only the transport is replaced.
 test('concurrent 401s share one refresh and replay with the rotated access token', async (t) => {
   const pending = deferred<any>();
   const attempts: any[] = [];

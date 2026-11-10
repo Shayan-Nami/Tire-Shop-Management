@@ -20,7 +20,7 @@ from apps.catalog.services import (
 @pytest.fixture
 def catalog_tire(db):
     tire = Tire.objects.create(
-        tire_name='Original', brand=Brand.objects.create(brand_name='Audit'),
+        tire_name='Original', brand=Brand.objects.create(brand_name='Barez'),
         size=Size.objects.create(size_name='205/55R16'), sale_price=Decimal('200.00'),
         purchase_price=Decimal('100.00'),
     )

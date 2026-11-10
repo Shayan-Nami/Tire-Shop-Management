@@ -21,19 +21,19 @@ export const paymentNulls: Pick<PaymentVoucher, 'reference_number' | 'created_by
 export const refundNulls: Pick<CustomerRefundVoucher, 'sales_return' | 'reference_number' | 'created_by'> = { sales_return: null, reference_number: null, created_by: null };
 
 export const purchaseItem: PurchaseInvoiceTireItem = { id: 1, tire: 2, tire_name: 'Tire', quantity: 4, unit_cost: '100.00' };
-// @ts-expect-error The purchase item serializer does not return total_cost.
+// @ts-expect-error
 void purchaseItem.total_cost;
-// @ts-expect-error The purchase item serializer does not return brand_name.
+// @ts-expect-error
 void purchaseItem.brand_name;
-// @ts-expect-error The purchase item serializer does not return size_name.
+// @ts-expect-error
 void purchaseItem.size_name;
 
 export const invoiceInput: CreateSalesInvoicePayload = { customer: 1, vehicle: 2, tire_items: [], payment_status: 'UNPAID' };
-// @ts-expect-error PARTIAL can be read but cannot be used when creating an invoice.
+// @ts-expect-error
 export const partialCreation: CreateSalesInvoicePayload['payment_status'] = 'PARTIAL';
 export const partialResponse: SalesInvoice['payment_status'] = 'PARTIAL';
 export const returnInput: CreateSalesReturnPayload = { sales_invoice: 1, items: [{ sales_invoice_tire_item_id: 1, quantity: 1 }], reason: 'Wrong size' };
-// @ts-expect-error The return creation serializer requires a reason.
+// @ts-expect-error
 export const returnWithoutReason: CreateSalesReturnPayload = { sales_invoice: 1, items: [] };
 
 export const dateReport: SalesByDateRangeResponse = {
@@ -47,7 +47,7 @@ export const inventoryReport: InventoryValueResponse = {
 };
 export const dateApiResponse: Awaited<ReturnType<typeof reportsApi.getSalesByDateRange>> = dateReport;
 export const inventoryApiResponse: Awaited<ReturnType<typeof reportsApi.getInventoryValue>> = inventoryReport;
-// @ts-expect-error Date responses always include the gross and refund amounts and nullable bounds.
+// @ts-expect-error
 export const incompleteDateReport: Awaited<ReturnType<typeof reportsApi.getSalesByDateRange>> = { total_invoices: 0, total_sales_amount: 0 };
-// @ts-expect-error Nullable backend fields cannot safely be assumed to be strings.
+// @ts-expect-error
 export const requiredPhone: string = customer.phone_number;

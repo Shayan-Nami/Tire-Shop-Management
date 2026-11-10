@@ -33,13 +33,6 @@ class TestReportsAndAnalytics:
     def test_dashboard_receivables_per_invoice_isolation_and_cancelled_exclusion(
         self, auth_client_manager, manager_user
     ):
-        """
-        تست تفکیک دقیق مطالبات معوق به ازای هر فاکتور:
-        - فاکتور الف: ۱,۰۰۰,۰۰۰ بدون پرداخت -> مانده بدهی = ۱,۰۰۰,۰۰۰
-        - فاکتور ب: ۵۰۰,۰۰۰ با پرداخت ۵۰۰,۰۰۰ و مرجوعی ۵۰۰,۰۰۰ -> مازاد ۵۰۰,۰۰۰ (نباید بدهی فاکتور الف را کسر کند)
-        - فاکتور ج: ۲,۰۰۰,۰۰۰ لغوشده (CANCELLED) -> نباید در مطالبات شمرده شود
-        کل مطالبات داشبورد باید دقیقا برابر با ۱,۰۰۰,۰۰۰ باشد و تعداد فاکتورهای بدهکار ۱ باشد.
-        """
         from decimal import Decimal
         from apps.catalog.models import Brand, Size, Tire, StockMovement, StockMovementType
         from apps.customers.models import Customer
@@ -71,7 +64,6 @@ class TestReportsAndAnalytics:
         customer2 = Customer.objects.create(full_name='مشتری ب', phone_number='09110000002')
         customer3 = Customer.objects.create(full_name='مشتری ج', phone_number='09110000003')
 
-        # فاکتور الف: ۱ حلقه ۱,۰۰۰,۰۰۰ تومان - بدون پرداخت
         create_sales_invoice_service(
             customer=customer1,
             vehicle=None,
@@ -80,7 +72,6 @@ class TestReportsAndAnalytics:
             created_by=manager_user
         )
 
-        # فاکتور ب: ۱ حلقه ۵۰۰,۰۰۰ تومان - پرداخت کامل و سپس مرجوعی کامل (دارای مازاد ۵۰۰,۰۰۰)
         inv_b = create_sales_invoice_service(
             customer=customer2,
             vehicle=None,
@@ -99,7 +90,6 @@ class TestReportsAndAnalytics:
         inv_b.refresh_from_db()
         assert inv_b.excess_amount == Decimal('500000.00')
 
-        # فاکتور ج: ۲ حلقه ۱,۰۰۰,۰۰۰ تومان (جمع ۲,۰۰۰,۰۰۰) - لغو شده
         inv_c = create_sales_invoice_service(
             customer=customer3,
             vehicle=None,
@@ -110,11 +100,9 @@ class TestReportsAndAnalytics:
         inv_c.status = InvoiceStatus.CANCELLED
         inv_c.save(update_fields=['status'])
 
-        # فراخوانی API آمار داشبورد
         url = reverse('dashboard-stats')
         response = auth_client_manager.get(url)
         assert response.status_code == 200
-        # بدهی باقی‌مانده فاکتور الف برابر با ۱,۰۰۰,۰۰۰ است و مازاد فاکتور ب نباید از آن کسر شده باشد
         assert response.data['total_receivables'] == 1000000.0
         assert response.data['unpaid_invoices_count'] == 1
 

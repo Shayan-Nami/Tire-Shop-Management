@@ -67,7 +67,6 @@ def test_return_only_period_has_negative_net_sales(auth_client_manager, period_d
         'gross_sales_amount': 0.0, 'total_refund_amount': 100.0,
         'start_date': '2026-10-10', 'end_date': '2026-10-10',
     }
-    # Returning stock does not require a cash refund voucher to affect this report.
     assert not invoice.refunds.exists()
 
 
@@ -118,7 +117,6 @@ def test_date_report_schema_exposes_gross_returns_and_signed_net():
 @pytest.mark.parametrize('price', ['0.00', '100.00'])
 def test_brand_revenue_ties_sort_by_name_not_creation_order(auth_client_manager, period_data, price):
     tire, customer = period_data
-    # Insert in reverse alphabetical order so database/insertion order is not the contract.
     for name in ['Zulu tie', 'Alpha tie', 'Middle tie']:
         other = Tire.objects.create(
             tire_name=name, brand=Brand.objects.create(brand_name=name), size=tire.size,

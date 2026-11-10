@@ -1,9 +1,11 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
-  "ignorePatterns": ["dist/**", "dist-audit/**"],
+  "ignorePatterns": ["dist/**"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+    "react/only-export-components": "off",
+    "react/set-state-in-effect": "off",
+    "react-hooks/exhaustive-deps": "off"
   }
 }

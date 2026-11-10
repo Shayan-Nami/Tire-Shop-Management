@@ -18,13 +18,10 @@ export const ReportsPage: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState<boolean>(true);
 
-  // داده‌های سودآوری
   const [profitabilityData, setProfitabilityData] = useState<ProfitabilityStat[]>([]);
 
-  // داده‌های ارزش انبار
   const [inventoryValueData, setInventoryValueData] = useState<InventoryValueResponse | null>(null);
 
-  // فروش بر اساس تاریخ
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [dateSalesResult, setDateSalesResult] = useState<SalesByDateRangeResponse | null>(null);
@@ -51,9 +48,7 @@ export const ReportsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Switching reports intentionally enters the network loading state.
     void loadReport();
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Dates are applied by form submission, not on every keystroke.
   }, [activeTab]);
 
   const handleDateFilterSubmit = (e: React.FormEvent) => {
@@ -63,7 +58,6 @@ export const ReportsPage: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("گزارش‌های تحلیلی، سودآوری و ارزش انبار")}</h1>
@@ -71,7 +65,6 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* تب‌های گزارشات */}
       <div className="tab-bar">
         <button
           onClick={() => setActiveTab('profitability')}
@@ -120,7 +113,6 @@ export const ReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* تب ۱: سودآوری تایرها */}
       {!error && activeTab === 'profitability' && (
         <div className="surface-panel overflow-hidden">
           {loading ? (
@@ -169,7 +161,6 @@ export const ReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* تب ۲: ارزش ریالی انبار */}
       {!error && activeTab === 'inventory_value' && (
         <div className="space-y-4">
           <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-850 text-white flex items-center justify-between border border-slate-800 shadow-md">
@@ -228,7 +219,6 @@ export const ReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* تب ۳: فروش بازه تاریخی */}
       {!error && activeTab === 'by_date' && (
         <div className="space-y-4">
           <form

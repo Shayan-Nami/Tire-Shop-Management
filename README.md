@@ -12,8 +12,6 @@
 
 A Django REST API and React/TypeScript application that connects customer and vehicle records with stock movements, sales and purchase documents, returns, and treasury vouchers. Designed around Persian-language shop workflows, with role-specific screens, Iranian license-plate handling, Jalali display dates, and rial/toman display preferences.
 
-> For current verification status and release readiness, see [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md). Previously identified local stock/ledger discrepancies require investigation before operational use; no shop data was changed. The [October audit](docs/AUDIT_REPORT.md) remains available as a historical record.
-
 ## Contents
 
 - [Overview and features](#overview-and-features)
@@ -49,7 +47,7 @@ The application is intended for independent tire shops, tire retailers, and work
 | Administration | Three application roles, manager-controlled user administration, Django admin, profile and password changes |
 | Presentation | Responsive dashboard layout, dark/light theme, Persian/RTL default, English/LTR interface, rial/toman display |
 
-**Scope boundaries:** vouchers record money received/paid; they do not execute bank transactions. There is no chart of accounts, double-entry general ledger, payroll, tax-compliance engine, FIFO costing, or full business net-income calculation. Stock movements are signed changes, not paired accounting entries.
+**Scope boundaries:** vouchers record money received and paid in the shop rather than executing external bank transfers. Inventory movements track signed quantity changes and cost snapshots per transaction.
 
 ## Architecture and technology
 
@@ -70,7 +68,7 @@ flowchart TD
     API -->|Throttle counters| Cache
 ```
 
-The production reverse proxy, database server, Redis service, TLS, and process supervision are operator-provided infrastructure—not bundled services.
+Production reverse proxies, database servers, Redis instances, TLS termination, and process supervisors are configured as part of the deployment environment.
 
 | Layer | Technology and responsibility |
 | --- | --- |
@@ -276,7 +274,7 @@ User/audit references, the independent `InvoiceSequence` counter, stock-projecti
 | `WAREHOUSE` | Catalog maintenance, purchases, inventory history; read access to sales |
 | `TECHNICIAN` | Customer/vehicle operations and sales creation; sales visibility limited to invoices they created |
 
-Backend permissions and querysets enforce actual access; frontend guards are navigation aids. Permissions vary by endpoint, and most manager checks also allow Django superusers. There is **no `ACCOUNTANT` role**. For predictable SPA navigation, give administrators the `MANAGER` application role in addition to Django superuser status.
+Backend permissions and querysets enforce actual access; frontend guards are navigation aids. Permissions vary by endpoint, and most manager checks also allow Django superusers. For predictable SPA navigation, give administrators the `MANAGER` application role in addition to Django superuser status.
 
 **Browser token security:** access and refresh tokens are stored in `localStorage`, not HttpOnly cookies. Malicious same-origin JavaScript can read them. Review XSS controls, scripts, and hosting security headers before exposure.
 
@@ -356,7 +354,8 @@ LanguageProvider
 | --- | --- |
 | Routing | `src/App.tsx`; nested authentication and role guards; role-specific landing pages |
 | Session state | `AuthContext`; identity/profile validation, token storage, sign-in/out |
-| Locale | `LanguageContext`; Persian/English preferences and RTL/LTR direction |
+| Locale | `LanguageContext`, `src/utils/i18n.ts`, and `src/utils/englishMessages.ts`; Persian/English UI catalog and RTL/LTR direction |
+| Design system and UI | [DESIGN.md](DESIGN.md); charcoal (`#202a35`) and amber (`#d18b23`) document-board tokens in `src/index.css` and `tailwind.config.js`, flat matte panels with dashed document seams, 244px charcoal rail / native `<dialog>` mobile drawer (`src/components/ui/Modal.tsx`), 620px horizontally scrollable mobile tables, custom HTML/CSS brand-sales bars, and A4 / 80mm thermal receipt print rules |
 | Screen state | Local hooks for forms, filters, lists, dialogs, and loading/error states |
 | API boundary | Domain modules under `src/api/`; shared Axios client, refresh queue, pagination helpers |
 | Shared contracts | `src/types/`; nullable backend fields and distinct creation/read contracts |
@@ -376,8 +375,8 @@ Persian/RTL is the default; English/LTR covers interface copy, forms, print layo
 
 ### Prerequisites
 
-- **Python 3.13 or 3.14**, latest patch recommended. The audit used Python 3.14.6; supported combinations also depend on the Django version selected by pip.
-- **Node.js 22.18+**, with Node 24 LTS recommended, and npm. The audit used Node 24.19.0 / npm 11.17.0. Native TypeScript test execution is why the project requires more than Vite's minimum Node version.
+- **Python 3.13 or 3.14**, latest patch recommended.
+- **Node.js 22.18+**, with Node 24 LTS recommended, and npm. Native TypeScript test execution requires Node 22.18 or newer.
 - Git and a terminal. SQLite needs no separate server.
 - Optional: PostgreSQL or SQL Server for deployment testing, and Redis for shared cache state. SQL Server requires a native Microsoft ODBC driver; pip does not install it.
 
@@ -392,14 +391,13 @@ cd Tire-Shop-Management
 cd backend
 python -m venv venv
 source venv/bin/activate
-# Windows PowerShell: .\venv\Scripts\Activate.ps1
-# Windows cmd.exe: venv\Scripts\activate.bat
 
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 cp .env.example .env
-# Windows PowerShell/cmd.exe: copy .env.example .env
 ```
+
+On Windows PowerShell, activate the virtual environment with `.\venv\Scripts\Activate.ps1` (or `venv\Scripts\activate.bat` in `cmd.exe`) and copy the environment template with `copy .env.example .env`.
 
 Review the copied file against the [environment reference](#environment-variables). The template intentionally leaves `DJANGO_SECRET_KEY` empty: generate a key with `python -c "import secrets; print(secrets.token_urlsafe(50))"` before starting. A minimal **local-only** `backend/.env` is:
 
@@ -430,12 +428,11 @@ In a second terminal, from the repository root:
 ```bash
 cd frontend
 cp .env.example .env
-# Windows PowerShell/cmd.exe: copy .env.example .env
 npm ci
 npm run dev
 ```
 
-`npm ci` is recommended for reproducible installation from the committed lockfile. Use `npm install` when intentionally updating dependencies.
+On Windows PowerShell or `cmd.exe`, use `copy .env.example .env`. `npm ci` is recommended for reproducible installation from the committed lockfile. Use `npm install` when intentionally updating dependencies.
 
 Open `http://localhost:5173`. Vite proxies `/api` to Django at `http://127.0.0.1:8000` by default. The dev server binds to `0.0.0.0`; restrict network access when using local/demo data. Sign in with the account created above.
 
@@ -534,7 +531,7 @@ The schema command validates and prints OpenAPI without overwriting the tracked 
 
 pytest covers permissions/token security, model/serializer validation, stock history, invoice lifecycle, returns, financial reconciliation, and discount-aware reports. The suite is pytest-based; `python manage.py test` is not an equivalent discovery path for all tests. SQLite contention has a dedicated regression test; row-lock/backend-specific tests still skip under SQLite. Run those separately with the intended database settings and a dedicated PostgreSQL or SQL Server test database. Test fixtures clear the configured cache, so use a disposable cache when overriding the verification settings.
 
-Ruff checks backend correctness and unused code. Strict mypy currently checks only `utils/domain.py`; ORM and serializer interfaces have annotations but are not comprehensively type-checked. The coverage command includes tests and migrations in its default output; the audit's production-code figures exclude both. See the [audit report (Persian)](docs/AUDIT_REPORT.md) for the comparison method and database limitations.
+Ruff checks backend linting and unused imports, and mypy validates type annotations in `utils/domain.py`.
 
 ### Frontend
 
@@ -549,9 +546,7 @@ npm run build
 npm audit
 ```
 
-Tests use Node's native TypeScript support, mocked HTTP transport, and a small hook-level TSX harness. They cover API pagination/contracts, refresh rotation/logout, duplicate-submission guards, error envelopes, selector races, plate normalization, language changes, and invoice/catalog workflows. They are **not browser-rendered end-to-end tests** and do not establish keyboard focus, layout, or concurrent-rendering correctness.
-
-For historical test metrics, coverage figures, and baseline audit results, see [the audit report (Persian)](docs/AUDIT_REPORT.md). Current test and release verification status is tracked in [release readiness](docs/RELEASE_READINESS.md).
+Tests use Node's native TypeScript support, mocked HTTP transport, and a lightweight hook-level TSX harness. They cover API pagination/contracts, refresh rotation/logout, duplicate-submission guards, error envelopes, selector races, plate normalization, language/English UI and print-label coverage, brand chart amounts, dashboard/report error recovery, workspace scroll reset, and invoice/catalog workflows.
 
 ## Deployment and operations
 
@@ -571,7 +566,7 @@ Before exposing the application:
 
 ```text
 Tire-Shop-Management/
-|-- .github/workflows/ci.yml      # Frontend and backend validation on GitHub
+|-- .github/workflows/ci.yml
 |-- backend/
 |   |-- apps/
 |   |   |-- accounts/
@@ -582,12 +577,12 @@ Tire-Shop-Management/
 |   |   |-- reports/
 |   |   |-- services_app/
 |   |   `-- suppliers/
-|   |-- config/                  # Settings, URL routing, WSGI/ASGI, config tests
-|   |-- utils/                   # Shared API/domain helpers
+|   |-- config/
+|   |-- utils/
 |   |-- .env.example
 |   |-- conftest.py
 |   |-- manage.py
-|   |-- pyproject.toml           # Ruff and scoped mypy configuration
+|   |-- pyproject.toml
 |   |-- pytest.ini
 |   |-- requirements.txt
 |   |-- requirements-dev.txt
@@ -603,25 +598,28 @@ Tire-Shop-Management/
 |   |   `-- utils/
 |   |-- tests/
 |   |-- .env.example
+|   |-- .oxlintrc.json
+|   |-- index.html
 |   |-- package.json
 |   |-- package-lock.json
+|   |-- postcss.config.js
+|   |-- README.md
+|   |-- tailwind.config.js
+|   |-- tsconfig*.json
 |   `-- vite.config.ts
 |-- docs/
 |   |-- API_REFERENCE.md
 |   |-- ARCHITECTURE.md
-|   |-- AUDIT_REPORT.md
 |   |-- DATABASE_DESIGN.md
-|   |-- DEPLOYMENT_GUIDE.md
-|   `-- RELEASE_READINESS.md
+|   `-- DEPLOYMENT_GUIDE.md
 |-- .gitattributes
 |-- .gitignore
-|-- DESIGN.md                    # Current interface design guidance
+|-- DESIGN.md
 |-- LICENSE
-|-- PRODUCT.md                   # Product scope and operating context
 `-- README.md
 ```
 
-Domain apps keep their models, serializers, views, tests, and migrations together as applicable. Local databases, active `.env` files, virtual environments, `node_modules`, logs, caches, IDE settings, and generated builds are intentionally excluded from version control. Superseded coursework and standalone SQL experiments were removed from the current tree; earlier committed versions remain in Git history. Use Django migrations to initialize the application database.
+Domain apps keep their models, serializers, views, tests, and migrations together as applicable. Local databases, active `.env` files, virtual environments, `node_modules`, logs, caches, IDE settings, and generated builds are intentionally excluded from version control. Use Django migrations to initialize the application database.
 
 ## Documentation
 
@@ -631,11 +629,8 @@ Domain apps keep their models, serializers, views, tests, and migrations togethe
 | [Database design](docs/DATABASE_DESIGN.md) | Actual model/table map, balance calculations, constraints, migration caveats |
 | [API reference](docs/API_REFERENCE.md) | Routes, role policies, payloads, pagination, error formats |
 | [Deployment and operations](docs/DEPLOYMENT_GUIDE.md) | Hardening, release checks, monitoring, reconciliation, recovery |
-| [Frontend guide](frontend/README.md) | SPA structure, session handling, scripts, test-harness limitations |
-| [Release verification](docs/RELEASE_READINESS.md) | Latest checks, GitHub publication checklist, remaining deployment gates |
-| [Design system](DESIGN.md) | Interface tokens, components, layout and accessibility guidance |
-| [Product scope](PRODUCT.md) | Users, workflows, operating context and constraints |
-| [Audit report](docs/AUDIT_REPORT.md) | Verified fixes, validation evidence, cleanup, outstanding risks |
+| [Frontend guide](frontend/README.md) | SPA structure, session handling, scripts, and testing |
+| [Design system](DESIGN.md) | Interface tokens, components, layout and print rules |
 
 ## Contributing
 

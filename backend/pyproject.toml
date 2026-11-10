@@ -6,6 +6,9 @@ extend-exclude = ["migrations"]
 [tool.ruff.lint]
 select = ["F", "E9"]
 
+[tool.ruff.lint.per-file-ignores]
+"config/verification_settings.py" = ["F403"]
+
 [tool.mypy]
 python_version = "3.14"
 files = ["utils/domain.py"]

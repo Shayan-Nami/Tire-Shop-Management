@@ -13,36 +13,23 @@ from .models import Tire, StockMovement, StockMovementType, StockProjectionRepai
 
 @transaction.atomic
 def record_stock_movements(movements_data: list[dict], user: User | None=None) -> list[StockMovement]:
-    """
-    سرویس مرکزی و جامع ثبت گروهی گردش‌های انبار.
-    
-    ویژگی‌های کلیدی:
-    ۱. جلوگیری قطعی از Deadlock: شناسه‌ها استخراج شده و به ترتیب صعودی (order_by('pk')) قفل می‌شوند.
-    ۲. ایمنی در همروندی (Concurrency Safety): با select_for_update ردیف‌های مربوطه قفل می‌شوند.
-    ۳. کنترل موجودی منفی: پیش‌بینی مانده برای هر تایر انجام و در صورت کسری موجودی خطا صادر می‌شود.
-    ۴. اتمیک بودن: تمام عملیات تغییر موجودی و درج در دفتر گردش در یک تراکنش انجام می‌شود.
-    """
     if not movements_data:
         return []
 
-    # ۱. استخراج و مرتب‌سازی صعودی شناسه‌های تایر جهت پیشگیری از بن‌بست همروندی (Deadlock)
     try:
         tire_ids = sorted(list({int(item['tire_id']) for item in movements_data}))
     except (TypeError, ValueError, KeyError):
         raise ValidationError("شناسه تایر در اطلاعات گردش انبار نامعتبر است.")
 
-    # ۲. قفل ردیفی تایرها در تراکنش جاری به ترتیب صعودی PK
     locked_tires = {
         tire.pk: tire
         for tire in Tire.objects.select_for_update().filter(pk__in=tire_ids).order_by('pk')
     }
 
-    # اعتبارسنجی وجود همه تایرها
     for tid in tire_ids:
         if tid not in locked_tires:
             raise ValidationError(f"تایر با شناسه {tid} یافت نشد.")
 
-    # ۳. بررسی پیش‌بینی مانده برای جلوگیری از منفی شدن موجودی انبار
     projected_balances = {tid: locked_tires[tid].stock_quantity for tid in tire_ids}
     for item in movements_data:
         try:
@@ -59,7 +46,6 @@ def record_stock_movements(movements_data: list[dict], user: User | None=None) -
             )
 
     created_movements = []
-    # ۴. اعمال تغییرات موجودی و درج رکوردهای گردش انبار
     for item in movements_data:
         tid = int(item['tire_id'])
         delta = validate_quantity(item['quantity_delta'])
@@ -70,7 +56,6 @@ def record_stock_movements(movements_data: list[dict], user: User | None=None) -
         previous_stock = tire.stock_quantity
         updates = {'stock_quantity': F('stock_quantity') + delta}
 
-        # به‌روزرسانی قیمت خرید در صورت ثبت فاکتور خرید (آخرین نرخ خرید)
         new_purchase_price = item.get('new_purchase_price')
         if new_purchase_price is not None:
             tire.purchase_price = validate_money(new_purchase_price)
@@ -113,9 +98,6 @@ def record_stock_movement(
     description: str = '',
     new_purchase_price: Decimal | None=None
 ) -> StockMovement | None:
-    """
-    ثبت تکی گردش انبار برای یک تایر (فراخوانی سرویس مرکزی record_stock_movements در لایه زیرین)
-    """
     movements = record_stock_movements(
         movements_data=[{
             'tire_id': tire_id,
@@ -135,18 +117,12 @@ def record_stock_movement(
 
 @transaction.atomic
 def adjust_tire_stock_service(tire: Tire, counted_quantity: int, reason: str, user: User | None=None) -> StockMovement:
-    """
-    سرویس اصلاح دستی و انبارگردانی تایر.
-    ورودی: مقدار جدید شمارش‌شده توسط انباردار (counted_quantity).
-    سیستم اختلاف را نسبت به موجودی جاری محاسبه و در قالب سند MANUAL_ADJUSTMENT ثبت می‌کند.
-    """
     counted_quantity = validate_quantity(counted_quantity)
     if counted_quantity < 0:
         raise ValidationError("موجودی شمارش‌شده نمی‌تواند منفی باشد.")
     if not reason or not reason.strip():
         raise ValidationError("ثبت علت / توضیحات اصلاح موجودی الزامی است.")
 
-    # قفل کردن تایر جهت واکشی دقیق‌ترین موجودی در لحظه تراکنش
     locked_tire = Tire.objects.select_for_update().get(pk=tire.pk)
     delta = counted_quantity - locked_tire.stock_quantity
 
@@ -175,7 +151,6 @@ def adjust_tire_stock_service(tire: Tire, counted_quantity: int, reason: str, us
 
 @transaction.atomic
 def repair_stock_projection_service(tire_id: int, reason: str, user: User | None) -> StockProjectionRepair | None:
-    """Rebuild from verified ledger truth; this is not a physical stock adjustment."""
     if not reason or not reason.strip():
         raise ValidationError('A repair reason is required.')
     if not user or not user.is_active or not (user.is_superuser or user.role == 'MANAGER'):

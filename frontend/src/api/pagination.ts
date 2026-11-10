@@ -2,7 +2,6 @@ import { apiClient } from './client';
 import type { PaginatedResponse } from '../types';
 import { fetchAllPages } from '../utils/invoiceRequests';
 
-/** Array-returning APIs must exhaust DRF pagination before exposing selector options. */
 export async function getAllResults<T>(url: string): Promise<T[]> {
   const getPage = async (page: number) => {
     const response = await apiClient.get<PaginatedResponse<T> | T[]>(url, {

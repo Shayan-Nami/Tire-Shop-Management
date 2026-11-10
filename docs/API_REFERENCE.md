@@ -69,7 +69,7 @@ Source: [account routes](../backend/apps/accounts/urls.py),
 | POST | `auth/change-password/` | `old_password`, `new_password` |
 | CRUD | `auth/users/`, `auth/users/{id}/` | Manager user administration, with self-account and superuser protections |
 
-There is no login endpoint at `auth/token/`. Login's `user` contains `id`,
+Login's `user` contains `id`,
 `username`, `full_name`, `role`, and `phone_number`. Profile responses additionally
 include `role_display`, `is_active`, and `date_joined`.
 
@@ -112,8 +112,8 @@ Most manager permission checks also permit superusers. See the
 Resource identifiers are not uniformly named `id`: examples include `customer_id`,
 `vehicle_id`, `brand_id`, `size_id`, `tire_id`, `service_id`, `supplier_id`,
 `sales_invoice_id`, `purchase_invoice_id`, `sales_return_id`, `movement_id`,
-`receipt_id`, `payment_id`, and `refund_id`. Tire catalog fields include
-`tire_name`, not `pattern`. Technicians do not receive catalog `purchase_price`;
+`receipt_id`, `payment_id`, and `refund_id`. Tire catalog records use
+`tire_name` for the tire model/tread name. Technicians do not receive catalog `purchase_price`;
 sales tire-line `unit_cost` is omitted for both technicians and warehouse users.
 Warehouse users can still read catalog purchase prices and purchase invoices.
 

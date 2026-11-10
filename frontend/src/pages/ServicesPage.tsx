@@ -18,7 +18,6 @@ export const ServicesPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
 
-  // افزودن یا ویرایش
   const [showModal, setShowModal] = useState<boolean>(false);
   const [editingService, setEditingService] = useState<TechnicalService | null>(null);
   const [name, setName] = useState<string>('');
@@ -50,7 +49,6 @@ export const ServicesPage: React.FC = () => {
   }, [debouncedSearch, currentPage]);
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Query changes intentionally enter the network loading state.
     void fetchServices();
   }, [fetchServices]);
 
@@ -105,7 +103,6 @@ export const ServicesPage: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("تعرفه خدمات فنی و کارگاهی")}</h1>
@@ -123,7 +120,6 @@ export const ServicesPage: React.FC = () => {
         )}
       </div>
 
-      {/* جستجو */}
       <div className="filter-bar">
         <div className="relative w-full md:w-80">
           <input
@@ -140,7 +136,6 @@ export const ServicesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* جدول خدمات */}
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت خدمات فنی...")}</div>
@@ -196,7 +191,6 @@ export const ServicesPage: React.FC = () => {
           </div>
         )}
 
-        {/* صفحه‌بندی (Pagination) */}
         {totalPages > 1 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
             <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("خدمت)")}</span>
@@ -216,7 +210,6 @@ export const ServicesPage: React.FC = () => {
         )}
       </div>
 
-      {/* مدال ایجاد/ویرایش خدمت */}
       {showModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">

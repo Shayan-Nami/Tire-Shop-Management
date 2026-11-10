@@ -5,14 +5,12 @@ from django.db import connection
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from apps.accounts.permissions import IsDocManagerOrDebug
 
-# شخصی‌سازی عنوان پنل ادمین
 admin.site.site_header = 'مدیریت فروشگاه و خدمات لاستیک'
 admin.site.site_title = 'سامانه فروشگاه لاستیک'
 admin.site.index_title = 'میز کار مدیریت سیستم'
 
 
 def health_check_view(request):
-    """بررسی سلامت سرویس و پایگاه داده برای مانیتورینگ زیرساخت"""
     try:
         connection.ensure_connection()
         db_healthy = True
@@ -25,18 +23,14 @@ def health_check_view(request):
 
 
 urlpatterns = [
-    # وضعیت سلامت سامانه
     path('api/health/', health_check_view, name='health-check'),
 
-    # پنل مدیریت استاندارد جنگو
     path('admin/', admin.site.urls),
 
-    # مستندات تعاملی Swagger و OpenAPI برای وب و اپلیکیشن موبایل (محافظت‌شده در پروداکشن)
     path('api/schema/', SpectacularAPIView.as_view(permission_classes=[IsDocManagerOrDebug]), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema', permission_classes=[IsDocManagerOrDebug]), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema', permission_classes=[IsDocManagerOrDebug]), name='redoc'),
 
-    # اندپوینت‌های نسخه یک (API v1)
     path('api/v1/auth/', include('apps.accounts.urls')),
     path('api/v1/crm/', include('apps.customers.urls')),
     path('api/v1/catalog/', include('apps.catalog.urls')),

@@ -1,4 +1,3 @@
-"""Real serializer responses must satisfy the SPA's actual TypeScript interfaces."""
 import json
 from pathlib import Path
 import shutil

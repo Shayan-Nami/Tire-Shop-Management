@@ -52,7 +52,6 @@ export const Dashboard: React.FC = () => {
   }, [t, language]);
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Mounting intentionally starts the dashboard network load.
     void loadData();
   }, [loadData]);
 
@@ -60,14 +59,12 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ داشبورد و خوش‌آمدگویی */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("میز کار مدیریت و آمار تحلیلی")}</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("خلاصه شاخص‌های فروش، گردش کالا و وضعیت مالی در یک نگاه")}</p>
         </div>
 
-        {/* دکمه‌های اقدام سریع */}
         <div className="flex items-center gap-2">
           {(user?.role === 'MANAGER' || user?.role === 'TECHNICIAN') && (
             <Link
@@ -102,9 +99,7 @@ export const Dashboard: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* ردیف کارت‌های شاخص‌های کلیدی (KPIs) */}
           <div className="dashboard-stats surface-panel">
-        {/* ۱. فروش خالص امروز */}
         <div className="summary-cell space-y-2">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-xs font-semibold">{t("فروش خالص امروز")}</span>
@@ -119,7 +114,6 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* ۲. مطالبات معوق فاکتورها */}
         <div className="summary-cell space-y-2">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-xs font-semibold">{t("مطالبات معوق فروشگاه")}</span>
@@ -134,7 +128,6 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* ۳. ارزش ریالی موجودی انبار */}
         <div className="summary-cell space-y-2">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-xs font-semibold">{t("ارزش ریالی موجودی انبار")}</span>
@@ -149,7 +142,6 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* ۴. هشدارهای کسری موجودی تایرها */}
         <div className="summary-cell space-y-2">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-xs font-semibold">{t("هشدارهای کمبود موجودی")}</span>
@@ -163,8 +155,6 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-
-      {/* بخش نمودارها */}
       <div className="dashboard-middle"><section className="surface-panel" aria-labelledby="brand-sales-title">
           <div className="panel-heading">
             <div>
@@ -283,12 +273,9 @@ export const Dashboard: React.FC = () => {
           </div>
         </div></div>
 
-      {/* جدول تایرهای با کسری یا هشدار موجودی */}
-
         </>
       )}
 
-      {/* مدال انبارگردانی سریع */}
       {selectedTireForAdjust && (
         <StockAdjustmentModal
           tire={selectedTireForAdjust}

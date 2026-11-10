@@ -35,11 +35,6 @@ def _validate_invoice_total(invoice: SalesInvoice | PurchaseInvoice) -> None:
 
 @transaction.atomic
 def generate_next_invoice_number(doc_type: str, dt: datetime | None=None) -> str:
-    """
-    تولید اتمیک و بدون تکرار شماره فاکتور پیوسته (Gapless Sequential Numbering)
-    بر اساس (doc_type, سال شمسی) با قفل select_for_update روی ردیف شمارنده
-    فرمت: S-1405-00001 (فروش) و P-1405-00001 (خرید)
-    """
     prefix = 'S' if doc_type == 'SALES' else 'P'
     year = get_jalali_year(dt)
 
@@ -65,9 +60,6 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
                                  status: str = InvoiceStatus.CONFIRMED, payment_status: str | None = None,
                                  payment_method: str = 'کارتخوان / نقدی', reference_number: str = '',
                                  notes: str = '', created_by: User | None = None) -> SalesInvoice:
-    """
-    سرویس ایجاد فاکتور فروش همراه با کسر امن و قفل ردیفی موجودی انبار در تراکنش اتمیک
-    """
     if vehicle is not None and vehicle.customer_id != customer.pk:
         raise ValidationError({'vehicle': 'خودروی انتخاب‌شده متعلق به این مشتری نیست.'})
     if status not in (InvoiceStatus.DRAFT, InvoiceStatus.CONFIRMED, InvoiceStatus.CANCELLED):
@@ -124,7 +116,6 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
         created_by=created_by
     )
 
-    # Read prices only after all tire locks are held, in the stock ledger's lock order.
     locked_tires = {
         tire.pk: tire
         for tire in Tire.objects.select_for_update().filter(pk__in=tire_ids).order_by('pk')
@@ -135,7 +126,6 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
     subtotal = Decimal('0.00')
     movements_data = []
 
-    # ۱. پردازش اقلام تایر و ایجاد رکوردهای فاکتور
     for item in tire_items_data:
         tire_obj = locked_tires[item['tire'].pk]
         try:
@@ -179,11 +169,9 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
                 'description': f"فروش کالا طی فاکتور فروش #{invoice.sales_invoice_id}"
             })
 
-    # کسر موجودی و ثبت گردش انبار به ترتیب صعودی شناسه‌ها
     if movements_data:
         record_stock_movements(movements_data, user=created_by)
 
-    # ۲. پردازش اقلام خدمات
     for s_item in service_items_data:
         service_obj = s_item['service']
         try:
@@ -209,7 +197,6 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
         )
         subtotal += qty * unit_price
 
-    # ۳. اعمال تخفیف و محاسبه مبلغ کل نهایی
     if discount_amount > subtotal:
         raise ValidationError(f"مبلغ تخفیف ({discount_amount:,.0f}) نمی‌تواند از جمع کل اقلام فاکتور ({subtotal:,.0f}) بیشتر باشد.")
 
@@ -230,7 +217,6 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
         invoice.payment_status = PaymentStatus.UNPAID
     invoice.save(update_fields=['total_amount', 'payment_status'])
 
-    # صدور خودکار سند دریافت وجه برای فاکتورهای نقدی / تسویه‌شده هم‌زمان با صدور فاکتور
     if init_payment_status == PaymentStatus.PAID and invoice.total_amount > Decimal('0.00'):
         invoice.refresh_from_db(fields=['total_amount'])
         create_receipt_voucher_service(
@@ -247,9 +233,6 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
 
 @transaction.atomic
 def cancel_sales_invoice_service(invoice: SalesInvoice | int, user: User | None=None) -> SalesInvoice:
-    """
-    سرویس لغو فاکتور فروش و بازگرداندن اقلام کسر شده به موجودی انبار از طریق دفتر گردش انبار
-    """
     invoice_id = invoice.pk if hasattr(invoice, 'pk') else int(invoice)
     locked_invoice = SalesInvoice.objects.select_for_update().get(pk=invoice_id)
 
@@ -262,7 +245,6 @@ def cancel_sales_invoice_service(invoice: SalesInvoice | int, user: User | None=
     if locked_invoice.receipts.filter(is_cancelled=False).exists():
         raise ValidationError("امکان لغو فاکتوری که برای آن سند دریافت وجه ثبت شده وجود ندارد. ابتدا اسناد دریافت وجه را بررسی یا حذف نمایید.")
 
-    # اگر فاکتور تایید شده بود، تایرها به انبار بازگردانده شده و سند گردش SALE_CANCEL ثبت می‌شود
     if locked_invoice.status == InvoiceStatus.CONFIRMED and locked_invoice.tire_items.exists():
         movements_data = [
             {
@@ -283,10 +265,6 @@ def cancel_sales_invoice_service(invoice: SalesInvoice | int, user: User | None=
 
 @transaction.atomic
 def confirm_sales_invoice_service(invoice: SalesInvoice | int, user: User | None=None) -> SalesInvoice:
-    """
-    سرویس تایید فاکتور فروش در وضعیت پیش‌نویس (DRAFT)، کسر اتمیک اقلام از انبار
-    و تغییر وضعیت به CONFIRMED
-    """
     invoice_id = invoice.pk if hasattr(invoice, 'pk') else int(invoice)
     locked_invoice = SalesInvoice.objects.select_for_update().get(pk=invoice_id)
 
@@ -300,7 +278,6 @@ def confirm_sales_invoice_service(invoice: SalesInvoice | int, user: User | None
             pk__in=[item.tire_id for item in items]
         ).order_by('pk')
     }
-    # A draft does not consume stock; finalize cost at the actual stock-out time.
     for item in items:
         item.unit_cost = locked_tires[item.tire_id].purchase_price
     if items:
@@ -326,10 +303,6 @@ def confirm_sales_invoice_service(invoice: SalesInvoice | int, user: User | None
 
 @transaction.atomic
 def create_purchase_invoice_service(supplier: Supplier, tire_items_data: list[dict[str, Any]], created_by: User | None=None) -> PurchaseInvoice:
-    """
-    سرویس ثبت فاکتور خرید از تأمین‌کننده، افزایش موجودی انبار و به‌روزرسانی قیمت خرید تایرها
-    از طریق دفتر گردش انبار
-    """
     if not tire_items_data:
         raise ValidationError("ثبت حداقل یک قلم تایر برای فاکتور خرید الزامی است.")
 
@@ -386,7 +359,7 @@ def create_purchase_invoice_service(supplier: Supplier, tire_items_data: list[di
             'movement_type': StockMovementType.PURCHASE,
             'purchase_invoice': invoice,
             'unit_cost': unit_cost,
-            'new_purchase_price': unit_cost,  # به‌روزرسانی قیمت خرید تایر به آخرین نرخ خرید
+            'new_purchase_price': unit_cost,
             'description': f"ورود خرید طی فاکتور #{invoice.purchase_invoice_id}"
         })
 
@@ -403,10 +376,6 @@ def create_purchase_invoice_service(supplier: Supplier, tire_items_data: list[di
 
 @transaction.atomic
 def cancel_purchase_invoice_service(invoice: PurchaseInvoice | int, user: User | None=None) -> PurchaseInvoice:
-    """
-    سرویس لغو فاکتور خرید، کسر موجودی انبار از طریق گردش PURCHASE_CANCEL
-    و بازگرداندن هوشمند نرخ خرید تایر (purchase_price) به آخرین نرخ خرید قبلی
-    """
     invoice_id = invoice.pk if hasattr(invoice, 'pk') else int(invoice)
     locked_invoice = PurchaseInvoice.objects.select_for_update().get(pk=invoice_id)
 
@@ -427,7 +396,7 @@ def cancel_purchase_invoice_service(invoice: PurchaseInvoice | int, user: User |
         movements_data = [
             {
                 'tire_id': item.tire_id,
-                'quantity_delta': -item.quantity,  # کسر از انبار
+                'quantity_delta': -item.quantity,
                 'movement_type': StockMovementType.PURCHASE_CANCEL,
                 'purchase_invoice': locked_invoice,
                 'unit_cost': item.unit_cost,
@@ -435,10 +404,8 @@ def cancel_purchase_invoice_service(invoice: PurchaseInvoice | int, user: User |
             }
             for item in items
         ]
-        # در صورت ناکافی بودن موجودی انبار، record_stock_movements خطای فارسی صادر می‌کند
         record_stock_movements(movements_data, user=user)
 
-        # بازگرداندن purchase_price در صورتی که این فاکتور آخرین خرید تایر بوده باشد
         for item in items:
             tire = locked_tires[item.tire_id]
             purchase_movement = StockMovement.objects.get(
@@ -466,8 +433,6 @@ def cancel_purchase_invoice_service(invoice: PurchaseInvoice | int, user: User |
                 if prev_purchase and prev_purchase.unit_cost is not None:
                     restored_price = prev_purchase.unit_cost
                 else:
-                    # Include cancelled purchases: the first snapshot is the catalog
-                    # baseline, even when intermediate purchases were cancelled first.
                     first_purchase = StockMovement.objects.filter(
                         tire=tire, movement_type=StockMovementType.PURCHASE,
                     ).order_by('movement_id').first()
@@ -489,16 +454,6 @@ def cancel_purchase_invoice_service(invoice: PurchaseInvoice | int, user: User |
 
 @transaction.atomic
 def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[dict], reason: str, return_date: datetime | None=None, user: User | None=None, auto_refund: bool = False) -> SalesReturn:
-    """
-    سرویس ثبت سند مرجوعی فروش (SalesReturn)، افزایش موجودی انبار و ثبت دقیق گردش SALE_RETURN.
-    
-    قواعد مالی و انبارداری:
-    ۱. فاکتور قفل شده (select_for_update) و وضعیت آن نباید لغو شده باشد.
-    ۲. سهم تخفیف فاکتور (ریالی یا درصدی) بر اساس نسبت تخفیف کل فاکتور به نسبت اقلام اعمال و تا ۲ رقم اعشار با ROUND_HALF_UP گرد می‌شود.
-    ۳. کنترل سقف مجاز مرجوعی بر اساس مانده مرجوع‌نشده هر قلم تایر.
-    ۴. جلوگیری از انباشت خطای رند: اگر مرجوعی شامل کل مانده قلم باشد، تفاضل سهم کل از استردادهای قبلی درج می‌شود.
-    ۵. درج گردش انبار با unit_cost واقعی اسنپ‌شات‌شده همان قلم در زمان فروش.
-    """
     invoice_id = invoice.pk if hasattr(invoice, 'pk') else int(invoice)
     locked_invoice = SalesInvoice.objects.select_for_update().get(pk=invoice_id)
 
@@ -527,7 +482,6 @@ def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[di
     else:
         return_date = timezone.now()
 
-    # محاسبه ضریب تخفیف برای لحاظ کردن سهم تخفیف در مبلغ استرداد
     invoice_items = {item.pk: item for item in locked_invoice.tire_items.select_related('tire')}
     subtotal = sum((item.quantity * item.unit_price for item in invoice_items.values()), Decimal('0.00'))
     subtotal += locked_invoice.service_items.aggregate(
@@ -574,7 +528,6 @@ def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[di
         if qty <= 0:
             raise ValidationError("تعداد قلم مرجوعی باید بزرگتر از صفر باشد.")
 
-        # واکشی مجموع تعداد و مبالغ استرداد قبلی این قلم درون همین تراکنش
         past_returns_aggr = past_returns.get(tire_item.pk, {})
         already_returned_qty = past_returns_aggr.get('total_qty') or 0
         already_refunded_amount = past_returns_aggr.get('total_refund') or Decimal('0.00')
@@ -585,12 +538,9 @@ def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[di
                 f"تعداد مرجوعی تایر '{tire_item.tire.tire_name}' ({qty} حلقه) بیشتر از سقف مجاز قابل مرجوعی ({remaining_qty} حلقه) است."
             )
 
-        # سهم کل خالص این قلم از فاکتور پس از اعمال ضریب تخفیف
         item_total_gross = Decimal(str(tire_item.quantity)) * tire_item.unit_price
         item_total_net = (item_total_gross * discount_factor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-        # اگر تعداد مرجوعی برابر تمام مانده این قلم باشد، جهت جلوگیری از انباشت خطای رند،
-        # مبلغ استرداد برابر مانده سهم خالص قلم قرار می‌گیرد.
         if qty == remaining_qty:
             item_refund = max(item_total_net - already_refunded_amount, Decimal('0.00'))
         else:
@@ -612,15 +562,14 @@ def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[di
 
         movements_data.append({
             'tire_id': tire_item.tire_id,
-            'quantity_delta': qty,  # ورود به انبار (مثبت)
+            'quantity_delta': qty,
             'movement_type': StockMovementType.SALE_RETURN,
             'sales_invoice': locked_invoice,
             'sales_return': sales_return,
-            'unit_cost': tire_item.unit_cost,  # بهای تمام‌شده اسنپ‌شات‌شده قلم اصلی
+            'unit_cost': tire_item.unit_cost,
             'description': f"مرجوعی از فاکتور فروش #{locked_invoice.sales_invoice_id} - {reason.strip()}"
         })
 
-    # ثبت گردش‌های انبار به صورت اتمیک با قفل صعودی
     record_stock_movements(movements_data, user=user)
 
     sales_return.total_refund_amount = total_refund

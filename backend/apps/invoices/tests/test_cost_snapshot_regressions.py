@@ -51,7 +51,7 @@ def sale(tire, customer, **kwargs):
 def test_sale_uses_current_database_cost_not_stale_caller(cost_data, cost):
     tire, customer, supplier = cost_data
     purchase(tire, supplier, cost)
-    assert tire.purchase_price == Decimal('50.00')  # Deliberately stale caller object.
+    assert tire.purchase_price == Decimal('50.00')
     invoice = sale(tire, customer)
     item = invoice.tire_items.get()
     movement = StockMovement.objects.get(sales_invoice=invoice, movement_type=StockMovementType.SALE)

@@ -21,7 +21,7 @@ def brand_sale_data(db):
             stock_quantity=50, purchase_price=Decimal('40.00'),
             sale_price=Decimal('100.00'),
         ))
-    customer = Customer.objects.create(full_name='Discount audit', phone_number='09112223344')
+    customer = Customer.objects.create(full_name='Discount customer', phone_number='09112223344')
     service = Service.objects.create(service_name='Balancing', price=Decimal('200.00'))
     return customer, tires, service
 

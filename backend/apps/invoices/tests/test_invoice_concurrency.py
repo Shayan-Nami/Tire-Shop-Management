@@ -26,11 +26,6 @@ from apps.finance.services import (
     reason="تست همروندی چندنخی و قفل ردیف (select_for_update) نیازمند پایگاه داده رابطه‌ای چندنخی (PostgreSQL) است."
 )
 class TestConcurrencyPostgres(TransactionTestCase):
-    """
-    مجموعه تست‌های جامع همروندی (Concurrency & Race Condition) روی پایگاه داده رابطه‌ای چندنخی (PostgreSQL).
-    این آزمون‌ها سناریوهای رقابت نخ‌ها (Race Condition)، قفل‌های ردیفی (select_for_update)، و جلوگیری از بن‌بست (Deadlock Prevention)
-    را با چندین Thread هم‌زمان و هماهنگ‌شده با Barrier می‌سنجند.
-    """
 
     def setUp(self):
         super().setUp()
@@ -58,12 +53,6 @@ class TestConcurrencyPostgres(TransactionTestCase):
         self.size_215, _ = Size.objects.get_or_create(size_name='215/60R16')
 
     def test_concurrent_sales_overselling_prevention(self):
-        """
-        سناریو ۱: جلوگیری از بیش‌فروشی (Overselling) در مرز موجودی.
-        تایر با موجودی فقط ۱ حلقه؛ ۵ نخ به صورت هم‌زمان تلاش می‌کنند ۱ حلقه بخرند.
-        نتیجه قطعی: دقیقاً ۱ فاکتور با موفقیت ثبت می‌شود، ۴ نخ دیگر با خطای عدم کفایت موجودی رد می‌شوند،
-        و موجودی نهایی دقیقاً ۰ می‌گردد (هرگز منفی نمی‌شود).
-        """
         tire = Tire.objects.create(
             tire_name='تایر همروندی ۱۷۵/۷۰R۱۳',
             size=self.size_175,
@@ -112,12 +101,6 @@ class TestConcurrencyPostgres(TransactionTestCase):
             assert 'موجودی تایر' in str(err) and 'کافی نیست' in str(err)
 
     def test_concurrent_excess_customer_refunds_cap(self):
-        """
-        سناریو ۲: جلوگیری از رقابت در استرداد وجه به مشتری مازاد بر سقف پرداخت.
-        فاکتوری با مبلغ ۱,۰۰۰,۰۰۰ تومان که کامل پرداخت شده، کالایی به ارزش ۴۰۰,۰۰۰ تومان مرجوع شده است.
-        حداکثر مازاد قابل استرداد ۴۰۰,۰۰۰ تومان است. ۵ نخ به طور هم‌زمان درخواست استرداد ۴۰۰,۰۰۰ تومان دارند.
-        نتیجه قطعی: دقیقاً ۱ سند استرداد صادر می‌شود و ۴ نخ دیگر رد می‌شوند. مجموع استرداد معتبر ۴۰۰,۰۰۰ تومان باقی می‌ماند.
-        """
         tire = Tire.objects.create(
             tire_name='تایر تست استرداد',
             size=self.size_205,
@@ -133,22 +116,18 @@ class TestConcurrencyPostgres(TransactionTestCase):
             service_items_data=[],
             created_by=self.manager
         )
-        # ثبت پرداخت کامل فاکتور
         create_receipt_voucher_service(
             sales_invoice=invoice,
             amount=Decimal('1000000'),
             user=self.manager
         )
         tire_item = invoice.tire_items.first()
-        # ثبت مرجوعی کالا به ارزش ۱,۰۰۰,۰۰۰ (۱ قلم)
         sales_return = create_sales_return_service(
             invoice=invoice,
             reason='مرجوعی به علت تغییر نظر مشتری',
             items_data=[{'sales_invoice_tire_item_id': tire_item.pk, 'quantity': 1}],
             user=self.manager
         )
-        # در این لحظه: دریافتی = ۱,۰۰۰,۰۰۰ ، خالص فاکتور = ۰ ، مازاد = ۱,۰۰۰,۰۰۰
-        # ۵ نخ به طور همزمان درخواست استرداد کل مبلغ ۱,۰۰۰,۰۰۰ تومان می‌دهند
         num_threads = 5
         barrier = threading.Barrier(num_threads, timeout=10)
         successes = []
@@ -188,13 +167,6 @@ class TestConcurrencyPostgres(TransactionTestCase):
         assert total_refunded == Decimal('1000000')
 
     def test_deadlock_prevention_reverse_ordered_tires(self):
-        """
-        سناریو ۳: پیشگیری قطعی از بن‌بست (Deadlock Prevention) با مرتب‌سازی صعودی شناسه تایرها.
-        نخ ۱: اقلام را با ترتیب [تایر A, تایر B] ثبت می‌کند.
-        نخ ۲: اقلام را با ترتیب معکوس [تایر B, تایر A] ثبت می‌کند.
-        به دلیل مرتب‌سازی صعودی شناسه تایرها قبل از select_for_update در سرویس انبار، هیچ بن‌بستی رخ نمی‌دهد
-        و هر دو فاکتور بدون بروز خطای Deadlock با موفقیت ذخیره می‌شوند.
-        """
         tire_a = Tire.objects.create(
             tire_name='تایر آلفا ۱۸۵/۶۵R۱۴',
             size=self.size_185,
@@ -274,11 +246,6 @@ class TestConcurrencyPostgres(TransactionTestCase):
         assert tire_b.stock_quantity == 8
 
     def test_concurrent_invoice_number_generation_sequential_and_gapless(self):
-        """
-        سناریو ۴: تولید شماره فاکتور پیوسته و یکتا در همروندی ۱۰ نخ.
-        ۱۰ نخ هم‌زمان اقدام به صدور فاکتور فروش می‌کنند.
-        تمام ۱۰ فاکتور شماره‌های یکتا و کاملاً متوالی و بدون پرش (Gapless) دریافت می‌کنند.
-        """
         tire = Tire.objects.create(
             tire_name='تایر شماره‌گذاری ۱۶۵/۶۵R۱۳',
             size=self.size_165,
@@ -323,19 +290,11 @@ class TestConcurrencyPostgres(TransactionTestCase):
         assert len(invoice_numbers) == num_threads
         assert len(set(invoice_numbers)) == num_threads, "شماره فاکتورهای تکراری تولید شده است!"
 
-        # استخراج ۵ رقم انتهای شماره‌ها برای بررسی پیوستگی
         seq_nums = sorted([int(num.split('-')[-1]) for num in invoice_numbers])
         for i in range(len(seq_nums) - 1):
             assert seq_nums[i + 1] == seq_nums[i] + 1, f"پیوستگی شماره‌ها شکسته شد: {seq_nums}"
 
     def test_concurrent_return_vs_invoice_cancellation(self):
-        """
-        سناریو ۵: تداخل لغو فاکتور در برابر ثبت مرجوعی فروش.
-        نخ ۱: قصد لغو فاکتور فروش را دارد.
-        نخ ۲: هم‌زمان قصد ثبت مرجوعی فروش برای همان فاکتور را دارد.
-        نتیجه قطعی: یکی از دو عملیات اول قفل را گرفته و ثبت می‌شود و دیگری با پیام اعتبارسنجی شفاف و معتبر رد می‌شود؛
-        هیچگاه وضعیت نامعتبر یا ناسازگاری مالی/انباری در دیتابیس به وجود نمی‌آید.
-        """
         tire = Tire.objects.create(
             tire_name='تایر تست لغو و مرجوعی',
             size=self.size_195,
@@ -409,13 +368,6 @@ class TestConcurrencyPostgres(TransactionTestCase):
             assert 'امکان لغو فاکتوری که برای آن سند مرجوعی ثبت شده وجود ندارد' in str(failures[0][2])
 
     def test_concurrent_receipt_vouchers_balance_cap(self):
-        """
-        سناریو ۶: سقف دریافت وجه در همروندی اسناد دریافت.
-        فاکتوری به مبلغ ۱,۵۰۰,۰۰۰ تومان بدون پرداختی.
-        ۵ نخ هم‌زمان تلاش می‌کنند سند دریافت به مبلغ ۱,۵۰۰,۰۰۰ تومان ثبت کنند.
-        نتیجه قطعی: دقیقاً ۱ نخ موفق می‌شود، ۴ نخ دیگر با خطای پر شدن سقف یا مازاد رد می‌شوند،
-        و جمع کل اسناد دریافت معتبر فاکتور دقیقاً ۱,۵۰۰,۰۰۰ تومان و وضعیت فاکتور PAID می‌شود.
-        """
         tire = Tire.objects.create(
             tire_name='تایر تست دریافت همروند',
             size=self.size_215,

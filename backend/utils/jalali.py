@@ -1,7 +1,6 @@
 import datetime
 
 def gregorian_to_jalali(gy, gm, gd):
-    # بررسی محدوده معتبر ماه و روز میلادی
     if not (1 <= gm <= 12 and 1 <= gd <= 31):
         raise ValueError(f"ماه ({gm}) یا روز ({gd}) میلادی نامعتبر است.")
     g_d_m_max = [0, 31, 29 if ((gy % 4 == 0 and gy % 100 != 0) or gy % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -32,10 +31,6 @@ from django.utils import timezone as dj_timezone
 from utils.persian import normalize_digits
 
 def jalali_to_gregorian(jy, jm, jd):
-    """
-    تبدیل تاریخ هجری شمسی (جلالی) به تاریخ میلادی
-    """
-    # بررسی محدوده معتبر ماه و روز هجری شمسی
     if not (1 <= jm <= 12 and 1 <= jd <= 31):
         raise ValueError(f"ماه ({jm}) یا روز ({jd}) هجری شمسی نامعتبر است.")
     if jm > 6 and jd == 31:
@@ -70,13 +65,9 @@ def jalali_to_gregorian(jy, jm, jd):
     return gy, gm, gd
 
 def parse_jalali_or_gregorian_date(date_str):
-    """
-    پارس کردن تاریخ ورودی (شمسی یا میلادی) با ارقام فارسی یا انگلیسی و بازگرداندن رشته YYYY-MM-DD میلادی
-    """
     if not date_str:
         return None
     normalized = normalize_digits(str(date_str).strip())
-    # جایگزینی اسلش با خط تیره
     normalized = normalized.replace('/', '-')
     parts = normalized.split('-')
     if len(parts) != 3:
@@ -90,14 +81,12 @@ def parse_jalali_or_gregorian_date(date_str):
         return None
 
     if 1300 <= y <= 1500:
-        # تاریخ شمسی
         try:
             gy, gm, gd = jalali_to_gregorian(y, m, d)
             return f"{gy:04d}-{gm:02d}-{gd:02d}"
         except ValueError:
             return None
     elif y > 1900:
-        # تاریخ میلادی
         return f"{y:04d}-{m:02d}-{d:02d}"
     return None
 
@@ -121,9 +110,6 @@ def format_jalali_date(dt):
 
 
 def get_jalali_year(dt=None) -> int:
-    """
-    استخراج سال هجری شمسی تاریخ مشخص‌شده یا زمان فعلی با لحاظ منطقه زمانی رسمی سامانه (Asia/Tehran)
-    """
     if dt is None:
         dt = dj_timezone.now()
     if isinstance(dt, datetime.datetime):

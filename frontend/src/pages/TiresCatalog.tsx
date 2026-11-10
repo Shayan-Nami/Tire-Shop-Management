@@ -31,10 +31,8 @@ export const TiresCatalog: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
 
-  // انبارگردانی
   const [adjustingTire, setAdjustingTire] = useState<Tire | null>(null);
 
-  // تعریف تایر جدید
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [newTireName, setNewTireName] = useState<string>('');
   const [newBrandId, setNewBrandId] = useState<number | ''>('');
@@ -44,13 +42,11 @@ export const TiresCatalog: React.FC = () => {
   const [newMinStock, setNewMinStock] = useState<number>(4);
   const [submittingNew, setSubmittingNew] = useState<boolean>(false);
 
-  // برند و سایز جدید پویا
   const [isCustomBrand, setIsCustomBrand] = useState<boolean>(false);
   const [customBrandName, setCustomBrandName] = useState<string>('');
   const [isCustomSize, setIsCustomSize] = useState<boolean>(false);
   const [customSizeName, setCustomSizeName] = useState<string>('');
 
-  // ویرایش نرخ و مشخصات تایر در کاتالوگ
   const [editingTire, setEditingTire] = useState<Tire | null>(null);
   const [editTireName, setEditTireName] = useState<string>('');
   const [editSalePrice, setEditSalePrice] = useState<string>('');
@@ -89,7 +85,6 @@ export const TiresCatalog: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Query changes intentionally enter the network loading state.
     void fetchTires();
   }, [fetchTires]);
 
@@ -223,7 +218,6 @@ export const TiresCatalog: React.FC = () => {
 
   return (
     <div className="page-stack">
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("کاتالوگ و انبار تایرها")}</h1>
@@ -241,7 +235,6 @@ export const TiresCatalog: React.FC = () => {
         )}
       </div>
 
-      {/* فیلترها و جستجو */}
       <div className="filter-bar">
         <div className="relative w-full md:w-80">
           <input
@@ -295,7 +288,6 @@ export const TiresCatalog: React.FC = () => {
         </div>
       </div>
 
-      {/* جدول تایرها */}
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت کاتالوگ...")}</div>
@@ -402,7 +394,6 @@ export const TiresCatalog: React.FC = () => {
         )}
       </div>
 
-      {/* مدال انبارگردانی */}
       {adjustingTire && (
         <StockAdjustmentModal
           tire={adjustingTire}
@@ -411,7 +402,6 @@ export const TiresCatalog: React.FC = () => {
         />
       )}
 
-      {/* مدال افزودن تایر جدید */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
@@ -440,7 +430,6 @@ export const TiresCatalog: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                {/* انتخاب یا تعریف برند */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("برند:")}</label>
@@ -491,7 +480,6 @@ export const TiresCatalog: React.FC = () => {
                   )}
                 </div>
 
-                {/* انتخاب یا تعریف سایز */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("سایز:")}</label>
@@ -610,7 +598,6 @@ export const TiresCatalog: React.FC = () => {
         </div>
       )}
 
-      {/* مدال ویرایش اطلاعات و به‌روزرسانی نرخ تایر در کاتالوگ */}
       {editingTire && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">

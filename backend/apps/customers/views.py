@@ -6,10 +6,6 @@ from apps.accounts.models import UserRole
 
 
 class CustomerOrVehiclePermission(permissions.BasePermission):
-    """
-    مشاهده، ثبت و ویرایش مشتری و خودرو برای کاربران احراز هویت شده مجاز است؛
-    اما حذف فیزیکی مشتری یا خودرو منحصراً در اختیار مدیر سیستم است.
-    """
     message = 'حذف اطلاعات مشتری یا خودرو فقط توسط مدیر سیستم امکان‌پذیر است.'
 
     def has_permission(self, request, view):

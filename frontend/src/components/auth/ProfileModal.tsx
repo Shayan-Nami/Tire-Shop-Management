@@ -21,7 +21,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
 
   useEffect(() => {
     if (user && isOpen) {
-      // oxlint-disable-next-line react/set-state-in-effect -- Reopening resets the editable snapshot; preserve the existing modal lifecycle.
       setFullName(user.full_name || '');
       setPhoneNumber(user.phone_number || '');
       setErrorMessage(null);
@@ -70,7 +69,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
       <div className="relative w-full max-w-md bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-        {/* هدر مدال */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center">
@@ -89,7 +87,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           </button>
         </div>
 
-        {/* فرم */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMessage && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs">
@@ -105,7 +102,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             </div>
           )}
 
-          {/* نام کاربری و نقش (غیرقابل ویرایش) */}
           <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs">
             <div>
               <span className="text-slate-400 block mb-0.5">{t("نام کاربری")}</span>
@@ -122,7 +118,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          {/* فیلد نام و نام خانوادگی */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">{t("نام و نام خانوادگی")}</label>
             <div className="relative">
@@ -136,7 +131,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          {/* فیلد شماره تماس */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">{t("شماره همراه")}</label>
             <div className="relative">
@@ -153,7 +147,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             <p className="mt-1 text-[11px] text-slate-400">{t("فرمت استاندارد: ۱۱ رقم با پیش‌شماره ۰۹")}</p>
           </div>
 
-          {/* دکمه‌های اقدام */}
           <div className="pt-2 flex items-center justify-end gap-2.5">
             <button
               type="button"

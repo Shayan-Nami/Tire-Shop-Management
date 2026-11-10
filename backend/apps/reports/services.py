@@ -32,13 +32,9 @@ def dashboard_stats() -> dict[str, Any]:
     ).aggregate(total=Sum('total_refund_amount'))['total'] or Decimal('0.00')
 
     gross_sales = today_sales_aggr['total'] or Decimal('0.00')
-    # محاسبه درآمد خالص روز با در نظر گرفتن کسر مرجوعی‌ها از ناخالص فروش
     today_revenue = gross_sales - today_returns_total
     today_invoices_count = today_sales_aggr['count'] or 0
 
-    # محاسبه دقیق مطالبات معوق: برای هر فاکتور مجزا max(net_amount - دریافتی_خالص, 0)
-    # تا مازاد پرداخت یا اضافه مرجوعی یک فاکتور، بدهی فاکتور دیگر را کسر نکند.
-    # فاکتورهای لغوشده (CANCELLED) به طور کامل از محاسبات خارج هستند.
     returned_subquery = SalesReturn.objects.filter(
         sales_invoice=OuterRef('pk')
     ).values('sales_invoice').annotate(

@@ -2,14 +2,10 @@ from decimal import Decimal
 from django.db import migrations
 
 def backfill_sales_tire_unit_cost(apps, schema_editor):
-    """
-    پر کردن فیلد unit_cost برای اقلام فروش قبلی بر اساس بهای خرید جاری تایر در کاتالوگ
-    """
     SalesInvoiceTireItem = apps.get_model('invoices', 'SalesInvoiceTireItem')
     
     items_to_update = []
     for item in SalesInvoiceTireItem.objects.all():
-        # دریافت قیمت خرید تایر مربوطه
         if item.tire_id:
             Tire = apps.get_model('catalog', 'Tire')
             try:

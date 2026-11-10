@@ -20,10 +20,10 @@ def test_dashboard_counts_only_today_confirmed_activity(auth_client_manager):
             status=status, total_amount=Decimal('1000.00'),
         )
 
-    current = invoice('AUDIT-TODAY', start)
-    invoice('AUDIT-YESTERDAY', start - timedelta(microseconds=1))
-    invoice('AUDIT-TOMORROW', start + timedelta(days=1))
-    cancelled = invoice('AUDIT-CANCELLED', start, InvoiceStatus.CANCELLED)
+    current = invoice('S-1405-00001', start)
+    invoice('S-1405-00002', start - timedelta(microseconds=1))
+    invoice('S-1405-00003', start + timedelta(days=1))
+    cancelled = invoice('S-1405-00004', start, InvoiceStatus.CANCELLED)
     for date, source, amount in [
         (start, current, '100.00'),
         (start - timedelta(microseconds=1), current, '200.00'),

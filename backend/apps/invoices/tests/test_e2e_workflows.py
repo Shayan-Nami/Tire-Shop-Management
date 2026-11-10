@@ -1,18 +1,3 @@
-"""
-End-to-End (E2E) Test Suite for Tire Shop Management System.
-
-System Specifications:
-- API & Contract Specifications
-- Business Logic & Financial Integrity Rules
-
-Methodology:
-- Systematic Verification Architecture:
-  * Phase 1: Feature Coverage (API contracts, serializers, enums, endpoints)
-  * Phase 2: Boundary & Corner Cases (Validation stress, overpayment, max returns, plate format)
-  * Phase 3: Cross-Feature Interactions (Cash invoice -> Auto-Receipt -> Dashboard -> Reconcile -> Cancel)
-  * Phase 4: Real-World Scenarios (Full tire sales and return lifecycle with Persian plate & POS)
-"""
-
 import pytest
 from decimal import Decimal
 from django.urls import reverse
@@ -29,13 +14,8 @@ from apps.invoices.models import (
 from apps.invoices.services import create_sales_invoice_service
 
 
-# ---------------------------------------------------------------------------
-# Fixtures & Setup Helpers
-# ---------------------------------------------------------------------------
-
 @pytest.fixture
 def e2e_catalog(db, manager_user):
-    """Fixture providing isolated catalog items for E2E tests."""
     brand, _ = Brand.objects.get_or_create(brand_name='کویر تایر E2E')
     size, _ = Size.objects.get_or_create(size_name='195/65R15-E2E')
     tire, created = Tire.objects.get_or_create(
@@ -55,7 +35,6 @@ def e2e_catalog(db, manager_user):
         tire.sale_price = Decimal('2500000.00')
         tire.save()
 
-    # Initial stock movement
     StockMovement.objects.get_or_create(
         tire=tire,
         movement_type=StockMovementType.INITIAL_STOCK,
@@ -96,22 +75,10 @@ def e2e_catalog(db, manager_user):
     }
 
 
-# ===========================================================================
-# Phase 1: Feature Contracts and Endpoints
-# ===========================================================================
-
 @pytest.mark.django_db
 class TestFeatureContracts:
-    """
-    Verifies individual feature contracts, payload schemas, and endpoints
-    according to the system functional specifications.
-    """
 
     def test_login_and_role_identity_payload(self, api_client, manager_user, technician_user, warehouse_user):
-        """
-        Verify login endpoint returns JWT tokens and profile endpoint returns
-        correct user role (MANAGER, TECHNICIAN, WAREHOUSE) enabling clean frontend routing.
-        """
         login_url = reverse('token_obtain_pair')
         profile_url = reverse('user_profile')
 
@@ -122,7 +89,6 @@ class TestFeatureContracts:
         ]
 
         for user, expected_role in roles_to_test:
-            # Test Login
             login_res = api_client.post(login_url, {'username': user.username, 'password': 'pass123'})
             assert login_res.status_code == status.HTTP_200_OK, f"Login failed for {expected_role}"
             assert 'access' in login_res.data
@@ -132,17 +98,12 @@ class TestFeatureContracts:
             auth_client = APIClient()
             auth_client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
 
-            # Test Profile
             profile_res = auth_client.get(profile_url)
             assert profile_res.status_code == status.HTTP_200_OK
             assert profile_res.data['username'] == user.username
             assert profile_res.data['role'] == expected_role
 
     def test_sales_return_input_serializer_contract(self, auth_client_manager, e2e_catalog, manager_user):
-        """
-        Verify POST /api/v1/invoices/returns/ requires
-        'sales_invoice_tire_item_id' and rejects legacy 'tire' payload.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
         invoice = create_sales_invoice_service(
@@ -155,7 +116,6 @@ class TestFeatureContracts:
         sales_item = invoice.tire_items.first()
         url = reverse('sales-return-list')
 
-        # 1. Invalid payload with legacy 'tire' field should be rejected with HTTP 400
         invalid_payload = {
             'sales_invoice': invoice.pk,
             'reason': 'نارضایتی از کیفیت',
@@ -168,7 +128,6 @@ class TestFeatureContracts:
         error_str = str(res_invalid.data)
         assert 'sales_invoice_tire_item_id' in error_str or 'شناسه قلم فاکتور' in error_str
 
-        # 2. Valid payload with 'sales_invoice_tire_item_id' should succeed with HTTP 201
         valid_payload = {
             'sales_invoice': invoice.pk,
             'reason': 'عدم تطابق سایز',
@@ -182,10 +141,6 @@ class TestFeatureContracts:
         assert res_valid.data['total_refund_amount'] == '2500000.00'
 
     def test_treasury_voucher_endpoints_and_primary_keys(self, auth_client_manager, e2e_catalog, manager_user):
-        """
-        Verify Treasury voucher endpoints return consistent primary key
-        fields ('receipt_id', 'payment_id', 'refund_id') and allow cancel operations.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
         invoice = create_sales_invoice_service(
@@ -196,7 +151,6 @@ class TestFeatureContracts:
             created_by=manager_user
         )
 
-        # Create Receipt Voucher
         receipt_url = reverse('receipt-voucher-list')
         receipt_res = auth_client_manager.post(receipt_url, {
             'sales_invoice': invoice.pk,
@@ -207,7 +161,6 @@ class TestFeatureContracts:
         assert 'receipt_id' in receipt_res.data
         receipt_id = receipt_res.data['receipt_id']
 
-        # Cancel Receipt Voucher using PK
         cancel_url = reverse('receipt-voucher-cancel', kwargs={'pk': receipt_id})
         cancel_res = auth_client_manager.post(cancel_url, {'reason': 'ابطال سند به دلیل اشتباه بانکی'}, format='json')
         assert cancel_res.status_code == status.HTTP_200_OK
@@ -215,10 +168,6 @@ class TestFeatureContracts:
         assert cancel_res.data['receipt_id'] == receipt_id
 
     def test_customer_specific_vehicle_filtering(self, auth_client_manager):
-        """
-        Verify GET /api/v1/crm/vehicles/?customer={id} returns only
-        vehicles belonging to that specific customer.
-        """
         cust1 = Customer.objects.create(full_name='مشتری الف', phone_number='09121110011')
         cust2 = Customer.objects.create(full_name='مشتری ب', phone_number='09121110022')
 
@@ -237,14 +186,9 @@ class TestFeatureContracts:
         assert res.data['count'] == 2
 
     def test_enum_partial_payment_status_filtering(self, auth_client_manager, e2e_catalog, manager_user):
-        """
-        Verify GET /api/v1/invoices/sales/?payment_status=PARTIAL
-        filters partially-paid invoices cleanly.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
 
-        # Create 3 invoices
         inv_unpaid = create_sales_invoice_service(
             customer=customer, vehicle=None,
             tire_items_data=[{'tire': tire, 'quantity': 1, 'unit_price': Decimal('2500000.00')}],
@@ -272,10 +216,6 @@ class TestFeatureContracts:
         assert inv_unpaid.pk not in returned_ids
 
     def test_voucher_reference_number_persistence(self, auth_client_manager, e2e_catalog, manager_user):
-        """
-        Verify ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher
-        persist and expose 'reference_number' (POS tracking code).
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
         invoice = create_sales_invoice_service(
@@ -300,10 +240,6 @@ class TestFeatureContracts:
         assert getattr(voucher, 'reference_number', None) == 'POS-REF-884920'
 
     def test_auto_receipt_creation_on_paid_sales_invoice(self, auth_client_manager, e2e_catalog):
-        """
-        Verify sales invoice created with payment_status='PAID'
-        automatically creates a cash ReceiptVoucher matching total_amount.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
 
@@ -337,10 +273,6 @@ class TestFeatureContracts:
     def test_remaining_amount_and_paid_amount_in_sales_invoice_serializer(
         self, auth_client_manager, e2e_catalog, manager_user
     ):
-        """
-        Verify SalesInvoiceSerializer exposes 'paid_amount' and
-        'remaining_amount' for list and detail views.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
         invoice = create_sales_invoice_service(
@@ -348,7 +280,6 @@ class TestFeatureContracts:
             tire_items_data=[{'tire': tire, 'quantity': 4, 'unit_price': Decimal('2500000.00')}],
             service_items_data=[], created_by=manager_user
         )
-        # 10,000,000 total. Issue partial receipt of 3,000,000.
         ReceiptVoucher.objects.create(
             sales_invoice=invoice,
             amount=Decimal('3000000.00'),
@@ -365,12 +296,7 @@ class TestFeatureContracts:
         assert Decimal(str(res.data['remaining_amount'])) == Decimal('7000000.00')
 
     def test_error_response_formatting_envelope(self, auth_client_manager):
-        """
-        Verify standard DRF custom exception handler returns
-        { success: false, status_code: 400, errors: ... } envelope.
-        """
         cust_url = reverse('customer-list')
-        # Empty full_name triggers validation error
         res = auth_client_manager.post(cust_url, {'full_name': ''}, format='json')
         assert res.status_code == status.HTTP_400_BAD_REQUEST
         assert 'success' in res.data
@@ -379,10 +305,6 @@ class TestFeatureContracts:
         assert 'errors' in res.data
 
     def test_action_button_role_guarding_permissions(self, auth_client_warehouse, e2e_catalog, manager_user):
-        """
-        Verify warehouse role receives HTTP 403 Forbidden when attempting
-        to confirm sales invoice or issue receipts.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
         draft_invoice = SalesInvoice.objects.create(
@@ -398,28 +320,14 @@ class TestFeatureContracts:
         assert res.status_code == status.HTTP_403_FORBIDDEN
 
 
-# ===========================================================================
-# Phase 2: Boundary & Corner Cases
-# ===========================================================================
-
 @pytest.mark.django_db
 class TestBoundaryAndValidationLimits:
-    """
-    Verifies system boundaries, extreme inputs, and validation robustness.
-    """
 
     def test_zero_total_invoice_and_discount_handling(self, auth_client_manager, e2e_catalog):
-        """
-        Boundary Case: Verify invoice discount validation:
-        1. Discount greater than subtotal is rejected.
-        2. Negative discount is rejected.
-        3. Zero discount is handled gracefully.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
         url = reverse('sales-invoice-list')
 
-        # 1. Discount exceeding subtotal (subtotal = 5,000,000, discount = 6,000,000)
         res_over = auth_client_manager.post(url, {
             'customer': customer.pk,
             'discount_amount': '6000000.00',
@@ -427,7 +335,6 @@ class TestBoundaryAndValidationLimits:
         }, format='json')
         assert res_over.status_code == status.HTTP_400_BAD_REQUEST
 
-        # 2. Negative discount
         res_neg = auth_client_manager.post(url, {
             'customer': customer.pk,
             'discount_amount': '-1000.00',
@@ -435,7 +342,6 @@ class TestBoundaryAndValidationLimits:
         }, format='json')
         assert res_neg.status_code == status.HTTP_400_BAD_REQUEST
 
-        # 3. Valid 0 discount
         res_zero = auth_client_manager.post(url, {
             'customer': customer.pk,
             'discount_amount': '0.00',
@@ -446,9 +352,6 @@ class TestBoundaryAndValidationLimits:
         assert Decimal(str(res_zero.data['total_amount'])) == Decimal('2500000.00')
 
     def test_maximum_return_quantity_boundary(self, auth_client_manager, e2e_catalog, manager_user):
-        """
-        Boundary Case: Returning quantity exceeding the sold quantity must fail with HTTP 400.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
         invoice = create_sales_invoice_service(
@@ -459,7 +362,6 @@ class TestBoundaryAndValidationLimits:
         sales_item = invoice.tire_items.first()
         url = reverse('sales-return-list')
 
-        # Attempt to return 3 when only 2 were purchased
         res = auth_client_manager.post(url, {
             'sales_invoice': invoice.pk,
             'reason': 'مرجوعی بیش از سقف خرید',
@@ -471,14 +373,9 @@ class TestBoundaryAndValidationLimits:
         assert 'بیشتر از سقف مجاز' in str(res.data) or 'سقف' in str(res.data)
 
     def test_duplicate_phone_number_error_payload(self, auth_client_manager):
-        """
-        Corner Case: Attempting to register customer with duplicate phone number
-        (including Persian digits) returns structured error envelope.
-        """
         url = reverse('customer-list')
         Customer.objects.create(full_name='مشتری اول', phone_number='09127778899')
 
-        # Persian digits duplicate
         payload = {
             'full_name': 'مشتری دوم با همان شماره',
             'phone_number': '۰۹۱۲۷۷۷۸۸۹۹'
@@ -489,10 +386,6 @@ class TestBoundaryAndValidationLimits:
         assert 'phone_number' in res.data['errors']
 
     def test_overpayment_validation_error(self, auth_client_manager, e2e_catalog, manager_user):
-        """
-        Boundary Case: Registering a ReceiptVoucher with amount exceeding remaining invoice debt
-        must be rejected with HTTP 400 and informative Persian message.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
         invoice = create_sales_invoice_service(
@@ -500,7 +393,6 @@ class TestBoundaryAndValidationLimits:
             tire_items_data=[{'tire': tire, 'quantity': 2, 'unit_price': Decimal('2500000.00')}],
             service_items_data=[], created_by=manager_user
         )
-        # Total debt = 5,000,000. Pay 3,000,000.
         ReceiptVoucher.objects.create(
             sales_invoice=invoice,
             amount=Decimal('3000000.00'),
@@ -508,7 +400,6 @@ class TestBoundaryAndValidationLimits:
         )
 
         receipt_url = reverse('receipt-voucher-list')
-        # Attempt to pay 2,500,000 (remaining is 2,000,000)
         res = auth_client_manager.post(receipt_url, {
             'sales_invoice': invoice.pk,
             'amount': '2500000.00',
@@ -519,29 +410,12 @@ class TestBoundaryAndValidationLimits:
         assert 'مانده بدهی' in str(res.data)
 
 
-# ===========================================================================
-# Phase 3: Cross-Module Interactions
-# ===========================================================================
-
 @pytest.mark.django_db
 class TestCrossFeatureWorkflows:
-    """
-    Verifies transaction flows that span multiple modules:
-    invoices, treasury, dashboard stats, and reconciliation commands.
-    """
 
     def test_cash_invoice_auto_receipt_dashboard_receivables_and_cancel_lifecycle(
         self, auth_client_manager, e2e_catalog
     ):
-        """
-        Cross-Feature Interaction 1:
-        1. Create cash sales invoice with payment_status='PAID'.
-        2. Verify auto-created ReceiptVoucher balances debt.
-        3. Query DashboardStatsView: verify total_receivables == 0.
-        4. Run reconcile_payments: verify 0 discrepancies.
-        5. Cancel the auto-created receipt voucher.
-        6. Query DashboardStatsView: verify invoice debt reappears under total_receivables.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
 
@@ -561,31 +435,26 @@ class TestCrossFeatureWorkflows:
         invoice_id = res_inv.data['sales_invoice_id']
         invoice = SalesInvoice.objects.get(pk=invoice_id)
 
-        # Check Auto Receipt
         receipts = invoice.receipts.filter(is_cancelled=False)
         assert receipts.exists(), "ReceiptVoucher must be created automatically for PAID invoice"
         receipt = receipts.first()
         assert receipt.amount == Decimal('5000000.00')
 
-        # Check Dashboard Stats
         dashboard_url = reverse('dashboard-stats')
         res_dash = auth_client_manager.get(dashboard_url)
         assert res_dash.status_code == status.HTTP_200_OK
         assert Decimal(str(res_dash.data['total_receivables'])) == Decimal('0.00')
         assert res_dash.data['unpaid_invoices_count'] == 0
 
-        # Run Reconcile Payments Command (should pass without CommandError)
         try:
             call_command('reconcile_payments')
         except CommandError as e:
             pytest.fail(f"reconcile_payments failed unexpectedly on auto-settled invoice: {e}")
 
-        # Cancel Receipt Voucher
         cancel_url = reverse('receipt-voucher-cancel', kwargs={'pk': receipt.pk})
         res_cancel = auth_client_manager.post(cancel_url, {'reason': 'مرجوعی رسید به درخواست مشتری'}, format='json')
         assert res_cancel.status_code == status.HTTP_200_OK
 
-        # Check Dashboard Stats again (receivables must now reflect 5,000,000)
         res_dash_after = auth_client_manager.get(dashboard_url)
         assert res_dash_after.status_code == status.HTTP_200_OK
         assert Decimal(str(res_dash_after.data['total_receivables'])) == Decimal('5000000.00')
@@ -594,13 +463,6 @@ class TestCrossFeatureWorkflows:
     def test_partial_receipt_remaining_amount_and_subsequent_receipt(
         self, auth_client_manager, e2e_catalog, manager_user
     ):
-        """
-        Cross-Feature Interaction 2:
-        1. Create confirmed invoice with 7,500,000.
-        2. Pay 3,000,000 -> remaining becomes 4,500,000, status becomes PARTIAL.
-        3. Attempting receipt for 5,000,000 fails (overpayment).
-        4. Paying exactly 4,500,000 succeeds -> remaining becomes 0, status becomes PAID.
-        """
         tire = e2e_catalog['tire']
         customer = e2e_catalog['customer']
         invoice = create_sales_invoice_service(
@@ -610,7 +472,6 @@ class TestCrossFeatureWorkflows:
         )
         receipt_url = reverse('receipt-voucher-list')
 
-        # 1. Partial payment: 3,000,000
         res_r1 = auth_client_manager.post(receipt_url, {
             'sales_invoice': invoice.pk,
             'amount': '3000000.00',
@@ -618,7 +479,6 @@ class TestCrossFeatureWorkflows:
         }, format='json')
         assert res_r1.status_code == status.HTTP_201_CREATED
 
-        # Refresh invoice and verify state
         inv_detail_url = reverse('sales-invoice-detail', kwargs={'pk': invoice.pk})
         res_inv = auth_client_manager.get(inv_detail_url)
         assert res_inv.status_code == status.HTTP_200_OK
@@ -628,7 +488,6 @@ class TestCrossFeatureWorkflows:
         assert Decimal(str(res_inv.data['remaining_amount'])) == Decimal('4500000.00')
         assert res_inv.data['payment_status'] == PaymentStatus.PARTIAL
 
-        # 2. Overpayment attempt: 5,000,000
         res_over = auth_client_manager.post(receipt_url, {
             'sales_invoice': invoice.pk,
             'amount': '5000000.00',
@@ -636,7 +495,6 @@ class TestCrossFeatureWorkflows:
         }, format='json')
         assert res_over.status_code == status.HTTP_400_BAD_REQUEST
 
-        # 3. Exact remaining payment: 4,500,000
         res_r2 = auth_client_manager.post(receipt_url, {
             'sales_invoice': invoice.pk,
             'amount': '4500000.00',
@@ -644,40 +502,19 @@ class TestCrossFeatureWorkflows:
         }, format='json')
         assert res_r2.status_code == status.HTTP_201_CREATED
 
-        # Final verification
         res_inv_final = auth_client_manager.get(inv_detail_url)
         assert Decimal(str(res_inv_final.data['paid_amount'])) == Decimal('7500000.00')
         assert Decimal(str(res_inv_final.data['remaining_amount'])) == Decimal('0.00')
         assert res_inv_final.data['payment_status'] == PaymentStatus.PAID
 
 
-# ===========================================================================
-# Phase 4: Real-World Scenarios
-# ===========================================================================
-
 @pytest.mark.django_db
 class TestEndToEndBusinessWorkflows:
-    """
-    Tests complete multi-step user workflows simulating end-to-end shop operations.
-    """
 
     def test_complete_tire_sales_and_return_lifecycle(self, auth_client_manager, e2e_catalog):
-        """
-        Complete Real-World Scenario:
-        1. Register a new customer via CRM API.
-        2. Register a vehicle with Persian plate digits.
-        3. Fetch customer's vehicles using customer query filter.
-        4. Checkout 4 tires with POS payment method, reference number, and PAID status.
-        5. Verify warehouse inventory drops by 4.
-        6. Verify auto-generated receipt voucher with matching reference number.
-        7. Customer returns 1 tire via SalesReturn API using sales_invoice_tire_item_id.
-        8. Verify tire inventory restored (+1).
-        9. Verify customer refund voucher issued and financials accurately adjusted.
-        """
         tire = e2e_catalog['tire']
         initial_stock = tire.stock_quantity
 
-        # Step 1: Register customer
         cust_res = auth_client_manager.post(reverse('customer-list'), {
             'full_name': 'مهندس کامران رستمی',
             'phone_number': '09123334455',
@@ -687,7 +524,6 @@ class TestEndToEndBusinessWorkflows:
         assert cust_res.status_code == status.HTTP_201_CREATED
         customer_id = cust_res.data['customer_id']
 
-        # Step 2: Register vehicle with Persian license plate digits (۱۲ ب ۳۴۵ ایران ۶۸)
         plate_input = '۱۲ب۳۴۵-۶۸'
         veh_res = auth_client_manager.post(reverse('vehicle-list'), {
             'customer': customer_id,
@@ -697,16 +533,13 @@ class TestEndToEndBusinessWorkflows:
         }, format='json')
         assert veh_res.status_code == status.HTTP_201_CREATED
         vehicle_id = veh_res.data['vehicle_id']
-        # Plate should be stored with normalized digits
         assert veh_res.data['license_plate'] == '12ب345-68'
 
-        # Step 3: Fetch vehicles for this customer
         v_filter_res = auth_client_manager.get(f"{reverse('vehicle-list')}?customer={customer_id}")
         assert v_filter_res.status_code == status.HTTP_200_OK
         assert v_filter_res.data['count'] == 1
         assert v_filter_res.data['results'][0]['vehicle_id'] == vehicle_id
 
-        # Step 4: Issue cash POS sales invoice for 4 tires
         invoice_res = auth_client_manager.post(reverse('sales-invoice-list'), {
             'customer': customer_id,
             'vehicle': vehicle_id,
@@ -724,11 +557,9 @@ class TestEndToEndBusinessWorkflows:
         invoice_id = invoice_res.data['sales_invoice_id']
         assert invoice_res.data['total_amount'] == '10000000.00'
 
-        # Step 5: Check stock deduction
         tire.refresh_from_db()
         assert tire.stock_quantity == initial_stock - 4
 
-        # Step 6: Verify auto receipt
         invoice = SalesInvoice.objects.get(pk=invoice_id)
         receipt = invoice.receipts.filter(is_cancelled=False).first()
         assert receipt is not None
@@ -736,7 +567,6 @@ class TestEndToEndBusinessWorkflows:
         if hasattr(receipt, 'reference_number'):
             assert receipt.reference_number == 'POS-TX-998877'
 
-        # Step 7: Sales return: Customer returns 1 tire
         sales_item = invoice.tire_items.first()
         return_res = auth_client_manager.post(reverse('sales-return-list'), {
             'sales_invoice': invoice_id,
@@ -748,11 +578,9 @@ class TestEndToEndBusinessWorkflows:
         assert return_res.status_code == status.HTTP_201_CREATED
         assert return_res.data['total_refund_amount'] == '2500000.00'
 
-        # Step 8: Verify inventory restored (+1)
         tire.refresh_from_db()
         assert tire.stock_quantity == initial_stock - 3
 
-        # Step 9: Verify refund voucher automatically or manually created and financials consistent
         refund_vouchers = CustomerRefundVoucher.objects.filter(sales_invoice=invoice, is_cancelled=False)
         assert refund_vouchers.exists()
         assert refund_vouchers.first().amount == Decimal('2500000.00')

@@ -1,4 +1,3 @@
-"""Domain failures retain the public DRF validation envelope."""
 from decimal import Decimal, InvalidOperation
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import DecimalValidator
@@ -6,15 +5,14 @@ from rest_framework.exceptions import ValidationError
 
 
 class DomainValidationError(ValidationError):
-    """A business invariant failed before a mutation could commit."""
+    pass
 
 
 class StockConflict(DomainValidationError):
-    """The stock projection changed after it was read."""
+    pass
 
 
 def validate_money(value: object) -> Decimal:
-    """Reject non-finite, over-precision and out-of-range money at service boundaries."""
     try:
         amount = Decimal(str(value))
         DecimalValidator(max_digits=14, decimal_places=2)(amount.normalize())
@@ -24,7 +22,6 @@ def validate_money(value: object) -> Decimal:
 
 
 def validate_quantity(value: object) -> int:
-    """Accept integral quantities without silently truncating fractions or booleans."""
     try:
         number = Decimal(str(value))
         if isinstance(value, bool) or not number.is_finite() or number != number.to_integral_value():

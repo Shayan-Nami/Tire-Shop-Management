@@ -82,11 +82,9 @@ def service_sample(db):
 @pytest.mark.django_db
 class TestServicesComprehensiveEdgeCoverage:
 
-    # ------------------ Catalog Services ------------------
     def test_catalog_service_empty_and_zero_delta(self, brand_sample, size_sample):
         assert record_stock_movements([]) == []
 
-        # delta == 0
         t = Tire.objects.create(
             tire_name='تایر دلتا صفر', size=size_sample, brand=brand_sample,
             stock_quantity=5, purchase_price=Decimal('100'), sale_price=Decimal('200')
@@ -99,7 +97,6 @@ class TestServicesComprehensiveEdgeCoverage:
             record_stock_movements([{'tire_id': 999999, 'quantity_delta': 1, 'movement_type': StockMovementType.INITIAL_STOCK}])
         assert 'یافت نشد' in str(exc.value)
 
-    # ------------------ Invoices Services: Sales ------------------
     def test_sales_invoice_duplicate_tire_raises_error(self, customer_obj, tire_sample, manager_user):
         with pytest.raises(ValidationError) as exc:
             create_sales_invoice_service(
@@ -129,7 +126,6 @@ class TestServicesComprehensiveEdgeCoverage:
         assert 'خدمت تکراری' in str(exc.value)
 
     def test_sales_invoice_invalid_discounts(self, customer_obj, tire_sample, manager_user):
-        # درصد تخفیف منفی
         with pytest.raises(ValidationError) as exc:
             create_sales_invoice_service(
                 customer=customer_obj, vehicle=None,
@@ -138,7 +134,6 @@ class TestServicesComprehensiveEdgeCoverage:
             )
         assert 'درصد تخفیف' in str(exc.value)
 
-        # درصد تخفیف بالای ۱۰۰
         with pytest.raises(ValidationError) as exc:
             create_sales_invoice_service(
                 customer=customer_obj, vehicle=None,
@@ -147,7 +142,6 @@ class TestServicesComprehensiveEdgeCoverage:
             )
         assert 'درصد تخفیف' in str(exc.value)
 
-        # مبلغ تخفیف منفی
         with pytest.raises(ValidationError) as exc:
             create_sales_invoice_service(
                 customer=customer_obj, vehicle=None,
@@ -156,7 +150,6 @@ class TestServicesComprehensiveEdgeCoverage:
             )
         assert 'مبلغ تخفیف' in str(exc.value)
 
-        # تخفیف هم‌زمان مبلغی و درصدی
         with pytest.raises(ValidationError) as exc:
             create_sales_invoice_service(
                 customer=customer_obj, vehicle=None,
@@ -166,7 +159,6 @@ class TestServicesComprehensiveEdgeCoverage:
         assert 'تخفیف' in str(exc.value) and ('درصدی' in str(exc.value) or 'مبلغی' in str(exc.value))
 
     def test_sales_invoice_invalid_item_quantities_and_prices(self, customer_obj, tire_sample, manager_user):
-        # تعداد صفر یا منفی
         with pytest.raises(ValidationError) as exc:
             create_sales_invoice_service(
                 customer=customer_obj, vehicle=None,
@@ -175,7 +167,6 @@ class TestServicesComprehensiveEdgeCoverage:
             )
         assert 'بزرگتر از صفر باشد' in str(exc.value)
 
-        # قیمت واحد منفی
         with pytest.raises(ValidationError) as exc:
             create_sales_invoice_service(
                 customer=customer_obj, vehicle=None,
@@ -185,7 +176,6 @@ class TestServicesComprehensiveEdgeCoverage:
         assert 'منفی باشد' in str(exc.value)
 
     def test_sales_invoice_with_service_items_and_zero_total(self, customer_obj, service_sample, manager_user):
-        # فاکتور خدمات با تخفیف ۱۰۰ درصدی -> مبلغ کل صفر -> وضعیت پرداخت خودکار PAID
         inv = create_sales_invoice_service(
             customer=customer_obj,
             vehicle=None,
@@ -198,7 +188,6 @@ class TestServicesComprehensiveEdgeCoverage:
         assert inv.payment_status == PaymentStatus.PAID
         assert inv.service_items.count() == 1
 
-    # ------------------ Invoices Services: Purchase ------------------
     def test_purchase_invoice_duplicate_tire_raises_error(self, supplier_obj, tire_sample, manager_user):
         with pytest.raises(ValidationError) as exc:
             create_purchase_invoice_service(
@@ -228,7 +217,6 @@ class TestServicesComprehensiveEdgeCoverage:
             )
         assert 'منفی باشد' in str(exc.value)
 
-    # ------------------ Invoices Services: Sales Return ------------------
     def test_sales_return_edge_validations(self, customer_obj, tire_sample, service_sample, manager_user):
         inv = create_sales_invoice_service(
             customer=customer_obj, vehicle=None,
@@ -239,23 +227,19 @@ class TestServicesComprehensiveEdgeCoverage:
         )
         ti = inv.tire_items.first()
 
-        # شرح خالی
         with pytest.raises(ValidationError) as exc:
             create_sales_return_service(inv, [{'sales_invoice_tire_item_id': ti.pk, 'quantity': 1}], reason='', user=manager_user)
         assert 'علت / شرح مرجوعی' in str(exc.value)
 
-        # اقلام خالی
         with pytest.raises(ValidationError) as exc:
             create_sales_return_service(inv, [], reason='شرح تست', user=manager_user)
         assert 'حداقل یک قلم تایر' in str(exc.value)
 
-        # تاریخ در آینده
         future_date = timezone.now() + timedelta(days=2)
         with pytest.raises(ValidationError) as exc:
             create_sales_return_service(inv, [{'sales_invoice_tire_item_id': ti.pk, 'quantity': 1}], reason='تست', return_date=future_date, user=manager_user)
         assert 'در آینده باشد' in str(exc.value)
 
-        # شناسه قلم نامعتبر یا گم‌شده
         with pytest.raises(ValidationError) as exc:
             create_sales_return_service(inv, [{'quantity': 1}], reason='تست', user=manager_user)
         assert 'sales_invoice_tire_item_id' in str(exc.value)
@@ -264,12 +248,10 @@ class TestServicesComprehensiveEdgeCoverage:
             create_sales_return_service(inv, [{'sales_invoice_tire_item_id': 99999, 'quantity': 1}], reason='تست', user=manager_user)
         assert 'یافت نشد' in str(exc.value)
 
-        # تعداد مرجوعی صفر
         with pytest.raises(ValidationError) as exc:
             create_sales_return_service(inv, [{'sales_invoice_tire_item_id': ti.pk, 'quantity': 0}], reason='تست', user=manager_user)
         assert 'بزرگتر از صفر باشد' in str(exc.value)
 
-    # ------------------ Finance Services: Receipt Voucher ------------------
     def test_receipt_voucher_edge_validations(self, customer_obj, tire_sample, manager_user):
         inv = create_sales_invoice_service(
             customer=customer_obj, vehicle=None,
@@ -277,30 +259,24 @@ class TestServicesComprehensiveEdgeCoverage:
             service_items_data=[], created_by=manager_user
         )
 
-        # مبلغ منفی یا صفر
         with pytest.raises(ValidationError) as exc:
             create_receipt_voucher_service(inv, amount=Decimal('0'))
         assert 'باید بزرگتر از صفر باشد' in str(exc.value)
 
-        # ثبت با تاریخ دلخواه
         past_date = timezone.now() - timedelta(days=1)
         voucher = create_receipt_voucher_service(inv, amount=Decimal('500000'), receipt_date=past_date, user=manager_user)
         assert voucher.receipt_date == past_date
 
-        # ابطال با شرح خالی
         with pytest.raises(ValidationError) as exc:
             cancel_receipt_voucher_service(voucher, reason='   ')
         assert 'ثبت علت ابطال سند الزامی است' in str(exc.value)
 
-        # ابطال موفق
         cancel_receipt_voucher_service(voucher, reason='ابطال صحیح', user=manager_user)
 
-        # ابطال مجدد سند لغو شده
         with pytest.raises(ValidationError) as exc:
             cancel_receipt_voucher_service(voucher, reason='تکرار ابطال')
         assert 'قبلاً ابطال شده است' in str(exc.value)
 
-    # ------------------ Finance Services: Payment Voucher ------------------
     def test_payment_voucher_edge_validations(self, supplier_obj, tire_sample, manager_user):
         p_inv = create_purchase_invoice_service(
             supplier=supplier_obj,
@@ -308,37 +284,30 @@ class TestServicesComprehensiveEdgeCoverage:
             created_by=manager_user
         )
 
-        # مبلغ بزرگتر از مانده
         with pytest.raises(ValidationError) as exc:
             create_payment_voucher_service(p_inv, amount=Decimal('1500000'), user=manager_user)
         assert 'بیشتر باشد' in str(exc.value)
 
-        # پرداخت با تاریخ سفارشی
         past_dt = timezone.now() - timedelta(hours=5)
         pv = create_payment_voucher_service(p_inv, amount=Decimal('1000000'), payment_date=past_dt, user=manager_user)
         assert pv.payment_date == past_dt
         p_inv.refresh_from_db()
         assert p_inv.payment_status == PaymentStatus.PAID
 
-        # ثبت پرداخت مجدد وقتی تسویه شده
         with pytest.raises(ValidationError) as exc:
             create_payment_voucher_service(p_inv, amount=Decimal('100000'), user=manager_user)
         assert 'سقف مبلغ کل فاکتور' in str(exc.value)
 
-        # ابطال با دلیل خالی
         with pytest.raises(ValidationError) as exc:
             cancel_payment_voucher_service(pv, reason='')
         assert 'ثبت علت ابطال سند الزامی است' in str(exc.value)
 
-        # ابطال سند پرداخت
         cancel_payment_voucher_service(pv, reason='علت موجه', user=manager_user)
 
-        # تلاش برای ابطال مجدد
         with pytest.raises(ValidationError) as exc:
             cancel_payment_voucher_service(pv, reason='دوباره')
         assert 'قبلاً ابطال شده است' in str(exc.value)
 
-    # ------------------ Finance Services: Customer Refund Voucher ------------------
     def test_customer_refund_voucher_edge_validations(self, customer_obj, tire_sample, manager_user):
         inv = create_sales_invoice_service(
             customer=customer_obj, vehicle=None,
@@ -354,12 +323,10 @@ class TestServicesComprehensiveEdgeCoverage:
             user=manager_user
         )
 
-        # مبلغ منفی یا صفر برای استرداد
         with pytest.raises(ValidationError) as exc:
             create_customer_refund_voucher_service(inv, amount=Decimal('-500'))
         assert 'باید بزرگتر از صفر باشد' in str(exc.value)
 
-        # سند مرجوعی متعلق به فاکتور دیگر
         inv2 = create_sales_invoice_service(
             customer=customer_obj, vehicle=None,
             tire_items_data=[{'tire': tire_sample, 'quantity': 1, 'unit_price': Decimal('500000')}],
@@ -369,22 +336,18 @@ class TestServicesComprehensiveEdgeCoverage:
             create_customer_refund_voucher_service(inv2, amount=Decimal('100000'), sales_return=ret, user=manager_user)
         assert 'متعلق به این فاکتور فروش نیست' in str(exc.value)
 
-        # ثبت با تاریخ سفارشی
         past_dt = timezone.now() - timedelta(hours=2)
         refund_v = create_customer_refund_voucher_service(
             inv, amount=Decimal('500000'), sales_return=ret, refund_date=past_dt, user=manager_user
         )
         assert refund_v.refund_date == past_dt
 
-        # ابطال با شرح خالی
         with pytest.raises(ValidationError) as exc:
             cancel_customer_refund_voucher_service(refund_v, reason='')
         assert 'ثبت علت ابطال سند الزامی است' in str(exc.value)
 
-        # ابطال موفق
         cancel_customer_refund_voucher_service(refund_v, reason='ابطال استرداد', user=manager_user)
 
-        # ابطال مجدد
         with pytest.raises(ValidationError) as exc:
             cancel_customer_refund_voucher_service(refund_v, reason='تکرار ابطال')
         assert 'قبلاً ابطال شده است' in str(exc.value)

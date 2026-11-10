@@ -1,9 +1,6 @@
 from rest_framework.exceptions import MethodNotAllowed
 
 class ImmutableDocumentViewSetMixin:
-    """
-    میکسین یکپارچه جهت مسدودسازی متدهای ویرایش و حذف در ViewSetهای اسناد مالی، فاکتورها و مرجوعی‌ها
-    """
     immutable_document_name = 'سند'
 
     def update(self, request, *args, **kwargs):

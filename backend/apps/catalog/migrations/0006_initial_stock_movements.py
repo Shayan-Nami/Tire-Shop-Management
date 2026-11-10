@@ -2,15 +2,10 @@ from decimal import Decimal
 from django.db import migrations
 
 def create_initial_stock_movements(apps, schema_editor):
-    """
-    ثبت سند موجودی اولیه برای کلیه تایرهایی که در حال حاضر موجودی مثبت دارند.
-    برای تایرهای با موجودی صفر، هیچ گردشی ساخته نمی‌شود.
-    """
     Tire = apps.get_model('catalog', 'Tire')
     StockMovement = apps.get_model('catalog', 'StockMovement')
 
     movements_to_create = []
-    # فقط تایرهایی که موجودی مثبت دارند
     for tire in Tire.objects.filter(stock_quantity__gt=0):
         movements_to_create.append(
             StockMovement(
@@ -27,9 +22,6 @@ def create_initial_stock_movements(apps, schema_editor):
         StockMovement.objects.bulk_create(movements_to_create)
 
 def reverse_initial_stock_movements(apps, schema_editor):
-    """
-    برگشت میگریشن: حذف کلیه اسناد موجودی اولیه
-    """
     StockMovement = apps.get_model('catalog', 'StockMovement')
     StockMovement.objects.filter(movement_type='INITIAL_STOCK').delete()
 

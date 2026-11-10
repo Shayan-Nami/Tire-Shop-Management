@@ -1,9 +1,9 @@
 # Database Design
 
-This guide summarizes the current Django models and migrations, not a dump of a
-verified live database. Use migrations to create/upgrade a database; do not recreate
-it from historical SQL scripts. See the [root README](../README.md) for setup and
-environment variables and the [deployment guide](DEPLOYMENT_GUIDE.md) for checks.
+This guide summarizes the current Django models, table mappings, and database
+constraints. Always use Django migrations to create or upgrade a database. See
+the [root README](../README.md) for setup and environment variables and the
+[deployment guide](DEPLOYMENT_GUIDE.md) for operational checks.
 
 ## Backend selection and storage conventions
 
@@ -15,10 +15,6 @@ environment variables and the [deployment guide](DEPLOYMENT_GUIDE.md) for checks
   driver as well as the Python dependencies.
 - SQLite at `backend/db.sqlite3` otherwise. An unrecognized engine value also falls
   through to SQLite, so verify the selected backend before deployment.
-
-The latest full suites passed on SQLite and PostgreSQL, including the
-PostgreSQL-specific concurrency tests. SQL Server remains unverified; see the
-[release record](RELEASE_READINESS.md) for the exact checks and remaining limits.
 
 Business tables often use explicit legacy names and `AutoField` primary keys,
 not Django's default `app_model` names. Exact names and case matter, including
@@ -36,7 +32,7 @@ numbering models omitted from that overview.
 | Model | Database table | Primary key | Selected stored fields / relationships |
 | --- | --- | --- | --- |
 | [User](../backend/apps/accounts/models.py) | `Users` | `id` (BigAutoField) | AbstractUser fields plus `role`, blankable `full_name` (150), optional `phone_number` (20) |
-| [Brand](../backend/apps/catalog/models.py) | `Brand` | `brand_id` (AutoField) | Unique `brand_name` (50); no country column |
+| [Brand](../backend/apps/catalog/models.py) | `Brand` | `brand_id` (AutoField) | Unique `brand_name` (50) |
 | Size | `Size` | `size_id` (AutoField) | Unique `size_name` (50) |
 | Tire | `Tier` | `tire_id` (AutoField) | `tire_name` (150), brand, size, stock, sale/purchase prices, `min_stock_alert` (default 5) |
 | StockMovement | `Stock_movement` | `movement_id` (BigAutoField) | Tire, signed `quantity`, `movement_type`, `balance_after`, optional invoice/return links and `unit_cost`, user, description, `created_at` |
@@ -70,8 +66,8 @@ Source: [invoice models](../backend/apps/invoices/models.py).
 Invoice states are `DRAFT`, `CONFIRMED`, and `CANCELLED`; model defaults are
 `CONFIRMED`. Payment states are `UNPAID`, `PARTIAL`, and `PAID`, defaulting to
 `UNPAID`. API workflows expose fewer transitions than the model choices: purchases
-are created confirmed, for example. Numbers use `S-1405-00001` / `P-1405-00001`
-formats, not Gregorian `INV-YYYY-XXXXXX` numbers.
+are created confirmed, for example. Numbers use Jalali-year `S-1405-00001` and
+`P-1405-00001` formats.
 
 Sales `returned_amount`, `net_amount`, `paid_amount`, `remaining_amount`, and
 `excess_amount` are computed properties/query annotations, not stored balance

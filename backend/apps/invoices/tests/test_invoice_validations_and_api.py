@@ -67,7 +67,6 @@ def invoice_api_setup(db):
 class TestInvoiceAPIValidations:
 
     def test_delete_sales_invoice_blocked_method_not_allowed(self, auth_client_manager, invoice_api_setup):
-        """حذف مستقیم فاکتور فروش باید مسدود باشد (HTTP 405 Method Not Allowed)"""
         setup = invoice_api_setup
         create_url = reverse('sales-invoice-list')
         res_create = auth_client_manager.post(create_url, {
@@ -78,16 +77,13 @@ class TestInvoiceAPIValidations:
         assert res_create.status_code == 201
         invoice_id = res_create.data['sales_invoice_id']
 
-        # تلاش برای حذف مستقیم فاکتور تایید شده
         delete_url = reverse('sales-invoice-detail', kwargs={'pk': invoice_id})
         res_delete = auth_client_manager.delete(delete_url)
         assert res_delete.status_code == 405
 
-        # بررسی اینکه فاکتور همچنان در دیتابیس وجود دارد
         assert SalesInvoice.objects.filter(pk=invoice_id).exists()
 
     def test_put_patch_sales_invoice_blocked_method_not_allowed(self, auth_client_manager, invoice_api_setup):
-        """ویرایش مستقیم فاکتور فروش (PUT/PATCH) باید مسدود باشد (HTTP 405)"""
         setup = invoice_api_setup
         create_url = reverse('sales-invoice-list')
         res_create = auth_client_manager.post(create_url, {
@@ -106,10 +102,8 @@ class TestInvoiceAPIValidations:
         assert res_patch.status_code == 405
 
     def test_vehicle_not_belonging_to_customer_rejected(self, auth_client_manager, invoice_api_setup):
-        """اعتبارسنجی تعلق خودرو به مشتری در فاکتور فروش"""
         setup = invoice_api_setup
         url = reverse('sales-invoice-list')
-        # ارسال مشتری ۱ با خودرو متعلق به مشتری ۲
         payload = {
             'customer': setup['customer1'].pk,
             'vehicle': setup['vehicle2'].pk,
@@ -120,7 +114,6 @@ class TestInvoiceAPIValidations:
         assert "خودرو" in str(response.data) and "متعلق به این مشتری نیست" in str(response.data)
 
     def test_invalid_tire_id_returns_400_bad_request(self, auth_client_manager, invoice_api_setup):
-        """ارسال ID تایر نامعتبر باید 400 برگرداند نه 500"""
         setup = invoice_api_setup
         url = reverse('sales-invoice-list')
         payload = {
@@ -132,7 +125,6 @@ class TestInvoiceAPIValidations:
         assert response.status_code == 400
 
     def test_negative_tire_quantity_returns_400_bad_request(self, auth_client_manager, invoice_api_setup):
-        """تعداد منفی یا صفر برای اقلام تایر باید خطای 400 بدهد"""
         setup = invoice_api_setup
         url = reverse('sales-invoice-list')
         payload = {
@@ -144,7 +136,6 @@ class TestInvoiceAPIValidations:
         assert response.status_code == 400
 
     def test_negative_unit_price_returns_400_bad_request(self, auth_client_manager, invoice_api_setup):
-        """قیمت واحد منفی باید خطای 400 بدهد"""
         setup = invoice_api_setup
         url = reverse('sales-invoice-list')
         payload = {
@@ -156,7 +147,6 @@ class TestInvoiceAPIValidations:
         assert response.status_code == 400
 
     def test_invalid_service_id_returns_400_bad_request(self, auth_client_manager, invoice_api_setup):
-        """ارسال ID خدمت نامعتبر باید خطای 400 بدهد"""
         setup = invoice_api_setup
         url = reverse('sales-invoice-list')
         payload = {
@@ -167,7 +157,6 @@ class TestInvoiceAPIValidations:
         assert response.status_code == 400
 
     def test_technician_blocked_from_creating_purchase_invoice(self, auth_client_technician, invoice_api_setup):
-        """تکنسین نباید اجازه ثبت فاکتور خرید داشته باشد (403 Forbidden)"""
         setup = invoice_api_setup
         url = reverse('purchase-invoice-list')
         payload = {
@@ -178,25 +167,21 @@ class TestInvoiceAPIValidations:
         assert response.status_code == 403
 
     def test_purchase_invoice_invalid_items_returns_400(self, auth_client_warehouse, invoice_api_setup):
-        """ورودی‌های نامعتبر در فاکتور خرید باید 400 بدهد نه 500"""
         setup = invoice_api_setup
         url = reverse('purchase-invoice-list')
 
-        # ۱. تایر ناموجود
         res1 = auth_client_warehouse.post(url, {
             'supplier': setup['supplier'].pk,
             'tire_items': [{'tire': 99999, 'quantity': 5}]
         }, format='json')
         assert res1.status_code == 400
 
-        # ۲. تعداد صفر یا منفی
         res2 = auth_client_warehouse.post(url, {
             'supplier': setup['supplier'].pk,
             'tire_items': [{'tire': setup['tire'].pk, 'quantity': 0}]
         }, format='json')
         assert res2.status_code == 400
 
-        # ۳. اقلام خالی
         res3 = auth_client_warehouse.post(url, {
             'supplier': setup['supplier'].pk,
             'tire_items': []
@@ -204,7 +189,6 @@ class TestInvoiceAPIValidations:
         assert res3.status_code == 400
 
     def test_double_cancel_invoice_raises_validation_error(self, auth_client_manager, invoice_api_setup):
-        """تست لغو مجدد فاکتور لغو شده که باید ارور 400 مناسب بدهد"""
         setup = invoice_api_setup
         url_create = reverse('sales-invoice-list')
         res_create = auth_client_manager.post(url_create, {
@@ -215,44 +199,35 @@ class TestInvoiceAPIValidations:
         invoice_id = res_create.data['sales_invoice_id']
         cancel_url = reverse('sales-invoice-cancel', kwargs={'pk': invoice_id})
 
-        # اولین بار لغو با موفقیت
         res_cancel1 = auth_client_manager.post(cancel_url)
         assert res_cancel1.status_code == 200
 
-        # دومین بار لغو باید 400 خطا بدهد
         res_cancel2 = auth_client_manager.post(cancel_url)
         assert res_cancel2.status_code == 400
         assert "قبلاً لغو شده است" in str(res_cancel2.data)
 
     def test_financial_vouchers_protect_cascade_on_invoice_delete(self, invoice_api_setup, manager_user):
-        """بررسی حفاظت اسناد مالی با on_delete=models.PROTECT"""
         setup = invoice_api_setup
-        # ایجاد فاکتور فروش
         sales_inv = SalesInvoice.objects.create(
             customer=setup['customer1'],
             total_amount=Decimal('1000000'),
             created_by=manager_user
         )
-        # ثبت سند دریافت وجه
         ReceiptVoucher.objects.create(
             sales_invoice=sales_inv,
             amount=Decimal('500000')
         )
-        # تلاش برای حذف مستقیم فاکتور باید ProtectedError بدهد
         with pytest.raises(ProtectedError):
             sales_inv.delete()
 
-        # ایجاد فاکتور خرید
         purchase_inv = PurchaseInvoice.objects.create(
             supplier=setup['supplier'],
             total_amount=Decimal('2000000'),
             created_by=manager_user
         )
-        # ثبت سند پرداخت وجه
         PaymentVoucher.objects.create(
             purchase_invoice=purchase_inv,
             amount=Decimal('1000000')
         )
-        # تلاش برای حذف مستقیم فاکتور خرید باید ProtectedError بدهد
         with pytest.raises(ProtectedError):
             purchase_inv.delete()

@@ -32,7 +32,6 @@ export const SalesInvoices: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
 
-  // استیت‌های مدال‌ها
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
   const [returnInvoice, setReturnInvoice] = useState<SalesInvoice | null>(null);
   const [receiptInvoice, setReceiptInvoice] = useState<SalesInvoice | null>(null);
@@ -73,14 +72,12 @@ export const SalesInvoices: React.FC = () => {
         if (isCurrent()) setLoading(false);
       }
     };
-    // oxlint-disable-next-line react/set-state-in-effect -- Query changes intentionally enter the network loading state.
     void loadInvoices();
     return () => requests.invalidate();
   }, [search, statusFilter, paymentStatusFilter, currentPage, refreshVersion, t, language]);
 
   return (
     <div className="page-stack" aria-busy={loading}>
-      {/* سربرگ */}
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("فهرست فاکتورهای فروش")}</h1>
@@ -98,9 +95,7 @@ export const SalesInvoices: React.FC = () => {
         )}
       </div>
 
-      {/* فیلترها و نوار جستجو */}
       <div className="filter-bar">
-        {/* جستجو */}
         <div className="relative w-full md:w-80">
           <input
             type="text"
@@ -117,7 +112,6 @@ export const SalesInvoices: React.FC = () => {
           <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-3" />
         </div>
 
-        {/* فیلتر وضعیت‌ها */}
         <div className="flex items-center gap-2 w-full md:w-auto">
           <Filter className="w-4 h-4 text-slate-400 shrink-0" />
           <select
@@ -161,7 +155,6 @@ export const SalesInvoices: React.FC = () => {
         </div>
       )}
 
-      {/* جدول فاکتورها */}
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت فاکتورها...")}</div>
@@ -270,7 +263,6 @@ export const SalesInvoices: React.FC = () => {
           </div>
         )}
 
-        {/* صفحه‌بندی (Pagination) */}
         {totalPages > 1 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
             <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages}
@@ -297,7 +289,6 @@ export const SalesInvoices: React.FC = () => {
         )}
       </div>
 
-      {/* مدال جزئیات و چاپ فاکتور */}
       {selectedInvoice && (
         <InvoiceDetailModal
           invoice={selectedInvoice}
@@ -314,7 +305,6 @@ export const SalesInvoices: React.FC = () => {
         />
       )}
 
-      {/* مدال مرجوعی کالا */}
       {returnInvoice && (
         <SalesReturnModal
           invoice={returnInvoice}
@@ -323,7 +313,6 @@ export const SalesInvoices: React.FC = () => {
         />
       )}
 
-      {/* مدال دریافت وجه */}
       {receiptInvoice && (
         <ReceiptModal
           invoice={receiptInvoice}

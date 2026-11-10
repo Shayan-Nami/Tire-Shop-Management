@@ -139,7 +139,6 @@ class SalesInvoiceViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSet):
     @extend_schema(request=None, responses={200: SalesInvoiceSerializer})
     @action(detail=True, methods=['post'], url_path='confirm', permission_classes=[SalesInvoicePermission])
     def confirm(self, request, pk=None):
-        """تایید فاکتور فروش در وضعیت پیش‌نویس، کسر موجودی انبار و نهایی‌سازی فاکتور"""
         invoice = self.get_object()
         confirmed_invoice = confirm_sales_invoice_service(invoice, user=request.user)
         data = SalesInvoiceSerializer(confirmed_invoice, context={'request': request}).data
@@ -162,7 +161,6 @@ class SalesInvoiceViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSet):
     @extend_schema(request=None, responses={200: SalesInvoiceSerializer})
     @action(detail=True, methods=['post'], url_path='cancel', permission_classes=[IsManager])
     def cancel(self, request, pk=None):
-        """لغو فاکتور فروش و بازگرداندن خودکار موجودی به انبار"""
         invoice = self.get_object()
         cancelled_invoice = cancel_sales_invoice_service(invoice, user=request.user)
         serializer = SalesInvoiceSerializer(cancelled_invoice, context={'request': request})
@@ -203,7 +201,6 @@ class PurchaseInvoiceViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSe
     @extend_schema(request=None, responses={200: PurchaseInvoiceSerializer})
     @action(detail=True, methods=['post'], url_path='cancel', permission_classes=[IsManager])
     def cancel(self, request, pk=None):
-        """لغو فاکتور خرید، کسر خودکار اقلام از انبار و اصلاح نرخ خرید تایر (فقط مدیر)"""
         invoice = self.get_object()
         cancelled_invoice = cancel_purchase_invoice_service(invoice, user=request.user)
         serializer = PurchaseInvoiceSerializer(cancelled_invoice, context={'request': request})
@@ -213,9 +210,6 @@ class PurchaseInvoiceViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSe
         }, status=status.HTTP_200_OK)
 
 class SalesReturnViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSet):
-    """
-    مدیریت اسناد مرجوعی فروش (ایجاد و مشاهده فقط برای مدیر، غیرقابل ویرایش یا حذف)
-    """
     immutable_document_name = 'سند مرجوعی'
     queryset = SalesReturn.objects.select_related(
         'sales_invoice__customer', 'created_by'

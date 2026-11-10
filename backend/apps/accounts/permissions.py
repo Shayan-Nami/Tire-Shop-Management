@@ -2,7 +2,6 @@ from rest_framework.permissions import BasePermission
 from .models import UserRole
 
 class IsManager(BasePermission):
-    """دسترسی فقط برای مدیران سیستم یا superuser"""
     message = 'این بخش فقط برای مدیران سیستم مجاز است.'
 
     def has_permission(self, request, view):
@@ -11,7 +10,6 @@ class IsManager(BasePermission):
         ))
 
 class IsWarehouse(BasePermission):
-    """دسترسی برای انبارداران و مدیران"""
     message = 'این بخش برای انباردار یا مدیر سیستم مجاز است.'
 
     def has_permission(self, request, view):
@@ -20,7 +18,6 @@ class IsWarehouse(BasePermission):
         ))
 
 class IsTechnician(BasePermission):
-    """دسترسی برای تکنسین‌ها و مدیران"""
     message = 'این بخش برای تکنسین یا مدیر سیستم مجاز است.'
 
     def has_permission(self, request, view):
@@ -29,7 +26,6 @@ class IsTechnician(BasePermission):
         ))
 
 class ReadOnlyOrManager(BasePermission):
-    """مشاهده برای همه کاربران لاگین کرده، ویرایش/ایجاد فقط برای مدیر"""
     message = 'تغییرات فقط توسط مدیر سیستم امکان‌پذیر است.'
 
     def has_permission(self, request, view):
@@ -40,7 +36,6 @@ class ReadOnlyOrManager(BasePermission):
         return request.user.role == UserRole.MANAGER or request.user.is_superuser
 
 class ReadOnlyOrWarehouse(BasePermission):
-    """مشاهده برای همه، تغییرات انبار برای انباردار و مدیر"""
     message = 'تغییرات انبار فقط توسط انباردار یا مدیر سیستم امکان‌پذیر است.'
 
     def has_permission(self, request, view):
@@ -53,16 +48,8 @@ class ReadOnlyOrWarehouse(BasePermission):
 
 from apps.invoices.permissions import SalesInvoicePermission as SalesInvoicePermission
 
-# کلاس SalesInvoicePermission به اپ دامنه مربوطه (invoices) منتقل شده و جهت سازگاری به عقب در این ماژول نگه‌داری می‌شود.
-
 
 class IsDocManagerOrDebug(BasePermission):
-    """
-    محدودسازی دسترسی به مستندات API (Swagger / Redoc / Schema):
-    - در حالت DEBUG=True: دسترسی برای عموم آزاد است.
-    - در حالت DEBUG=False: فقط برای کاربران با نقش مدیر (MANAGER یا superuser) باز است؛
-      یا در صورتی که متغیر محیطی ENABLE_DOCS_IN_PROD صراحتاً فعال باشد.
-    """
     message = 'دسترسی به مستندات سامانه در محیط پروداکشن منحصراً برای مدیران سیستم مجاز است.'
 
     def has_permission(self, request, view):

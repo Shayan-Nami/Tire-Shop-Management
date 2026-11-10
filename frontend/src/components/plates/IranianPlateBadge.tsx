@@ -41,10 +41,8 @@ export const IranianPlateBadge: React.FC<IranianPlateBadgeProps> = ({
       style={{ fontFamily: 'Vazirmatn, sans-serif' }}
       title={t("پلاک خودرو: {0}", undefined, { 0: plateString || t("تعیین‌نشده") })}
     >
-      {/* نوار پرچم آبی سمت چپ پلاک */}
       <div className="flex flex-col items-center justify-between bg-blue-700 text-white h-full px-1 py-0.5 rounded-l-[2px] mr-1.5 text-[8px] leading-none">
         <div className="flex flex-col items-center space-y-0.5">
-          {/* پرچم ایران کوچک */}
           <div className="w-3.5 h-2 rounded-[1px] overflow-hidden flex flex-col shadow-xs">
             <div className="h-1/3 bg-emerald-600"></div>
             <div className="h-1/3 bg-white"></div>
@@ -55,19 +53,14 @@ export const IranianPlateBadge: React.FC<IranianPlateBadgeProps> = ({
         </div>
       </div>
 
-      {/* دو رقم اول */}
       <span className="px-1 text-slate-900 tabular-nums">{part1}</span>
 
-      {/* حرف فارسی وسط */}
       <span className="px-1 text-blue-900 font-extrabold">{letter}</span>
 
-      {/* سه رقم دوم */}
       <span className="px-1 text-slate-900 tabular-nums tracking-wide">{part2}</span>
 
-      {/* جداکننده عمودی کد ایران */}
       <div className="h-full w-[2px] bg-slate-800 mx-1"></div>
 
-      {/* کد ایران */}
       <div className="flex flex-col items-center justify-center px-1 leading-none">
         <span className="text-[9px] text-slate-600 font-medium">{t("ایران")}</span>
         <span className="text-slate-900 tabular-nums font-black">{iranCode}</span>

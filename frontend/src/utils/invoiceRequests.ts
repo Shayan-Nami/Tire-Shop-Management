@@ -1,6 +1,5 @@
 import type { PaginatedResponse, Vehicle } from '../types/index.ts';
 
-/** Each new operation invalidates every previous result, error, and finalizer. */
 export function createRequestSequence() {
   let sequence = 0;
   return {
@@ -10,7 +9,6 @@ export function createRequestSequence() {
   };
 }
 
-/** Page size is a batch size, never a limit on the available selector options. */
 export async function fetchAllPages<T>(
   fetchPage: (page: number) => Promise<PaginatedResponse<T>>,
   isCurrent: () => boolean = () => true,

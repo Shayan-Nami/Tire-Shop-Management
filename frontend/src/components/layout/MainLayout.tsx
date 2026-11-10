@@ -18,14 +18,11 @@ export const MainLayout: React.FC = () => {
   return (
     <div className="app-shell flex h-dvh bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans">
       <a href="#main-content" className="skip-link">{t("رفتن به محتوای اصلی")}</a>
-      {/* سایدبار سمت راست (RTL) */}
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      {/* بخش بدنه محتوا */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Navbar onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} />
 
-        {/* ناحیه اسکرول صفحه */}
         <main ref={mainRef} id="main-content" tabIndex={-1} className="workspace flex-1 overflow-y-auto">
           <div className="max-w-[1440px] mx-auto w-full">
             <Outlet />

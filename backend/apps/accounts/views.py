@@ -35,7 +35,6 @@ class CurrentUserProfileView(APIView):
 
     @extend_schema(request=UserProfileUpdateSerializer, responses={200: UserSerializer})
     def patch(self, request):
-        """ویرایش مشخصات فردی (نام و شماره تماس) توسط خود کاربر"""
         serializer = UserProfileUpdateSerializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -43,12 +42,10 @@ class CurrentUserProfileView(APIView):
 
     @extend_schema(request=UserProfileUpdateSerializer, responses={200: UserSerializer})
     def put(self, request):
-        """پشتیبانی از متد PUT برای ویرایش مشخصات فردی کاربر جاری"""
         return self.patch(request)
 
 
 class ChangePasswordView(APIView):
-    """تغییر رمز عبور توسط کاربر جاری با دریافت رمز قبلی"""
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(request=ChangePasswordSerializer, responses={200: dict})
@@ -60,7 +57,6 @@ class ChangePasswordView(APIView):
 
 
 class LogoutView(APIView):
-    """خروج از حساب کاربری و قرار دادن توکن در لیست سیاه"""
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(request=LogoutSerializer, responses={200: dict})
@@ -88,7 +84,6 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def check_object_permissions(self, request, obj):
         super().check_object_permissions(request, obj)
-        # جلوگیری از تغییر یا حذف کاربر ارشد توسط مدیران غیر-سوپریوزر
         if obj.is_superuser and not request.user.is_superuser:
             self.permission_denied(
                 request,

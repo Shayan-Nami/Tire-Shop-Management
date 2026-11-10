@@ -6,7 +6,6 @@ import { LanguageProvider } from './context/LanguageContext';
 import { RoleGuard } from './components/layout/RoleGuard';
 import { MainLayout } from './components/layout/MainLayout';
 
-// بارگذاری تنبل صفحات جهت کاهش حجم باندل اولیه (Code Splitting)
 const Login = React.lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
 const Dashboard = React.lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const SalesInvoices = React.lazy(() => import('./pages/SalesInvoices').then((m) => ({ default: m.SalesInvoices })));
@@ -51,22 +50,18 @@ export const App: React.FC = () => {
         <BrowserRouter>
           <Suspense fallback={<PageLoadingFallback />}>
             <Routes>
-              {/* صفحه عمومی لاگین */}
               <Route path="/login" element={<Login />} />
 
-              {/* مسیرهای محافظت‌شده با گارد احراز هویت */}
               <Route element={<RoleGuard />}>
                 <Route element={<MainLayout />}>
                   <Route path="/" element={<RootRedirect />} />
 
-                  {/* داشبورد و شاخص‌ها */}
                   <Route element={<RoleGuard allowedRoles={['MANAGER']} />}>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/reports" element={<ReportsPage />} />
                     <Route path="/treasury" element={<Treasury />} />
                   </Route>
 
-                  {/* فاکتور فروش و صندوق */}
                   <Route element={<RoleGuard allowedRoles={['MANAGER', 'TECHNICIAN']} />}>
                     <Route path="/invoices/create" element={<CreateInvoice />} />
                   </Route>
@@ -76,7 +71,6 @@ export const App: React.FC = () => {
                     element={<SalesInvoices />}
                   />
 
-                  {/* انبار و خرید */}
                   <Route
                     path="/catalog/tires"
                     element={<TiresCatalog />}
@@ -91,22 +85,18 @@ export const App: React.FC = () => {
                     <Route path="/catalog/movements" element={<StockMovements />} />
                   </Route>
 
-                  {/* مشتریان و خودروها */}
                   <Route path="/customers" element={<Customers />} />
 
-                  {/* خدمات کارگاهی */}
                   <Route element={<RoleGuard allowedRoles={['MANAGER', 'TECHNICIAN']} />}>
                     <Route path="/services" element={<ServicesPage />} />
                   </Route>
 
-                  {/* مدیریت کاربران فقط مدیر */}
                   <Route element={<RoleGuard allowedRoles={['MANAGER']} />}>
                     <Route path="/users" element={<UsersPage />} />
                   </Route>
                 </Route>
               </Route>
 
-              {/* ریدایرکت برای مسیرهای نامعتبر */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

@@ -245,7 +245,7 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
   * {
     box-sizing: border-box;
   }
-  
+
   body {
     font-feature-settings: "ss01", "ss02", "cv01", "cv02";
   }
@@ -258,13 +258,11 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
     direction: ltr;
   }
 
-  /* کلاس اعداد فارسی با فونت یکدست و تراز */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 }
 
-/* اسکرول‌بار شیک و مدرن */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -283,7 +281,6 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
   background: rgba(100, 116, 139, 0.7);
 }
 
-/* استایل‌های اختصاصی چاپ فاکتور و فیش حرارتی */
 @media print {
   .app-modal[open] { display: block; height: auto; }
   .app-modal::backdrop { background: transparent; }
@@ -306,7 +303,6 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
     display: block !important;
   }
 
-  /* خنثی‌سازی کامل لایه‌های مدال هنگام پرینت */
   .invoice-modal-overlay {
     position: static !important;
     display: block !important;
@@ -347,7 +343,6 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
     visibility: hidden !important;
   }
 
-  /* ایزوله‌سازی فیش حرارتی ۸۰ میلی‌متری */
   .thermal-receipt-mode {
     width: 80mm !important;
     max-width: 80mm !important;
@@ -370,7 +365,6 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
   }
 }
 
-/* Values remain readable without hover; bars compare brands on one shared scale. */
 .brand-sales-chart { padding: 24px; }
 .brand-sales-list { display: flex; flex-direction: column; gap: 24px; max-height: 360px; overflow-y: auto; padding: 2px; }
 .brand-sales-label { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 10px; color: var(--ink); font-size: 14px; }

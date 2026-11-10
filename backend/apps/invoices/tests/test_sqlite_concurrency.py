@@ -1,4 +1,3 @@
-"""SQLite serializes writers; a lock failure is retryable, never a committed partial sale."""
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from threading import Barrier
@@ -32,7 +31,6 @@ def test_competing_drafts_never_commit_double_stock_out():
         except ValidationError:
             return 'rejected'
         finally:
-            # Django keeps shared-memory SQLite connections open in close(); the worker is done.
             worker_connection = connections['default']
             if worker_connection.connection is not None:
                 worker_connection.connection.close()
@@ -41,7 +39,6 @@ def test_competing_drafts_never_commit_double_stock_out():
         futures = [workers.submit(confirm, invoice.pk) for invoice in invoices]
         outcomes = [future.result(timeout=15) for future in futures]
     assert outcomes.count('confirmed') <= 1
-    # Retry only after the competing writers have exited, as a client would.
     for invoice in invoices:
         invoice.refresh_from_db()
         if invoice.status == InvoiceStatus.DRAFT:
