@@ -38,3 +38,20 @@ class TokenRefreshRateThrottle(SimpleRateThrottle):
             'scope': self.scope,
             'ident': ident
         }
+
+
+class AdminLoginIPRateThrottle(LoginIPRateThrottle):
+    scope = 'admin_login_ip'
+
+
+class AdminLoginUsernameRateThrottle(SimpleRateThrottle):
+    scope = 'admin_login_username'
+
+    def get_cache_key(self, request, view):
+        username = request.POST.get('username')
+        if not username:
+            return None
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': str(username).strip().lower()
+        }

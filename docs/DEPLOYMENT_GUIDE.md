@@ -29,6 +29,23 @@ server or Vite's dev/preview server as the production service.
 React uses browser-history routing. Static hosting must return `index.html` for
 frontend routes, while preserving real `/api/`, `/admin/`, and static-file responses.
 
+## Installing backend dependencies
+
+From `backend/`, with a virtual environment active, install the pinned lock files
+for a reproducible environment (resolved identically for Python 3.13 and 3.14):
+
+```sh
+python -m pip install -r requirements.lock          # SQLite / PostgreSQL
+python -m pip install -r requirements-mssql.lock    # SQL Server (runtime + pyodbc/mssql-django)
+```
+
+Use one of the two. `requirements*.txt` hold the bounded top-level requirements;
+`requirements-dev.txt`/`requirements-dev.lock` add test and lint tooling (and are
+what CI installs). SQL Server deployments also need a native Microsoft ODBC driver.
+Gunicorn is skipped automatically on Windows. After editing a `requirements*.txt`
+file, regenerate the locks (see the header in each `.lock` file), for example
+`uv pip compile requirements.txt --universal --python-version 3.14 -o requirements.lock`.
+
 ## Configuration checks before exposure
 
 Configuration is read in [settings.py](../backend/config/settings.py), including
@@ -37,14 +54,28 @@ and restrict their filesystem access. Use the root README's configuration tables
 rather than copying an unverified production template.
 
 1. Set `DJANGO_DEBUG=False`, a unique random `DJANGO_SECRET_KEY`, and explicit
-   production `ALLOWED_HOSTS`. Settings reject a missing secret or the known
-   fallback secret outside debug mode; that guard does not validate overall readiness.
+   production `ALLOWED_HOSTS`. Settings refuse to start without a secret, or with a
+   `django-insecure-` key, outside debug mode; that guard does not validate overall
+   readiness. No fallback key is committed: with `DJANGO_DEBUG=True` and no key, a
+   random per-process key is generated (sessions and tokens do not survive restarts).
 2. Replace development CORS/CSRF origin defaults with the actual trusted origins.
-   Review admin/session access, cookie security, HTTPS redirect, and HSTS settings.
-   Enable HSTS only after confirming HTTPS and the intended subdomain policy.
+   Review admin/session access, cookie security, HTTPS redirect, and HSTS settings:
+   - `SESSION_COOKIE_SECURE` and `CSRF_COOKIE_SECURE` default to **true** when
+     `DJANGO_DEBUG=False`. Django admin login then works only over HTTPS (browsers
+     also accept `localhost`). A shop that serves the admin over plain HTTP on a LAN
+     must set both to `False` explicitly in `backend/.env`; the SPA uses JWT headers
+     and is unaffected.
+   - `SECURE_SSL_REDIRECT` and HSTS (`SECURE_HSTS_SECONDS`, `..._INCLUDE_SUBDOMAINS`,
+     `..._PRELOAD`) stay **opt-in** because many deployments are plain-HTTP LANs.
+     Enable the redirect once all traffic is HTTPS. HSTS is effectively irreversible
+     for browsers that have seen it: enable it only after HTTPS works on every
+     hostname, start with a short value such as `3600`, and raise it gradually.
 3. Trust `X-Forwarded-Proto` only when a trusted proxy controls it. Set
    `SECURE_PROXY_SSL_HEADER` and `NUM_PROXIES` to match the real proxy chain;
    prevent clients from reaching the backend with forged forwarded headers.
+   With the header trusted but `NUM_PROXIES=0`, every client appears to share the
+   proxy's IP and one login-throttle bucket; `check --deploy` warns
+   (`tireshop.W001`).
 4. Verify the intended database was selected, credentials have least privilege,
    TLS works, migrations apply, and backups can be restored. An unrecognized
    `DB_ENGINE` falls back to SQLite; do not mistake that for a working external DB.
@@ -58,6 +89,11 @@ rather than copying an unverified production template.
    name is `ODBC Driver 17 for SQL Server`; install/configure the actual driver.
 6. With multiple workers/instances, provision and test a shared Redis cache if throttle
    counters must be shared across processes, and add edge-level rate limiting as needed.
+   The default LocMem cache keeps per-process counters, so each gunicorn worker
+   enforces its own limit; `check --deploy` warns (`tireshop.W002`). POSTs to
+   `/admin/login/` are throttled per IP and per username with the same rates as the
+   API login (`THROTTLE_LOGIN_IP_RATE`, `THROTTLE_LOGIN_USER_RATE`; HTTP 429 plus
+   `Retry-After`) in separate counters.
 7. Keep `ALLOW_DEMO_SEED=False` and the public `ENABLE_DOCS_IN_PROD` override off.
    Schema/Swagger/Redoc are public in debug mode or with that override, otherwise
    manager/superuser-only. Restrict administration and monitor authentication failures.

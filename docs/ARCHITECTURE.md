@@ -21,7 +21,9 @@ HTTPS termination, static file hosting, process supervision, and shared cache ar
 configured by the operator.
 
 - [Backend requirements](../backend/requirements.txt) allow Django `>=5.2.17,<6.2`
-  with DRF, SimpleJWT, django-filter, drf-spectacular, and database drivers.
+  with DRF, SimpleJWT, django-filter, drf-spectacular, and the PostgreSQL driver;
+  SQL Server drivers live in `requirements-mssql.txt`, test tooling in
+  `requirements-dev.txt`, and exact versions in the matching `requirements*.lock` files.
 - [Frontend package metadata](../frontend/package.json) specifies React 19,
   TypeScript 6, Vite 8, Tailwind CSS 3, Axios, React Router and Lucide.
   Node.js must be at least 22.18.0.
