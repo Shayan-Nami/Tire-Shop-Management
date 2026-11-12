@@ -1,6 +1,6 @@
 from typing import Any
-from decimal import Decimal
-from datetime import datetime, time, timedelta
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import date, datetime, time, timedelta
 from django.db.models import Sum, Count, F, ExpressionWrapper, DecimalField, OuterRef, Subquery, Value, Case, When, Q
 from django.db.models.functions import Greatest, Coalesce
 from django.utils import timezone
@@ -12,6 +12,51 @@ from apps.invoices.models import (
 from apps.finance.models import ReceiptVoucher, CustomerRefundVoucher
 from utils.jalali import parse_jalali_or_gregorian_date
 from utils.expressions import DecimalDivision
+
+
+def _quantize_money(value: Decimal | int | float | None) -> Decimal:
+    if value is None:
+        return Decimal('0.00')
+    dec = value if isinstance(value, Decimal) else Decimal(str(value))
+    return dec.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _net_tire_revenue_expr() -> Sum:
+    return Sum(
+        Case(
+            When(
+                sales_invoice__discount_percent__gt=0,
+                then=ExpressionWrapper(
+                    F('quantity') * F('unit_price') * (
+                        Decimal('1.00') - DecimalDivision(F('sales_invoice__discount_percent'), Decimal('100.00'))
+                    ),
+                    output_field=DecimalField(max_digits=18, decimal_places=2)
+                )
+            ),
+            When(
+                sales_invoice__discount_amount__gt=0,
+                then=Case(
+                    When(
+                        Q(sales_invoice__total_amount__gt=0) | Q(sales_invoice__discount_amount__gt=0),
+                        then=ExpressionWrapper(
+                            DecimalDivision(
+                                F('quantity') * F('unit_price') * F('sales_invoice__total_amount'),
+                                F('sales_invoice__total_amount') + F('sales_invoice__discount_amount'),
+                            ),
+                            output_field=DecimalField(max_digits=18, decimal_places=2)
+                        )
+                    ),
+                    default=Decimal('0.00'),
+                    output_field=DecimalField(max_digits=18, decimal_places=2)
+                )
+            ),
+            default=ExpressionWrapper(
+                F('quantity') * F('unit_price'),
+                output_field=DecimalField(max_digits=18, decimal_places=2)
+            ),
+            output_field=DecimalField(max_digits=18, decimal_places=2)
+        )
+    )
 
 
 def dashboard_stats() -> dict[str, Any]:
@@ -93,11 +138,11 @@ def dashboard_stats() -> dict[str, Any]:
     low_stock_count = Tire.objects.filter(stock_quantity__lte=F('min_stock_alert')).count()
 
     return {
-        'today_revenue': float(today_revenue),
+        'today_revenue': float(_quantize_money(today_revenue)),
         'today_invoices_count': today_invoices_count,
-        'total_receivables': float(total_receivables),
+        'total_receivables': float(_quantize_money(total_receivables)),
         'unpaid_invoices_count': unpaid_count,
-        'total_inventory_value': float(total_inventory_value),
+        'total_inventory_value': float(_quantize_money(total_inventory_value)),
         'total_tires_stock': total_tires_stock,
         'low_stock_count': low_stock_count
     }
@@ -117,41 +162,7 @@ def sales_by_brand(brand_id: int | None = None) -> list[dict[str, Any]]:
         brand_name=F('tire__brand__brand_name')
     ).annotate(
         total_quantity=Sum('quantity'),
-        total_revenue=Sum(
-            Case(
-                When(
-                    sales_invoice__discount_percent__gt=0,
-                    then=ExpressionWrapper(
-                        F('quantity') * F('unit_price') * (
-                            Decimal('1.00') - DecimalDivision(F('sales_invoice__discount_percent'), Decimal('100.00'))
-                        ),
-                        output_field=DecimalField(max_digits=18, decimal_places=2)
-                    )
-                ),
-                When(
-                    sales_invoice__discount_amount__gt=0,
-                    then=Case(
-                        When(
-                            Q(sales_invoice__total_amount__gt=0) | Q(sales_invoice__discount_amount__gt=0),
-                            then=ExpressionWrapper(
-                                DecimalDivision(
-                                    F('quantity') * F('unit_price') * F('sales_invoice__total_amount'),
-                                    F('sales_invoice__total_amount') + F('sales_invoice__discount_amount'),
-                                ),
-                                output_field=DecimalField(max_digits=18, decimal_places=2)
-                            )
-                        ),
-                        default=Decimal('0.00'),
-                        output_field=DecimalField(max_digits=18, decimal_places=2)
-                    )
-                ),
-                default=ExpressionWrapper(
-                    F('quantity') * F('unit_price'),
-                    output_field=DecimalField(max_digits=18, decimal_places=2)
-                ),
-                output_field=DecimalField(max_digits=18, decimal_places=2)
-            )
-        )
+        total_revenue=_net_tire_revenue_expr()
     )
 
     returns_by_brand = {
@@ -169,7 +180,12 @@ def sales_by_brand(brand_id: int | None = None) -> list[dict[str, Any]]:
         brand_name = r['brand_name']
         ret = returns_by_brand.get(brand_name, {})
         net_qty = max((r['total_quantity'] or 0) - (ret.get('ret_qty') or 0), 0)
-        net_rev = max((r['total_revenue'] or Decimal('0.00')) - (ret.get('ret_rev') or Decimal('0.00')), Decimal('0.00'))
+        if net_qty == 0:
+            net_rev = Decimal('0.00')
+        else:
+            net_rev = _quantize_money(
+                max((r['total_revenue'] or Decimal('0.00')) - (ret.get('ret_rev') or Decimal('0.00')), Decimal('0.00'))
+            )
         data.append({
             'brand_name': brand_name,
             'total_quantity': net_qty,
@@ -196,41 +212,7 @@ def profitability() -> list[dict[str, Any]]:
                 output_field=DecimalField(max_digits=18, decimal_places=2)
             )
         ),
-        total_revenue=Sum(
-            Case(
-                When(
-                    sales_invoice__discount_percent__gt=0,
-                    then=ExpressionWrapper(
-                        F('quantity') * F('unit_price') * (
-                            Decimal('1.00') - DecimalDivision(F('sales_invoice__discount_percent'), Decimal('100.00'))
-                        ),
-                        output_field=DecimalField(max_digits=18, decimal_places=2)
-                    )
-                ),
-                When(
-                    sales_invoice__discount_amount__gt=0,
-                    then=Case(
-                        When(
-                            Q(sales_invoice__total_amount__gt=0) | Q(sales_invoice__discount_amount__gt=0),
-                            then=ExpressionWrapper(
-                                DecimalDivision(
-                                    F('quantity') * F('unit_price') * F('sales_invoice__total_amount'),
-                                    F('sales_invoice__total_amount') + F('sales_invoice__discount_amount'),
-                                ),
-                                output_field=DecimalField(max_digits=18, decimal_places=2)
-                            )
-                        ),
-                        default=Decimal('0.00'),
-                        output_field=DecimalField(max_digits=18, decimal_places=2)
-                    )
-                ),
-                default=ExpressionWrapper(
-                    F('quantity') * F('unit_price'),
-                    output_field=DecimalField(max_digits=18, decimal_places=2)
-                ),
-                output_field=DecimalField(max_digits=18, decimal_places=2)
-            )
-        )
+        total_revenue=_net_tire_revenue_expr()
     )
 
     returns_by_tire = {
@@ -255,9 +237,14 @@ def profitability() -> list[dict[str, Any]]:
         ret_cst = ret.get('ret_cost') or Decimal('0.00')
 
         net_sold = max((r['total_sold'] or 0) - ret_qty, 0)
-        net_revenue = max((r['total_revenue'] or Decimal('0.00')) - ret_rev, Decimal('0.00'))
-        net_cost = max((r['total_cost'] or Decimal('0.00')) - ret_cst, Decimal('0.00'))
-        net_profit = net_revenue - net_cost
+        if net_sold == 0:
+            net_revenue = Decimal('0.00')
+            net_cost = Decimal('0.00')
+            net_profit = Decimal('0.00')
+        else:
+            net_revenue = _quantize_money(max((r['total_revenue'] or Decimal('0.00')) - ret_rev, Decimal('0.00')))
+            net_cost = _quantize_money(max((r['total_cost'] or Decimal('0.00')) - ret_cst, Decimal('0.00')))
+            net_profit = _quantize_money(net_revenue - net_cost)
 
         data.append({
             'tire_id': tid,
@@ -285,7 +272,7 @@ def inventory_value() -> dict[str, Any]:
     data = []
     total_val = Decimal('0.00')
     for t in tires:
-        val = t.inventory_value or Decimal('0.00')
+        val = _quantize_money(t.inventory_value)
         total_val += val
         data.append({
             'tire_id': t.tire_id,
@@ -293,12 +280,12 @@ def inventory_value() -> dict[str, Any]:
             'brand_name': t.brand.brand_name,
             'size_name': t.size.size_name,
             'stock_quantity': t.stock_quantity,
-            'purchase_price': float(t.purchase_price),
+            'purchase_price': float(_quantize_money(t.purchase_price)),
             'inventory_value': float(val)
         })
 
     return {
-        'total_inventory_value': float(total_val),
+        'total_inventory_value': float(_quantize_money(total_val)),
         'items': data
     }
 
@@ -306,25 +293,30 @@ def inventory_value() -> dict[str, Any]:
 def sales_by_date(start_date: str | None = None, end_date: str | None = None) -> dict[str, Any]:
     parsed_start = parse_jalali_or_gregorian_date(start_date) if start_date else None
     parsed_end = parse_jalali_or_gregorian_date(end_date) if end_date else None
+    tehran_tz = timezone.get_current_timezone()
 
     invoices = SalesInvoice.objects.filter(status=InvoiceStatus.CONFIRMED)
     returns = SalesReturn.objects.filter(sales_invoice__status=InvoiceStatus.CONFIRMED)
 
     if parsed_start:
-        invoices = invoices.filter(invoice_date__date__gte=parsed_start)
-        returns = returns.filter(return_date__date__gte=parsed_start)
+        start_day = date.fromisoformat(parsed_start)
+        start_dt = timezone.make_aware(datetime.combine(start_day, time.min), tehran_tz)
+        invoices = invoices.filter(invoice_date__gte=start_dt)
+        returns = returns.filter(return_date__gte=start_dt)
 
     if parsed_end:
-        invoices = invoices.filter(invoice_date__date__lte=parsed_end)
-        returns = returns.filter(return_date__date__lte=parsed_end)
+        end_day = date.fromisoformat(parsed_end)
+        end_next_day = timezone.make_aware(datetime.combine(end_day + timedelta(days=1), time.min), tehran_tz)
+        invoices = invoices.filter(invoice_date__lt=end_next_day)
+        returns = returns.filter(return_date__lt=end_next_day)
 
     summary = invoices.aggregate(
         total_invoices=Count('sales_invoice_id'),
         total_sales_amount=Sum('total_amount')
     )
-    total_refund = returns.aggregate(total=Sum('total_refund_amount'))['total'] or Decimal('0.00')
-    gross_sales = summary['total_sales_amount'] or Decimal('0.00')
-    net_sales = gross_sales - total_refund
+    total_refund = _quantize_money(returns.aggregate(total=Sum('total_refund_amount'))['total'])
+    gross_sales = _quantize_money(summary['total_sales_amount'])
+    net_sales = _quantize_money(gross_sales - total_refund)
 
     return {
         'total_invoices': summary['total_invoices'] or 0,

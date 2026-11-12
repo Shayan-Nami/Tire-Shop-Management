@@ -11,7 +11,9 @@ from apps.services_app.models import Service
 from apps.suppliers.models import Supplier
 from apps.catalog.services import record_stock_movements
 from apps.invoices.models import (
-    PaymentStatus
+    PaymentStatus,
+    PurchaseInvoice,
+    SalesInvoice,
 )
 from apps.invoices.services import (
     create_sales_invoice_service,
@@ -264,6 +266,8 @@ class TestServicesComprehensiveEdgeCoverage:
         assert 'باید بزرگتر از صفر باشد' in str(exc.value)
 
         past_date = timezone.now() - timedelta(days=1)
+        SalesInvoice.objects.filter(pk=inv.pk).update(invoice_date=past_date - timedelta(hours=1))
+        inv.refresh_from_db()
         voucher = create_receipt_voucher_service(inv, amount=Decimal('500000'), receipt_date=past_date, user=manager_user)
         assert voucher.receipt_date == past_date
 
@@ -289,6 +293,8 @@ class TestServicesComprehensiveEdgeCoverage:
         assert 'بیشتر باشد' in str(exc.value)
 
         past_dt = timezone.now() - timedelta(hours=5)
+        PurchaseInvoice.objects.filter(pk=p_inv.pk).update(invoice_date=past_dt - timedelta(hours=1))
+        p_inv.refresh_from_db()
         pv = create_payment_voucher_service(p_inv, amount=Decimal('1000000'), payment_date=past_dt, user=manager_user)
         assert pv.payment_date == past_dt
         p_inv.refresh_from_db()
@@ -337,6 +343,8 @@ class TestServicesComprehensiveEdgeCoverage:
         assert 'متعلق به این فاکتور فروش نیست' in str(exc.value)
 
         past_dt = timezone.now() - timedelta(hours=2)
+        SalesInvoice.objects.filter(pk=inv.pk).update(invoice_date=past_dt - timedelta(hours=1))
+        inv.refresh_from_db()
         refund_v = create_customer_refund_voucher_service(
             inv, amount=Decimal('500000'), sales_return=ret, refund_date=past_dt, user=manager_user
         )

@@ -76,30 +76,16 @@ class PurchaseInvoiceAdmin(ReadOnlyDocumentAdminMixin, admin.ModelAdmin):
     search_fields = ('supplier__supplier_name',)
     inlines = [PurchaseInvoiceTireItemInline]
 
-class SalesReturnItemInline(admin.TabularInline):
+class SalesReturnItemInline(ReadOnlyDocumentAdminMixin, admin.TabularInline):
     model = SalesReturnItem
     extra = 0
-    readonly_fields = ('sales_invoice_tire_item', 'tire', 'quantity', 'unit_price', 'unit_cost', 'refund_amount')
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 @admin.register(SalesReturn)
-class SalesReturnAdmin(admin.ModelAdmin):
+class SalesReturnAdmin(ReadOnlyDocumentAdminMixin, admin.ModelAdmin):
     list_display = ('sales_return_id', 'sales_invoice', 'return_date', 'total_refund_amount', 'created_by')
     list_filter = ('return_date',)
     search_fields = ('sales_invoice__customer__full_name', 'reason')
-    readonly_fields = ('sales_return_id', 'sales_invoice', 'return_date', 'reason', 'total_refund_amount', 'created_by', 'created_at')
     inlines = [SalesReturnItemInline]
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 @admin.register(InvoiceSequence)
 class InvoiceSequenceAdmin(ReadOnlyDocumentAdminMixin, admin.ModelAdmin):

@@ -61,9 +61,27 @@ def sync_purchase_invoice_payment_status(invoice_or_id: PurchaseInvoice | int) -
     return new_status
 
 
+def _validate_confirmed_invoice_status(invoice: SalesInvoice | PurchaseInvoice, doc_label: str) -> None:
+    if invoice.status == InvoiceStatus.CANCELLED:
+        raise ValidationError(f"امکان ثبت {doc_label} برای فاکتور لغو شده وجود ندارد.")
+    if invoice.status == InvoiceStatus.DRAFT:
+        raise ValidationError(f"امکان ثبت {doc_label} برای فاکتور پیش‌نویس وجود ندارد. ابتدا فاکتور را تایید نمایید.")
+    if invoice.status != InvoiceStatus.CONFIRMED:
+        raise ValidationError(f"امکان ثبت {doc_label} فقط برای فاکتورهای تایید شده (CONFIRMED) وجود دارد.")
+
+
+def _validate_voucher_date(voucher_date: datetime | None, invoice_date: datetime | None, date_label: str) -> None:
+    if voucher_date is None:
+        return
+    if voucher_date > timezone.now():
+        raise ValidationError(f"تاریخ {date_label} نمی‌تواند در آینده باشد.")
+    if invoice_date is not None and voucher_date < invoice_date:
+        raise ValidationError(f"تاریخ {date_label} نمی‌تواند پیش از تاریخ صدور فاکتور باشد.")
+
+
 def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal, payment_method: str = 'کارتخوان / نقدی', notes: str = '', receipt_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> ReceiptVoucher:
-    if sales_invoice.status == InvoiceStatus.CANCELLED:
-        raise ValidationError("امکان ثبت سند دریافت وجه برای فاکتور لغو شده وجود ندارد.")
+    _validate_confirmed_invoice_status(sales_invoice, 'سند دریافت وجه')
+    _validate_voucher_date(receipt_date, None, 'دریافت وجه')
 
     if amount is None:
         raise ValidationError("مبلغ سند دریافت الزامی است.")
@@ -79,8 +97,8 @@ def create_receipt_voucher_service(sales_invoice: SalesInvoice, amount: Decimal,
 
     with transaction.atomic():
         invoice = SalesInvoice.objects.select_for_update().get(pk=invoice_id)
-        if invoice.status == InvoiceStatus.CANCELLED:
-            raise ValidationError("امکان ثبت سند دریافت وجه برای فاکتور لغو شده وجود ندارد.")
+        _validate_confirmed_invoice_status(invoice, 'سند دریافت وجه')
+        _validate_voucher_date(receipt_date, invoice.invoice_date, 'دریافت وجه')
 
         valid_received = invoice.receipts.filter(is_cancelled=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
         valid_refunded = invoice.refunds.filter(is_cancelled=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
@@ -140,8 +158,8 @@ def cancel_receipt_voucher_service(voucher: ReceiptVoucher, reason: str, user: U
 
 
 def create_payment_voucher_service(purchase_invoice: PurchaseInvoice, amount: Decimal, payment_method: str = 'حواله / چک', notes: str = '', payment_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> PaymentVoucher:
-    if purchase_invoice.status == InvoiceStatus.CANCELLED:
-        raise ValidationError("امکان ثبت سند پرداخت وجه برای فاکتور خرید لغو شده وجود ندارد.")
+    _validate_confirmed_invoice_status(purchase_invoice, 'سند پرداخت وجه')
+    _validate_voucher_date(payment_date, None, 'پرداخت وجه')
 
     if amount is None:
         raise ValidationError("مبلغ سند پرداخت الزامی است.")
@@ -157,8 +175,8 @@ def create_payment_voucher_service(purchase_invoice: PurchaseInvoice, amount: De
 
     with transaction.atomic():
         invoice = PurchaseInvoice.objects.select_for_update().get(pk=invoice_id)
-        if invoice.status == InvoiceStatus.CANCELLED:
-            raise ValidationError("امکان ثبت سند پرداخت وجه برای فاکتور خرید لغو شده وجود ندارد.")
+        _validate_confirmed_invoice_status(invoice, 'سند پرداخت وجه')
+        _validate_voucher_date(payment_date, invoice.invoice_date, 'پرداخت وجه')
 
         valid_paid = invoice.payments.filter(is_cancelled=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
         remaining = invoice.total_amount - valid_paid
@@ -208,8 +226,8 @@ def cancel_payment_voucher_service(voucher: PaymentVoucher, reason: str, user: U
 
 
 def create_customer_refund_voucher_service(sales_invoice: SalesInvoice, amount: Decimal, sales_return: SalesReturn | None = None, payment_method: str = 'کارتخوان / نقدی', notes: str = '', refund_date: datetime | None = None, user: User | None = None, reference_number: str = '') -> CustomerRefundVoucher:
-    if sales_invoice.status == InvoiceStatus.CANCELLED:
-        raise ValidationError("امکان ثبت استرداد وجه برای فاکتور فروش لغو شده وجود ندارد.")
+    _validate_confirmed_invoice_status(sales_invoice, 'استرداد وجه')
+    _validate_voucher_date(refund_date, None, 'استرداد وجه')
 
     if amount is None:
         raise ValidationError("مبلغ سند استرداد وجه الزامی است.")
@@ -225,8 +243,8 @@ def create_customer_refund_voucher_service(sales_invoice: SalesInvoice, amount: 
 
     with transaction.atomic():
         invoice = SalesInvoice.objects.select_for_update().get(pk=invoice_id)
-        if invoice.status == InvoiceStatus.CANCELLED:
-            raise ValidationError("امکان ثبت استرداد وجه برای فاکتور فروش لغو شده وجود ندارد.")
+        _validate_confirmed_invoice_status(invoice, 'استرداد وجه')
+        _validate_voucher_date(refund_date, invoice.invoice_date, 'استرداد وجه')
 
         if sales_return and sales_return.sales_invoice_id != invoice.pk:
             raise ValidationError("سند مرجوعی انتخاب‌شده متعلق به این فاکتور فروش نیست.")

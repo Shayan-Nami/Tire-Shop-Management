@@ -196,9 +196,9 @@ class SalesInvoiceTireItem(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        if not self.pk and (self.unit_cost is None or self.unit_cost == Decimal('0.00')) and self.tire_id:
+        if not self.pk and self.unit_cost is None and self.tire_id:
             try:
-                if self.tire and self.tire.purchase_price:
+                if self.tire and self.tire.purchase_price is not None:
                     self.unit_cost = self.tire.purchase_price
             except Exception:
                 pass

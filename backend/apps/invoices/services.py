@@ -25,11 +25,16 @@ from utils.jalali import get_jalali_year
 
 def _validate_invoice_total(invoice: SalesInvoice | PurchaseInvoice) -> None:
     field = invoice._meta.get_field('total_amount')
-    maximum = Decimal(10) ** (field.max_digits - field.decimal_places) - Decimal(1).scaleb(-field.decimal_places)
+    step = Decimal(1).scaleb(-field.decimal_places)
+    maximum = Decimal(10) ** (field.max_digits - field.decimal_places) - step
     amount = invoice.total_amount
     if not amount.is_finite() or not Decimal('0.00') <= amount <= maximum:
         raise ValidationError({
             'total_amount': f'مبلغ کل فاکتور باید بین صفر و {maximum:,.2f} باشد.'
+        })
+    if amount != amount.quantize(step):
+        raise ValidationError({
+            'total_amount': f'مبلغ کل فاکتور نمی‌تواند بیش از {field.decimal_places} رقم اعشار داشته باشد.'
         })
 
 
@@ -101,13 +106,17 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
 
     if status == InvoiceStatus.CANCELLED:
         raise ValidationError("امکان صدور فاکتور در وضعیت لغو شده وجود ندارد.")
+    if status == InvoiceStatus.DRAFT and payment_status == PaymentStatus.PAID:
+        raise ValidationError({'payment_status': "امکان صدور فاکتور پیش‌نویس در وضعیت پرداخت‌شده وجود ندارد."})
 
     init_payment_status = payment_status or PaymentStatus.UNPAID
-    inv_number = generate_next_invoice_number('SALES')
+    now = timezone.now()
+    inv_number = generate_next_invoice_number('SALES', dt=now)
     invoice = SalesInvoice.objects.create(
         invoice_number=inv_number,
         customer=customer,
         vehicle=vehicle,
+        invoice_date=now,
         status=status,
         payment_status=init_payment_status,
         discount_amount=discount_amount,
@@ -203,19 +212,19 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
     total = subtotal
     if discount_percent > 0:
         discount_val = (subtotal * discount_percent) / Decimal('100.0')
-        total -= discount_val
+        total = (total - discount_val).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     elif discount_amount > 0:
         total -= discount_amount
 
     invoice.total_amount = max(total, Decimal('0.00'))
     _validate_invoice_total(invoice)
-    if payment_status is not None:
-        invoice.payment_status = payment_status
-    elif invoice.total_amount == Decimal('0.00'):
+    if invoice.total_amount == Decimal('0.00'):
         invoice.payment_status = PaymentStatus.PAID
+    elif payment_status is not None:
+        invoice.payment_status = payment_status
     else:
         invoice.payment_status = PaymentStatus.UNPAID
-    invoice.save(update_fields=['total_amount', 'payment_status'])
+    invoice.save(update_fields=['total_amount', 'payment_status', 'updated_at'])
 
     if init_payment_status == PaymentStatus.PAID and invoice.total_amount > Decimal('0.00'):
         invoice.refresh_from_db(fields=['total_amount'])
@@ -260,7 +269,7 @@ def cancel_sales_invoice_service(invoice: SalesInvoice | int, user: User | None=
         record_stock_movements(movements_data, user=user)
 
     locked_invoice.status = InvoiceStatus.CANCELLED
-    locked_invoice.save(update_fields=['status'])
+    locked_invoice.save(update_fields=['status', 'updated_at'])
     return locked_invoice
 
 @transaction.atomic
@@ -310,10 +319,12 @@ def create_purchase_invoice_service(supplier: Supplier, tire_items_data: list[di
     if len(tire_ids) != len(set(tire_ids)):
         raise ValidationError("تایر تکراری در اقلام فاکتور خرید یافت شد. لطفاً تعداد را در یک ردیف تجمیع نمایید.")
 
-    inv_number = generate_next_invoice_number('PURCHASE')
+    now = timezone.now()
+    inv_number = generate_next_invoice_number('PURCHASE', dt=now)
     invoice = PurchaseInvoice.objects.create(
         invoice_number=inv_number,
         supplier=supplier,
+        invoice_date=now,
         created_by=created_by
     )
 
@@ -369,10 +380,69 @@ def create_purchase_invoice_service(supplier: Supplier, tire_items_data: list[di
     _validate_invoice_total(invoice)
     if total == Decimal('0.00'):
         invoice.payment_status = PaymentStatus.PAID
-        invoice.save(update_fields=['total_amount', 'payment_status'])
+        invoice.save(update_fields=['total_amount', 'payment_status', 'updated_at'])
     else:
-        invoice.save(update_fields=['total_amount'])
+        invoice.save(update_fields=['total_amount', 'updated_at'])
     return invoice
+
+
+def _resolve_purchase_cancellation_baseline(tire: Tire, purchase_movement: StockMovement) -> Decimal:
+    candidate = purchase_movement
+    while True:
+        earlier_purchases = StockMovement.objects.filter(
+            tire=tire,
+            movement_type=StockMovementType.PURCHASE,
+            movement_id__lt=candidate.pk,
+        ).select_related('purchase_invoice').order_by('-movement_id')
+        prev_active_in_chain = None
+        for pm in earlier_purchases:
+            if pm.purchase_invoice and pm.purchase_invoice.status != InvoiceStatus.CANCELLED:
+                prev_active_in_chain = pm
+                break
+            was_cancelled_after = StockMovement.objects.filter(
+                tire=tire,
+                movement_type=StockMovementType.PURCHASE_CANCEL,
+                purchase_invoice_id=pm.purchase_invoice_id,
+                movement_id__gt=candidate.pk,
+            ).exists()
+            if was_cancelled_after:
+                prev_active_in_chain = pm
+                break
+        if prev_active_in_chain is None:
+            break
+        candidate = prev_active_in_chain
+
+    first_item = PurchaseInvoiceTireItem.objects.filter(
+        tire=tire,
+        purchase_invoice_id=candidate.purchase_invoice_id,
+    ).first()
+    if not first_item or first_item.previous_purchase_price is None:
+        raise ValidationError(
+            "قیمت خرید پیش از اولین خرید در سوابق قدیمی موجود نیست؛ ابتدا سابقه قیمت را تکمیل نمایید."
+        )
+    return first_item.previous_purchase_price
+
+
+def _compute_tire_refundable_pool(
+    invoice: SalesInvoice,
+    tire_subtotal: Decimal,
+    service_subtotal: Decimal,
+) -> Decimal:
+    gross_subtotal = tire_subtotal + service_subtotal
+    if tire_subtotal <= Decimal('0.00') or invoice.total_amount <= Decimal('0.00') or gross_subtotal <= Decimal('0.00'):
+        return Decimal('0.00')
+    if service_subtotal <= Decimal('0.00'):
+        return min(invoice.total_amount, tire_subtotal)
+
+    effective_discount = max(gross_subtotal - invoice.total_amount, Decimal('0.00'))
+    service_discount = (
+        (effective_discount * service_subtotal) / gross_subtotal
+    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    service_discount = min(service_discount, effective_discount, service_subtotal)
+    service_net = service_subtotal - service_discount
+    tire_pool = max(invoice.total_amount - service_net, Decimal('0.00'))
+    return min(tire_pool, tire_subtotal, invoice.total_amount)
+
 
 @transaction.atomic
 def cancel_purchase_invoice_service(invoice: PurchaseInvoice | int, user: User | None=None) -> PurchaseInvoice:
@@ -433,23 +503,13 @@ def cancel_purchase_invoice_service(invoice: PurchaseInvoice | int, user: User |
                 if prev_purchase and prev_purchase.unit_cost is not None:
                     restored_price = prev_purchase.unit_cost
                 else:
-                    first_purchase = StockMovement.objects.filter(
-                        tire=tire, movement_type=StockMovementType.PURCHASE,
-                    ).order_by('movement_id').first()
-                    first_item = PurchaseInvoiceTireItem.objects.get(
-                        tire=tire, purchase_invoice_id=first_purchase.purchase_invoice_id,
-                    )
-                    restored_price = first_item.previous_purchase_price
-                    if restored_price is None:
-                        raise ValidationError(
-                            "قیمت خرید پیش از اولین خرید در سوابق قدیمی موجود نیست؛ ابتدا سابقه قیمت را تکمیل نمایید."
-                        )
+                    restored_price = _resolve_purchase_cancellation_baseline(tire, purchase_movement)
                 tire.purchase_price = restored_price
                 tire.save(update_fields=['purchase_price'])
 
 
     locked_invoice.status = InvoiceStatus.CANCELLED
-    locked_invoice.save(update_fields=['status'])
+    locked_invoice.save(update_fields=['status', 'updated_at'])
     return locked_invoice
 
 @transaction.atomic
@@ -479,27 +539,48 @@ def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[di
     if return_date:
         if return_date > timezone.now():
             raise ValidationError("تاریخ مرجوعی نمی‌تواند در آینده باشد.")
+        if return_date < locked_invoice.invoice_date:
+            raise ValidationError("تاریخ مرجوعی نمی‌تواند پیش از تاریخ صدور فاکتور فروش باشد.")
     else:
         return_date = timezone.now()
 
     invoice_items = {item.pk: item for item in locked_invoice.tire_items.select_related('tire')}
-    subtotal = sum((item.quantity * item.unit_price for item in invoice_items.values()), Decimal('0.00'))
-    subtotal += locked_invoice.service_items.aggregate(
-        total=models.Sum(models.F('quantity') * models.F('unit_price'))
-    )['total'] or Decimal('0.00')
-    past_returns = {row['sales_invoice_tire_item_id']: row for row in
-        SalesReturnItem.objects.filter(sales_invoice_tire_item_id__in=invoice_items).values(
-            'sales_invoice_tire_item_id'
-        ).annotate(total_qty=models.Sum('quantity'), total_refund=models.Sum('refund_amount'))}
+    tire_subtotal = sum(
+        (Decimal(str(item.quantity)) * item.unit_price for item in invoice_items.values()),
+        Decimal('0.00'),
+    )
+    service_subtotal = sum(
+        (Decimal(str(s.quantity)) * s.unit_price for s in locked_invoice.service_items.all()),
+        Decimal('0.00'),
+    )
+    tire_net_pool = _compute_tire_refundable_pool(locked_invoice, tire_subtotal, service_subtotal)
 
-    if locked_invoice.discount_percent > 0:
-        discount_factor = Decimal('1.00') - (locked_invoice.discount_percent / Decimal('100.00'))
-    elif locked_invoice.discount_amount > 0 and subtotal > Decimal('0.00'):
-        discount_factor = Decimal('1.00') - (locked_invoice.discount_amount / subtotal)
-    else:
-        discount_factor = Decimal('1.00')
-
-    discount_factor = max(Decimal('0.00'), discount_factor)
+    past_returns = {
+        row['sales_invoice_tire_item_id']: row
+        for row in SalesReturnItem.objects.filter(
+            sales_invoice_tire_item_id__in=invoice_items
+        ).values('sales_invoice_tire_item_id').annotate(
+            total_qty=models.Sum('quantity'),
+            total_refund=models.Sum('refund_amount'),
+        )
+    }
+    returned_qty_by_item = {
+        item_id: (row.get('total_qty') or 0)
+        for item_id, row in past_returns.items()
+    }
+    refunded_amount_by_item = {
+        item_id: (row.get('total_refund') or Decimal('0.00'))
+        for item_id, row in past_returns.items()
+    }
+    already_refunded_tire_pool = sum(refunded_amount_by_item.values(), Decimal('0.00'))
+    remaining_tire_pool = max(tire_net_pool - already_refunded_tire_pool, Decimal('0.00'))
+    remaining_tire_gross = sum(
+        (
+            Decimal(str(item.quantity - returned_qty_by_item.get(item.pk, 0))) * item.unit_price
+            for item in invoice_items.values()
+        ),
+        Decimal('0.00'),
+    )
 
     sales_return = SalesReturn.objects.create(
         sales_invoice=locked_invoice,
@@ -528,9 +609,8 @@ def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[di
         if qty <= 0:
             raise ValidationError("تعداد قلم مرجوعی باید بزرگتر از صفر باشد.")
 
-        past_returns_aggr = past_returns.get(tire_item.pk, {})
-        already_returned_qty = past_returns_aggr.get('total_qty') or 0
-        already_refunded_amount = past_returns_aggr.get('total_refund') or Decimal('0.00')
+        already_returned_qty = returned_qty_by_item.get(tire_item.pk, 0)
+        already_refunded_amount = refunded_amount_by_item.get(tire_item.pk, Decimal('0.00'))
 
         remaining_qty = tire_item.quantity - already_returned_qty
         if qty > remaining_qty:
@@ -538,15 +618,29 @@ def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[di
                 f"تعداد مرجوعی تایر '{tire_item.tire.tire_name}' ({qty} حلقه) بیشتر از سقف مجاز قابل مرجوعی ({remaining_qty} حلقه) است."
             )
 
-        item_total_gross = Decimal(str(tire_item.quantity)) * tire_item.unit_price
-        item_total_net = (item_total_gross * discount_factor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        line_gross = Decimal(str(qty)) * tire_item.unit_price
+        remaining_tire_gross = max(remaining_tire_gross - line_gross, Decimal('0.00'))
 
-        if qty == remaining_qty:
-            item_refund = max(item_total_net - already_refunded_amount, Decimal('0.00'))
+        if line_gross == Decimal('0.00') or tire_subtotal == Decimal('0.00'):
+            item_refund = Decimal('0.00')
+        elif remaining_tire_gross == Decimal('0.00'):
+            item_refund = remaining_tire_pool
+        elif qty == remaining_qty:
+            item_total_gross = Decimal(str(tire_item.quantity)) * tire_item.unit_price
+            item_total_net = (
+                (item_total_gross * tire_net_pool) / tire_subtotal
+            ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            item_refund = min(max(item_total_net - already_refunded_amount, Decimal('0.00')), remaining_tire_pool)
         else:
-            raw_refund = Decimal(str(qty)) * tire_item.unit_price * discount_factor
-            item_refund = max(raw_refund.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP), Decimal('0.00'))
+            raw_refund = (line_gross * tire_net_pool) / tire_subtotal
+            item_refund = min(
+                max(raw_refund.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP), Decimal('0.00')),
+                remaining_tire_pool,
+            )
 
+        remaining_tire_pool -= item_refund
+        returned_qty_by_item[tire_item.pk] = already_returned_qty + qty
+        refunded_amount_by_item[tire_item.pk] = already_refunded_amount + item_refund
         total_refund += item_refund
 
         SalesReturnItem.objects.create(
@@ -578,16 +672,18 @@ def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[di
     from apps.finance.services import sync_sales_invoice_payment_status
     sync_sales_invoice_payment_status(locked_invoice)
 
-    if auto_refund and locked_invoice.excess_amount > Decimal('0.00'):
-        from apps.finance.services import create_customer_refund_voucher_service
-        create_customer_refund_voucher_service(
-            sales_invoice=locked_invoice,
-            amount=locked_invoice.excess_amount,
-            sales_return=sales_return,
-            payment_method='کارتخوان / نقدی',
-            notes=f'استرداد وجه بابت مرجوعی شماره {sales_return.sales_return_id}',
-            user=user
-        )
+    if auto_refund:
+        excess = locked_invoice.excess_amount
+        if excess > Decimal('0.00'):
+            from apps.finance.services import create_customer_refund_voucher_service
+            create_customer_refund_voucher_service(
+                sales_invoice=locked_invoice,
+                amount=excess,
+                sales_return=sales_return,
+                payment_method='کارتخوان / نقدی',
+                notes=f'استرداد وجه بابت مرجوعی شماره {sales_return.sales_return_id}',
+                user=user
+            )
 
     return sales_return
 

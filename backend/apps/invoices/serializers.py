@@ -18,6 +18,18 @@ from apps.services_app.models import Service
 from utils.jalali import format_jalali_date
 
 
+def _mask_confidential_cost(data: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    request = context.get('request')
+    user = getattr(request, 'user', None)
+    if (
+        user
+        and not getattr(user, 'is_superuser', False)
+        and getattr(user, 'role', None) in ('TECHNICIAN', 'WAREHOUSE')
+    ):
+        data.pop('unit_cost', None)
+    return data
+
+
 class SalesInvoiceTireItemSerializer(serializers.ModelSerializer):
     tire_name = serializers.ReadOnlyField(source='tire.tire_name')
     brand_name = serializers.ReadOnlyField(source='tire.brand.brand_name')
@@ -30,11 +42,7 @@ class SalesInvoiceTireItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'unit_cost', 'total_price']
 
     def to_representation(self, instance: SalesInvoiceTireItem) -> dict[str, Any]:
-        data = super().to_representation(instance)
-        request = self.context.get('request')
-        if request and hasattr(request.user, 'role') and request.user.role in ('TECHNICIAN', 'WAREHOUSE'):
-            data.pop('unit_cost', None)
-        return data
+        return _mask_confidential_cost(super().to_representation(instance), self.context)
 
     @extend_schema_field(serializers.DecimalField(max_digits=14, decimal_places=2))
     def get_total_price(self, obj: SalesInvoiceTireItem) -> Decimal:
@@ -201,6 +209,8 @@ class SalesInvoiceCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"status": "امکان صدور مستقیم فاکتور در وضعیت لغو شده وجود ندارد."})
 
         payment_status = attrs.get('payment_status')
+        if status == InvoiceStatus.DRAFT and payment_status == PaymentStatus.PAID:
+            raise serializers.ValidationError({"payment_status": "امکان صدور فاکتور پیش‌نویس در وضعیت پرداخت‌شده وجود ندارد."})
         if payment_status == PaymentStatus.PARTIAL:
             raise serializers.ValidationError({"payment_status": "امکان ثبت مستقیم فاکتور در وضعیت نیمه‌پرداخت در بدو صدور وجود ندارد."})
 
@@ -293,16 +303,6 @@ class PurchaseInvoiceCreateSerializer(serializers.ModelSerializer):
         tire_items = validated_data.pop('tire_items', [])
         user = self.context['request'].user if 'request' in self.context else None
 
-        prepared_tire_items = []
-        for item in tire_items:
-            tire_obj = item['tire']
-            unit_c_val = item.get('unit_cost')
-            prepared_tire_items.append({
-                'tire': tire_obj,
-                'quantity': item['quantity'],
-                'unit_cost': unit_c_val if unit_c_val is not None else tire_obj.purchase_price
-            })
-
         return create_purchase_invoice_service(
             supplier=validated_data['supplier'],
             tire_items_data=tire_items,
@@ -322,11 +322,7 @@ class SalesReturnItemSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def to_representation(self, instance: SalesReturnItem) -> dict[str, Any]:
-        data = super().to_representation(instance)
-        request = self.context.get('request')
-        if request and hasattr(request.user, 'role') and request.user.role == 'TECHNICIAN':
-            data.pop('unit_cost', None)
-        return data
+        return _mask_confidential_cost(super().to_representation(instance), self.context)
 
 class SalesReturnItemInputSerializer(serializers.Serializer):
     sales_invoice_tire_item_id = serializers.IntegerField(
@@ -391,6 +387,12 @@ class SalesReturnCreateSerializer(serializers.Serializer):
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         invoice = attrs.get('sales_invoice')
+        return_date = attrs.get('return_date')
+        if invoice and return_date and return_date < invoice.invoice_date:
+            raise serializers.ValidationError({
+                "return_date": "تاریخ مرجوعی نمی‌تواند پیش از تاریخ صدور فاکتور فروش باشد."
+            })
+
         items = attrs.get('items', [])
         if not items:
             raise serializers.ValidationError({"items": "ثبت حداقل یک قلم تایر جهت مرجوعی الزامی است."})
