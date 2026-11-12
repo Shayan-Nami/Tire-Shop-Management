@@ -1,4 +1,4 @@
-import { translations } from '../src/utils/i18n.ts';
+import * as i18n from '../src/utils/i18n.ts';
 import * as invoiceRequests from '../src/utils/invoiceRequests.ts';
 import { readFileSync } from 'node:fs';
 
@@ -9,7 +9,7 @@ import ts from 'typescript';
 const fallbackLanguage = {
   language: 'fa', direction: 'rtl', isRTL: true,
   t: (key: string, fallback?: string, values?: Record<string, unknown>) =>
-    (translations[key]?.fa || fallback || key || '').replace(/\{(\w+)\}/g, (match, name) => String(values?.[name] ?? match)),
+    (i18n.translations[key]?.fa || fallback || key || '').replace(/\{(\w+)\}/g, (match, name) => String(values?.[name] ?? match)),
 };
 
 export function loadComponent(path: string, mocks: Record<string, unknown>, env?: Record<string, string>) {
@@ -22,6 +22,7 @@ export function loadComponent(path: string, mocks: Record<string, unknown>, env?
   const mockedRequire = (id: string) => {
     if (id in mocks) return mocks[id];
     if (id.endsWith('/context/LanguageContext')) return { useLanguage: () => fallbackLanguage };
+    if (id.endsWith('/utils/i18n')) return i18n;
     if (id.endsWith('/utils/invoiceRequests')) return invoiceRequests;
     if (id.endsWith('/ui/Modal')) {
       return {

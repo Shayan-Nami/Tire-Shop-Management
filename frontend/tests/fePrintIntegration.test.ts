@@ -137,6 +137,15 @@ test('ReceiptModal truncates remaining_amount with floor-to-2-decimals and reset
   h.render({ ...baseProps, invoice: makeInvoice(3, '5000.00') });
   await h.flush();
   assert.equal(find(h.tree, (node) => node.type === 'input' && node.props.id === 'receipt-amount').props.value, '5000');
+
+  for (const [rawRemaining, expectedAmount] of [['19.99', '19.99'], ['1.13', '1.13'], ['19.999', '19.99']] as const) {
+    h.render({ ...baseProps, invoice: makeInvoice(4, rawRemaining) });
+    await h.flush();
+    assert.equal(
+      find(h.tree, (node) => node.type === 'input' && node.props.id === 'receipt-amount').props.value,
+      expectedAmount,
+    );
+  }
 });
 
 test('CreateInvoice locks payment status to UNPAID for DRAFT invoices and unlocks PAID for CONFIRMED', async (t: TestContext) => {
@@ -265,6 +274,7 @@ test('Treasury translates payment methods cleanly in English and Persian includi
       '../components/finance/CancelVoucherModal': { CancelVoucherModal: 'cancel-voucher-modal' },
       '../utils/invoiceRequests': invoiceRequests,
       '../utils/errorParser': { parseApiError },
+      '../utils/i18n': { translatePaymentMethod },
       '../context/LanguageContext': { useLanguage: () => langCtx },
     });
   };
@@ -328,4 +338,122 @@ test('InvoiceDetailModal allows DRAFT confirmation only for MANAGER and TECHNICI
     const canConfirm = nodes(h.tree, (node) => node.type === 'button' && text(node).includes('تایید نهایی و کسر از انبار')).length > 0;
     assert.equal(canConfirm, expected, `Unexpected DRAFT confirm visibility for ${role}`);
   }
+});
+
+test('Treasury debounces page reset when searching from page 2 without firing an extra stale request', async (t: TestContext) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const calls: Array<{ page?: number; search?: string }> = [];
+  const h = mountComponent('../src/pages/Treasury.tsx', 'Treasury', {
+    '../api/finance': {
+      financeApi: {
+        getReceipts: async (params: { page?: number; search?: string }) => {
+          calls.push(params);
+          return page([{ receipt_id: 1, customer_name: 'Ali', amount: '1000', payment_method: 'POS', receipt_date: '2026-01-01T10:00:00Z', is_cancelled: false }], params.page ?? 1, 2);
+        },
+        getPayments: async () => page([]),
+        getCustomerRefunds: async () => page([]),
+      },
+    },
+    '../utils/formatters': formatters,
+    '../context/AuthContext': { useAuth: () => ({ currencyUnit: 'rial', user: { id: 1, role: 'MANAGER' } }) },
+    '../components/finance/CancelVoucherModal': { CancelVoucherModal: 'cancel-voucher-modal' },
+    '../utils/invoiceRequests': invoiceRequests,
+    '../utils/errorParser': { parseApiError },
+    '../utils/i18n': { translatePaymentMethod },
+  });
+  t.after(() => h.unmount());
+  await h.flush();
+
+  find(h.tree, (node) => node.type === 'button' && text(node) === 'بعدی').props.onClick();
+  h.render();
+  await h.flush();
+  assert.deepEqual(calls, [
+    { page: 1, search: undefined },
+    { page: 2, search: undefined },
+  ]);
+
+  find(h.tree, (node) => node.type === 'input' && node.props['aria-label'] === 'جستجو در اسناد مالی...').props.onChange({
+    target: { value: 'ali' },
+  });
+  h.render();
+  await h.flush();
+  assert.equal(calls.length, 2, 'Typing search must not immediately fetch page 1 before debounce expires');
+
+  t.mock.timers.tick(350);
+  await h.flush();
+  assert.deepEqual(calls, [
+    { page: 1, search: undefined },
+    { page: 2, search: undefined },
+    { page: 1, search: 'ali' },
+  ]);
+});
+
+test('SalesReturnModal preserves unsaved return quantities and reason when language toggles', async (t) => {
+  let langState = {
+    language: 'fa' as 'fa' | 'en',
+    direction: 'rtl' as 'rtl' | 'ltr',
+    isRTL: true,
+    t: (key: string) => translateMessage(key, 'fa'),
+  };
+  let returnFetches = 0;
+  const invoice = {
+    sales_invoice_id: 42,
+    invoice_number: 'S-42',
+    customer: 1,
+    customer_name: 'مشتری',
+    customer_phone: '09120000001',
+    vehicle: 1,
+    license_plate: '12ب345-ایران11',
+    total_amount: '2000',
+    discount_amount: '0',
+    discount_percent: 0,
+    net_amount: '2000',
+    paid_amount: '2000',
+    remaining_amount: '0',
+    status: 'CONFIRMED',
+    payment_status: 'PAID',
+    created_at: '2026-01-01T10:00:00Z',
+    tire_items: [{ id: 10, tire: 1, tire_name: 'Tire A', quantity: 4, unit_price: '500' }],
+    service_items: [],
+  };
+
+  const h = mountComponent('../src/components/invoices/SalesReturnModal.tsx', 'SalesReturnModal', {
+    '../../api/invoices': {
+      invoicesApi: {
+        getSalesReturns: async () => {
+          returnFetches++;
+          return page([{ return_id: 1, sales_invoice: 42, items: [{ sales_invoice_tire_item: 10, quantity: 1 }] }]);
+        },
+        createSalesReturn: async () => ({}),
+      },
+    },
+    '../../utils/formatters': formatters,
+    '../../context/AuthContext': { useAuth: () => ({ currencyUnit: 'rial' }) },
+    '../../utils/errorParser': { parseApiError },
+    '../../context/LanguageContext': { useLanguage: () => langState },
+  }, { invoice, onClose() {}, onSuccess() {} });
+  t.after(() => h.unmount());
+  await h.flush();
+  assert.equal(returnFetches, 1);
+
+  find(h.tree, (node) => node.type === 'input' && node.props.type === 'number').props.onChange({
+    target: { value: '2' },
+  });
+  find(h.tree, (node) => node.type === 'textarea' && node.props.id === 'sales-return-reason').props.onChange({
+    target: { value: 'Wrong size' },
+  });
+  h.render();
+
+  langState = {
+    language: 'en',
+    direction: 'ltr',
+    isRTL: false,
+    t: (key: string) => translateMessage(key, 'en'),
+  };
+  h.render();
+  await h.flush();
+
+  assert.equal(returnFetches, 1, 'Language toggle must not re-fetch prior sales returns');
+  assert.equal(find(h.tree, (node) => node.type === 'input' && node.props.type === 'number').props.value, 2);
+  assert.equal(find(h.tree, (node) => node.type === 'textarea' && node.props.id === 'sales-return-reason').props.value, 'Wrong size');
 });
