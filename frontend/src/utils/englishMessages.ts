@@ -706,5 +706,14 @@ export const englishMessages: Record<string, string> = {
   "مهلت زمانی ارتباط با سرور به پایان رسید. لطفاً مجدداً تلاش فرمایید.": "The request timed out. Please try again.",
   "خطای داخلی سرور رخ داده است. لطفاً با پشتیبانی سیستم تماس بگیرید.": "A server error occurred. Please contact your administrator.",
   "شما مجوز دسترسی به این عملیات را ندارید.": "You do not have permission to perform this action.",
-  "اطلاعات مورد نظر در سرور یافت نشد.": "The requested record was not found."
+  "اطلاعات مورد نظر در سرور یافت نشد.": "The requested record was not found.",
+  "خطا در دریافت سوابق مرجوعی فاکتور": "Could not load invoice return history",
+  "مرجوع‌شده:": "Returned:",
+  "قابل مرجوعی:": "Returnable:",
+  "تعداد همه اقلام تایر باید حداقل ۱ حلقه باشد.": "Quantity for every tire item must be at least 1.",
+  "خطا در دریافت فاکتورهای خرید": "Could not load purchase invoices",
+  "خطا در دریافت اسناد مالی": "Could not load treasury vouchers",
+  "جستجو در اسناد مالی...": "Search treasury vouchers...",
+  "پاسخ صفحه‌بندی نامعتبر است؛ صفحه درخواستی دریافت نشد.": "Invalid pagination response; requested page was not returned.",
+  "پاسخ صفحه‌بندی نامعتبر است؛ دریافت همه گزینه‌ها ممکن نشد.": "Invalid pagination response; failed to load all options."
 };

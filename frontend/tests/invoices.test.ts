@@ -145,8 +145,11 @@ test('vehicle loading failure is visible, and foreign vehicles cannot be submitt
 
 test('every invoice selector exposes records beyond page one', async (t) => {
   const calls: Record<string, number[]> = { customers: [], vehicles: [], tires: [], services: [] };
-  const paged = (kind: string, make: (id: number) => any) => async ({ page: number }: any) => {
+  const customerParams: any[] = [];
+  const paged = (kind: string, make: (id: number) => any) => async (params: any) => {
+    const number = params?.page ?? 1;
     calls[kind].push(number);
+    if (kind === 'customers') customerParams.push(params);
     return page(Array.from({ length: 60 }, (_, i) => make((number - 1) * 60 + i + 1)), number, 3);
   };
   const { h, ready } = setup(t, {
@@ -157,13 +160,15 @@ test('every invoice selector exposes records beyond page one', async (t) => {
   await ready();
   change(h, 'invoice-customer', '1');
   await h.flush();
-  assert.equal(options(h, 'invoice-customer').length, 181);
+  assert.equal(options(h, 'invoice-customer').length, 61);
+  assert.deepEqual(calls.customers, [1]);
+  assert.deepEqual(customerParams, [{ search: undefined, page_size: 20 }]);
   assert.equal(options(h, 'invoice-vehicle').length, 180);
   for (const label of ['افزودن تایر از کاتالوگ', 'افزودن خدمت کارگاهی']) {
     const control = find(h, (node) => node.props?.['aria-label'] === label);
     assert.equal(nodes(control, (node) => node.type === 'option').length, 181);
   }
-  for (const call of Object.values(calls)) assert.deepEqual(call, [1, 2, 3]);
+  for (const kind of ['vehicles', 'tires', 'services'] as const) assert.deepEqual(calls[kind], [1, 2, 3]);
 });
 
 test('superseded customer searches ignore stale responses, errors and finalizers', async (t) => {

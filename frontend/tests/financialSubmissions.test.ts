@@ -3,6 +3,7 @@ import { test, type TestContext } from 'node:test';
 import { AxiosError } from 'axios';
 import * as formatters from '../src/utils/formatters.ts';
 import { parseApiError } from '../src/utils/errorParser.ts';
+import * as invoiceRequests from '../src/utils/invoiceRequests.ts';
 import { deferred, mountComponent, nodes, page, text } from './componentHarness.ts';
 
 type Harness = ReturnType<typeof mountComponent>;
@@ -44,6 +45,8 @@ async function setup(t: TestContext, kind: string, create: (payload: any) => Pro
     '../../utils/formatters': formatters,
     '../utils/errorParser': { parseApiError },
     '../../utils/errorParser': { parseApiError },
+    '../utils/invoiceRequests': invoiceRequests,
+    '../../utils/invoiceRequests': invoiceRequests,
   }, { invoice, onClose() {}, onSuccess() { successes++; } });
   t.after(() => h.unmount());
   await h.flush();

@@ -101,11 +101,13 @@ export function mountComponent(path: string, exportName: string, mocks: Record<s
     },
   };
   const Component = loadComponent(path, { ...mocks, react })[exportName];
-  function render() {
+  let currentProps = props;
+  function render(nextProps?: Record<string, unknown>) {
+    if (nextProps) currentProps = nextProps;
     cursor = 0;
     dirty = false;
     pending = [];
-    tree = Component(props);
+    tree = Component(currentProps);
     const scheduled = pending;
     pending = [];
     for (const effect of scheduled) effect();
