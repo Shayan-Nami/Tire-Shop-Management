@@ -1,17 +1,20 @@
 import { useLanguage } from '../context/LanguageContext';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, PlusCircle, Trash2, Edit2 } from 'lucide-react';
 import { servicesApi } from '../api/services';
 import { TechnicalService } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
+import { Modal } from '../components/ui/Modal';
 import { parseApiError } from '../utils/errorParser';
+import { createRequestSequence } from '../utils/invoiceRequests';
 
 export const ServicesPage: React.FC = () => {
   const { t, language } = useLanguage();
   const { currencyUnit, user } = useAuth();
   const [services, setServices] = useState<TechnicalService[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -19,34 +22,46 @@ export const ServicesPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
 
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [editingService, setEditingService] = useState<TechnicalService | null>(null);
   const [name, setName] = useState<string>('');
   const [price, setPrice] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const serviceRequests = useRef(createRequestSequence());
+
+  useEffect(() => () => serviceRequests.current.invalidate(), []);
 
   useEffect(() => {
+    if (search === debouncedSearch) return;
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
+      setCurrentPage(1);
     }, 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, debouncedSearch]);
 
   const fetchServices = useCallback(async () => {
+    const request = serviceRequests.current.begin();
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await servicesApi.getServices({
         search: debouncedSearch.trim() || undefined,
         page: currentPage,
       });
+      if (!serviceRequests.current.isCurrent(request)) return;
       setServices(data.results || []);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.count || 0);
     } catch (e) {
-      console.error(e);
+      if (!serviceRequests.current.isCurrent(request)) return;
+      setLoadError(parseApiError(e, t("دریافت اطلاعات ناموفق بود. اتصال را بررسی کنید و دوباره تلاش کنید."), language));
     } finally {
-      setLoading(false);
+      if (serviceRequests.current.isCurrent(request)) {
+        setLoading(false);
+      }
     }
-  }, [debouncedSearch, currentPage]);
+  }, [debouncedSearch, currentPage, language, t]);
 
   useEffect(() => {
     void fetchServices();
@@ -70,6 +85,7 @@ export const ServicesPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       if (editingService) {
         await servicesApi.updateService(editingService.service_id, {
@@ -85,9 +101,11 @@ export const ServicesPage: React.FC = () => {
         });
       }
       setShowModal(false);
-      fetchServices();
+      void fetchServices();
     } catch (err: unknown) {
       alert(parseApiError(err, t("خطا در ثبت خدمت فنی"), language));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -95,7 +113,7 @@ export const ServicesPage: React.FC = () => {
     if (!confirm(t("آیا از حذف این خدمت فنی اطمینان دارید؟"))) return;
     try {
       await servicesApi.deleteService(id);
-      fetchServices();
+      void fetchServices();
     } catch (err: unknown) {
       alert(parseApiError(err, t("امکان حذف این خدمت به دلیل استفاده در فاکتورهای صادرشده وجود ندارد."), language));
     }
@@ -111,6 +129,7 @@ export const ServicesPage: React.FC = () => {
 
         {user?.role === 'MANAGER' && (
           <button
+            type="button"
             onClick={handleOpenAdd}
             className="action-primary inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
           >
@@ -125,10 +144,8 @@ export const ServicesPage: React.FC = () => {
           <input
             type="text"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label={t("جستجو در نام خدمت کارگاهی یا توضیحات...")}
             placeholder={t("جستجو در نام خدمت کارگاهی یا توضیحات...")}
             className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />
@@ -136,82 +153,97 @@ export const ServicesPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="surface-panel overflow-hidden">
-        {loading ? (
-          <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت خدمات فنی...")}</div>
-        ) : services.length === 0 ? (
-          <div className="py-16 text-center text-xs text-slate-400">{t("خدمتی با این مشخصات یافت نشد.")}</div>
-        ) : (
-          <div className="table-scroll overflow-x-auto">
-            <table className="data-table w-full text-xs text-start">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-3 px-4">{t("عنوان خدمت کارگاهی")}</th>
-                  <th className="py-3 px-4">{t("تعرفه مصوب")}</th>
-                  <th className="py-3 px-4">{t("توضیحات و دامنه اجرا")}</th>
-                  {user?.role === 'MANAGER' && <th className="py-3 px-4 text-center">{t("عملیات")}</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {services.map((srv) => (
-                  <tr key={srv.service_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                      <bdi dir="auto">{srv.service_name}</bdi>
-                    </td>
-                    <td className="py-3 px-4 font-black text-brand-600 dark:text-brand-400 tabular-nums">
-                      {formatCurrency(srv.price, true, currencyUnit, language)}
-                    </td>
-                    <td className="py-3 px-4 text-slate-500">{srv.description || '-'}</td>
-                    {user?.role === 'MANAGER' && (
-                      <td className="py-3 px-4 text-center">
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            aria-label={t("ویرایش خدمت")}
-                            title={t("ویرایش خدمت")}
-                            onClick={() => handleOpenEdit(srv)}
-                            className="p-1 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            aria-label={t("حذف خدمت")}
-                            title={t("حذف خدمت")}
-                            onClick={() => handleDelete(srv.service_id)}
-                            className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
+      {loadError ? (
+        <div className="surface-panel p-5 space-y-3" role="alert">
+          <p className="text-xs text-rose-600 dark:text-rose-400">{loadError}</p>
+          <button type="button" className="action-secondary" onClick={() => void fetchServices()}>{t("تلاش دوباره")}</button>
+        </div>
+      ) : (
+        <div className="surface-panel overflow-hidden">
+          {loading ? (
+            <div className="py-16 text-center text-xs text-slate-500 dark:text-slate-400">{t("در حال دریافت خدمات فنی...")}</div>
+          ) : services.length === 0 ? (
+            <div className="py-16 text-center text-xs text-slate-500 dark:text-slate-400">{t("خدمتی با این مشخصات یافت نشد.")}</div>
+          ) : (
+            <div className="table-scroll overflow-x-auto">
+              <table className="data-table w-full text-xs text-start">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">{t("عنوان خدمت کارگاهی")}</th>
+                    <th className="py-3 px-4">{t("تعرفه مصوب")}</th>
+                    <th className="py-3 px-4">{t("توضیحات و دامنه اجرا")}</th>
+                    {user?.role === 'MANAGER' && <th className="py-3 px-4 text-center">{t("عملیات")}</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("خدمت)")}</span>
-            <div className="flex gap-1">
-              <button
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-                className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >{t("قبلی")}</button>
-              <button
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >{t("بعدی")}</button>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {services.map((srv) => (
+                    <tr key={srv.service_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                        <bdi dir="auto">{srv.service_name}</bdi>
+                      </td>
+                      <td className="py-3 px-4 font-black text-brand-600 dark:text-brand-400 tabular-nums">
+                        {formatCurrency(srv.price, true, currencyUnit, language)}
+                      </td>
+                      <td className="py-3 px-4 text-slate-500">{srv.description || '-'}</td>
+                      {user?.role === 'MANAGER' && (
+                        <td className="py-3 px-4 text-center">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              aria-label={t("ویرایش خدمت")}
+                              title={t("ویرایش خدمت")}
+                              onClick={() => handleOpenEdit(srv)}
+                              className="p-1 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={t("حذف خدمت")}
+                              title={t("حذف خدمت")}
+                              onClick={() => handleDelete(srv.service_id)}
+                              className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("خدمت)")}</span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >{t("قبلی")}</button>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >{t("بعدی")}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+        <Modal
+          onClose={() => setShowModal(false)}
+          label={editingService ? t("ویرایش تعرفه خدمت") : t("تعریف خدمت کارگاهی جدید")}
+          busy={submitting}
+        >
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
@@ -220,16 +252,18 @@ export const ServicesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-               aria-label={t("بستن پنجره")}>
+                className="p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg"
+                aria-label={t("بستن پنجره")}
+              >
                 ×
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("عنوان خدمت:")}</label>
+                <label htmlFor="service-name" className="font-bold text-slate-700 dark:text-slate-300 block">{t("عنوان خدمت:")}</label>
                 <input
+                  id="service-name"
                   type="text"
                   required
                   value={name}
@@ -240,8 +274,9 @@ export const ServicesPage: React.FC = () => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("تعرفه مصوب (ریال):")}</label>
+                <label htmlFor="service-price" className="font-bold text-slate-700 dark:text-slate-300 block">{t("تعرفه مصوب (ریال):")}</label>
                 <input
+                  id="service-price"
                   type="number"
                   required
                   min={0}
@@ -253,8 +288,9 @@ export const ServicesPage: React.FC = () => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("توضیحات و شرح:")}</label>
+                <label htmlFor="service-description" className="font-bold text-slate-700 dark:text-slate-300 block">{t("توضیحات و شرح:")}</label>
                 <textarea
+                  id="service-description"
                   rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -271,12 +307,13 @@ export const ServicesPage: React.FC = () => {
                 >{t("انصراف")}</button>
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
                 >{t("ذخیره تعرفه")}</button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

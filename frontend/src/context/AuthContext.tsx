@@ -26,6 +26,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
+    let active = true;
+
     const initAuth = async () => {
       const token = localStorage.getItem('access_token');
       const savedUser = localStorage.getItem('user_info');
@@ -34,19 +36,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           setUser(JSON.parse(savedUser));
           const freshUser = await authApi.getCurrentUser();
+          if (!active) return;
           setUser(freshUser);
           localStorage.setItem('user_info', JSON.stringify(freshUser));
         } catch {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('user_info');
-          setUser(null);
+          clearLocalSession();
+          if (active) setUser(null);
         }
       }
-      setIsLoading(false);
+      if (active) setIsLoading(false);
     };
 
-    initAuth();
+    void initAuth();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+      return;
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === null) {
+        setUser(null);
+        setCurrencyUnit('toman');
+        return;
+      }
+
+      if (event.key === 'access_token') {
+        if (!event.newValue) {
+          setUser(null);
+          return;
+        }
+        const savedUser = localStorage.getItem('user_info');
+        if (savedUser) {
+          try {
+            setUser(JSON.parse(savedUser));
+          } catch {
+            setUser(null);
+          }
+        }
+        return;
+      }
+
+      if (event.key === 'user_info') {
+        if (!event.newValue) {
+          setUser(null);
+          return;
+        }
+        try {
+          setUser(JSON.parse(event.newValue));
+        } catch {
+          setUser(null);
+        }
+        return;
+      }
+
+      if (event.key === 'preferred_currency') {
+        setCurrencyUnit(event.newValue === 'rial' ? 'rial' : 'toman');
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('storage', handleStorage);
+      }
+    };
   }, []);
 
   const login = async (username: string, password: string) => {

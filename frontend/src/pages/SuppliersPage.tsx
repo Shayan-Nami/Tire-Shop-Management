@@ -1,16 +1,19 @@
 import { useLanguage } from '../context/LanguageContext';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, PlusCircle, Trash2, Edit2 } from 'lucide-react';
 import { suppliersApi } from '../api/suppliers';
 import { Supplier } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { Modal } from '../components/ui/Modal';
 import { parseApiError } from '../utils/errorParser';
+import { createRequestSequence } from '../utils/invoiceRequests';
 
 export const SuppliersPage: React.FC = () => {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -18,34 +21,46 @@ export const SuppliersPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
 
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [address, setAddress] = useState<string>('');
+  const supplierRequests = useRef(createRequestSequence());
+
+  useEffect(() => () => supplierRequests.current.invalidate(), []);
 
   useEffect(() => {
+    if (search === debouncedSearch) return;
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
+      setCurrentPage(1);
     }, 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, debouncedSearch]);
 
   const fetchSuppliers = useCallback(async () => {
+    const request = supplierRequests.current.begin();
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await suppliersApi.getSuppliers({
         search: debouncedSearch.trim() || undefined,
         page: currentPage,
       });
+      if (!supplierRequests.current.isCurrent(request)) return;
       setSuppliers(data.results || []);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.count || 0);
     } catch (e) {
-      console.error(e);
+      if (!supplierRequests.current.isCurrent(request)) return;
+      setLoadError(parseApiError(e, t("دریافت اطلاعات ناموفق بود. اتصال را بررسی کنید و دوباره تلاش کنید."), language));
     } finally {
-      setLoading(false);
+      if (supplierRequests.current.isCurrent(request)) {
+        setLoading(false);
+      }
     }
-  }, [debouncedSearch, currentPage]);
+  }, [debouncedSearch, currentPage, language, t]);
 
   useEffect(() => {
     void fetchSuppliers();
@@ -69,6 +84,7 @@ export const SuppliersPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       if (editingSupplier) {
         await suppliersApi.updateSupplier(editingSupplier.supplier_id, {
@@ -84,9 +100,11 @@ export const SuppliersPage: React.FC = () => {
         });
       }
       setShowModal(false);
-      fetchSuppliers();
+      void fetchSuppliers();
     } catch (err: unknown) {
       alert(parseApiError(err, t("خطا در ثبت تأمین‌کننده"), language));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -94,7 +112,7 @@ export const SuppliersPage: React.FC = () => {
     if (!confirm(t("آیا از حذف این تأمین‌کننده اطمینان دارید؟"))) return;
     try {
       await suppliersApi.deleteSupplier(id);
-      fetchSuppliers();
+      void fetchSuppliers();
     } catch (err: unknown) {
       alert(parseApiError(err, t("امکان حذف تأمین‌کننده به دلیل وجود فاکتورهای خرید ثبت‌شده وجود ندارد."), language));
     }
@@ -110,6 +128,7 @@ export const SuppliersPage: React.FC = () => {
 
         {(user?.role === 'MANAGER' || user?.role === 'WAREHOUSE') && (
           <button
+            type="button"
             onClick={handleOpenAdd}
             className="action-primary inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
           >
@@ -124,10 +143,8 @@ export const SuppliersPage: React.FC = () => {
           <input
             type="text"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label={t("جستجو در نام شرکت یا تلفن یا نشانی...")}
             placeholder={t("جستجو در نام شرکت یا تلفن یا نشانی...")}
             className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />
@@ -135,86 +152,101 @@ export const SuppliersPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="surface-panel overflow-hidden">
-        {loading ? (
-          <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت اطلاعات تأمین‌کنندگان...")}</div>
-        ) : suppliers.length === 0 ? (
-          <div className="py-16 text-center text-xs text-slate-400">{t("تأمین‌کننده‌ای با این مشخصات یافت نشد.")}</div>
-        ) : (
-          <div className="table-scroll overflow-x-auto">
-            <table className="data-table w-full text-xs text-start">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-3 px-4">{t("نام شرکت / نمایندگی")}</th>
-                  <th className="py-3 px-4">{t("شماره تلفن")}</th>
-                  <th className="py-3 px-4">{t("نشانی و دفتر مرکزی")}</th>
-                  {(user?.role === 'MANAGER' || user?.role === 'WAREHOUSE') && (
-                    <th className="py-3 px-4 text-center">{t("عملیات")}</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {suppliers.map((sup) => (
-                  <tr key={sup.supplier_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                      <bdi dir="auto">{sup.supplier_name}</bdi>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300">
-                      {sup.phone_number || '-'}
-                    </td>
-                    <td className="py-3 px-4 text-slate-500">{sup.address || '-'}</td>
+      {loadError ? (
+        <div className="surface-panel p-5 space-y-3" role="alert">
+          <p className="text-xs text-rose-600 dark:text-rose-400">{loadError}</p>
+          <button type="button" className="action-secondary" onClick={() => void fetchSuppliers()}>{t("تلاش دوباره")}</button>
+        </div>
+      ) : (
+        <div className="surface-panel overflow-hidden">
+          {loading ? (
+            <div className="py-16 text-center text-xs text-slate-500 dark:text-slate-400">{t("در حال دریافت اطلاعات تأمین‌کنندگان...")}</div>
+          ) : suppliers.length === 0 ? (
+            <div className="py-16 text-center text-xs text-slate-500 dark:text-slate-400">{t("تأمین‌کننده‌ای با این مشخصات یافت نشد.")}</div>
+          ) : (
+            <div className="table-scroll overflow-x-auto">
+              <table className="data-table w-full text-xs text-start">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">{t("نام شرکت / نمایندگی")}</th>
+                    <th className="py-3 px-4">{t("شماره تلفن")}</th>
+                    <th className="py-3 px-4">{t("نشانی و دفتر مرکزی")}</th>
                     {(user?.role === 'MANAGER' || user?.role === 'WAREHOUSE') && (
-                      <td className="py-3 px-4 text-center">
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            aria-label={t("ویرایش تأمین‌کننده")}
-                            title={t("ویرایش تأمین‌کننده")}
-                            onClick={() => handleOpenEdit(sup)}
-                            className="p-1 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          {user?.role === 'MANAGER' && (
-                            <button
-                              aria-label={t("حذف تأمین‌کننده")}
-                            title={t("حذف تأمین‌کننده")}
-                            onClick={() => handleDelete(sup.supplier_id)}
-                              className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                      <th className="py-3 px-4 text-center">{t("عملیات")}</th>
                     )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("شرکت)")}</span>
-            <div className="flex gap-1">
-              <button
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-                className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >{t("قبلی")}</button>
-              <button
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >{t("بعدی")}</button>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {suppliers.map((sup) => (
+                    <tr key={sup.supplier_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                        <bdi dir="auto">{sup.supplier_name}</bdi>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300">
+                        {sup.phone_number || '-'}
+                      </td>
+                      <td className="py-3 px-4 text-slate-500">{sup.address || '-'}</td>
+                      {(user?.role === 'MANAGER' || user?.role === 'WAREHOUSE') && (
+                        <td className="py-3 px-4 text-center">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              aria-label={t("ویرایش تأمین‌کننده")}
+                              title={t("ویرایش تأمین‌کننده")}
+                              onClick={() => handleOpenEdit(sup)}
+                              className="p-1 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            {user?.role === 'MANAGER' && (
+                              <button
+                                type="button"
+                                aria-label={t("حذف تأمین‌کننده")}
+                                title={t("حذف تأمین‌کننده")}
+                                onClick={() => handleDelete(sup.supplier_id)}
+                                className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("شرکت)")}</span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >{t("قبلی")}</button>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >{t("بعدی")}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+        <Modal
+          onClose={() => setShowModal(false)}
+          label={editingSupplier ? t("ویرایش اطلاعات تأمین‌کننده") : t("ثبت تأمین‌کننده جدید")}
+          busy={submitting}
+        >
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
@@ -223,16 +255,18 @@ export const SuppliersPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-               aria-label={t("بستن پنجره")}>
+                className="p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg"
+                aria-label={t("بستن پنجره")}
+              >
                 ×
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام شرکت / تأمین‌کننده:")}</label>
+                <label htmlFor="supplier-name" className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام شرکت / تأمین‌کننده:")}</label>
                 <input
+                  id="supplier-name"
                   type="text"
                   required
                   value={name}
@@ -243,19 +277,22 @@ export const SuppliersPage: React.FC = () => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("تلفن تماس:")}</label>
+                <label htmlFor="supplier-phone" className="font-bold text-slate-700 dark:text-slate-300 block">{t("تلفن تماس:")}</label>
                 <input
+                  id="supplier-phone"
                   type="text"
+                  dir="ltr"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="02188990011"
-                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end"
+                  className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-start font-mono"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("آدرس و انبار پخش:")}</label>
+                <label htmlFor="supplier-address" className="font-bold text-slate-700 dark:text-slate-300 block">{t("آدرس و انبار پخش:")}</label>
                 <textarea
+                  id="supplier-address"
                   rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
@@ -272,12 +309,13 @@ export const SuppliersPage: React.FC = () => {
                 >{t("انصراف")}</button>
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm"
                 >{t("ذخیره اطلاعات")}</button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

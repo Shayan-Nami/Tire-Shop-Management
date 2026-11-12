@@ -20,14 +20,19 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id: string) {
-            if (id.includes('node_modules')) {
-              if (id.includes('react-router')) {
+            const normalized = id.replace(/\\/g, '/');
+            if (normalized.includes('node_modules')) {
+              if (normalized.includes('node_modules/react-router')) {
                 return 'react-router';
               }
-              if (id.includes('react') || id.includes('scheduler')) {
+              if (
+                normalized.includes('node_modules/react/') ||
+                normalized.includes('node_modules/react-dom/') ||
+                normalized.includes('node_modules/scheduler/')
+              ) {
                 return 'react-core';
               }
-              if (id.includes('axios')) {
+              if (normalized.includes('node_modules/axios/')) {
                 return 'axios';
               }
             }

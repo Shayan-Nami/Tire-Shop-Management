@@ -14,8 +14,14 @@ import { Tire, Brand, Size } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 import { StockAdjustmentModal } from '../components/catalog/StockAdjustmentModal';
+import { Modal } from '../components/ui/Modal';
 import { parseApiError } from '../utils/errorParser';
 import { createRequestSequence } from '../utils/invoiceRequests';
+
+const parseMinStockAlert = (raw: string) => {
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : 4;
+};
 
 export const TiresCatalog: React.FC = () => {
   const { t, language } = useLanguage();
@@ -24,7 +30,9 @@ export const TiresCatalog: React.FC = () => {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [sizes, setSizes] = useState<Size[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [brandFilter, setBrandFilter] = useState<number | ''>('');
   const [sizeFilter, setSizeFilter] = useState<number | ''>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -39,7 +47,7 @@ export const TiresCatalog: React.FC = () => {
   const [newSizeId, setNewSizeId] = useState<number | ''>('');
   const [newSalePrice, setNewSalePrice] = useState<string>('');
   const [newPurchasePrice, setNewPurchasePrice] = useState<string>('');
-  const [newMinStock, setNewMinStock] = useState<number>(4);
+  const [newMinStock, setNewMinStock] = useState<string>('4');
   const [submittingNew, setSubmittingNew] = useState<boolean>(false);
 
   const [isCustomBrand, setIsCustomBrand] = useState<boolean>(false);
@@ -51,19 +59,29 @@ export const TiresCatalog: React.FC = () => {
   const [editTireName, setEditTireName] = useState<string>('');
   const [editSalePrice, setEditSalePrice] = useState<string>('');
 
-  const [editMinStock, setEditMinStock] = useState<number>(4);
+  const [editMinStock, setEditMinStock] = useState<string>('4');
   const [submittingEdit, setSubmittingEdit] = useState<boolean>(false);
 
   const tireRequests = useRef(createRequestSequence());
 
   useEffect(() => () => tireRequests.current.invalidate(), []);
 
+  useEffect(() => {
+    if (search === debouncedSearch) return;
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, debouncedSearch]);
+
   const fetchTires = useCallback(async () => {
     const request = tireRequests.current.begin();
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await catalogApi.getTires({
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
         brand: brandFilter !== '' ? Number(brandFilter) : undefined,
         size: sizeFilter !== '' ? Number(sizeFilter) : undefined,
         page: currentPage,
@@ -73,11 +91,12 @@ export const TiresCatalog: React.FC = () => {
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.count || 0);
     } catch (e) {
-      if (tireRequests.current.isCurrent(request)) console.error(e);
+      if (!tireRequests.current.isCurrent(request)) return;
+      setLoadError(parseApiError(e, t("دریافت اطلاعات ناموفق بود. اتصال را بررسی کنید و دوباره تلاش کنید."), language));
     } finally {
       if (tireRequests.current.isCurrent(request)) setLoading(false);
     }
-  }, [search, brandFilter, sizeFilter, currentPage]);
+  }, [debouncedSearch, brandFilter, sizeFilter, currentPage, language, t]);
 
   useEffect(() => {
     catalogApi.getBrands().then(setBrands).catch(console.error);
@@ -166,7 +185,7 @@ export const TiresCatalog: React.FC = () => {
         size: finalSizeId,
         sale_price: parseFloat(newSalePrice),
         purchase_price: newPurchasePrice ? parseFloat(newPurchasePrice) : undefined,
-        min_stock_alert: newMinStock,
+        min_stock_alert: parseMinStockAlert(newMinStock),
       });
 
       setShowAddModal(false);
@@ -179,7 +198,8 @@ export const TiresCatalog: React.FC = () => {
       setCustomSizeName('');
       setNewSalePrice('');
       setNewPurchasePrice('');
-      fetchTires();
+      setNewMinStock('4');
+      void fetchTires();
     } catch (err: unknown) {
       alert(parseApiError(err, t("خطا در ثبت تایر جدید"), language));
     } finally {
@@ -192,7 +212,7 @@ export const TiresCatalog: React.FC = () => {
     setEditTireName(tire.tire_name);
     setEditSalePrice(String(tire.sale_price));
 
-    setEditMinStock(tire.min_stock_alert);
+    setEditMinStock(String(tire.min_stock_alert));
   };
 
   const handleUpdateTire = async (e: React.FormEvent) => {
@@ -205,10 +225,10 @@ export const TiresCatalog: React.FC = () => {
         tire_name: editTireName.trim(),
         sale_price: parseFloat(editSalePrice),
 
-        min_stock_alert: editMinStock,
+        min_stock_alert: parseMinStockAlert(editMinStock),
       });
       setEditingTire(null);
-      fetchTires();
+      void fetchTires();
     } catch (err: unknown) {
       alert(parseApiError(err, t("خطا در ویرایش اطلاعات تایر"), language));
     } finally {
@@ -240,10 +260,8 @@ export const TiresCatalog: React.FC = () => {
           <input
             type="text"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label={t("جستجو در نام تایر، برند و سایز...")}
             placeholder={t("جستجو در نام تایر، برند و سایز...")}
             className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />
@@ -288,111 +306,124 @@ export const TiresCatalog: React.FC = () => {
         </div>
       </div>
 
-      <div className="surface-panel overflow-hidden">
-        {loading ? (
-          <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت کاتالوگ...")}</div>
-        ) : tires.length === 0 ? (
-          <div className="py-16 text-center text-xs text-slate-400">{t("تایری با این مشخصات یافت نشد.")}</div>
-        ) : (
-          <div className="table-scroll overflow-x-auto">
-            <table className="data-table w-full text-xs text-start">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-3 px-4">{t("شرح و نام تایر")}</th>
-                  <th className="py-3 px-4">{t("برند")}</th>
-                  <th className="py-3 px-4">{t("سایز")}</th>
-                  <th className="py-3 px-4 text-center">{t("موجودی انبار")}</th>
-                  <th className="py-3 px-4">{t("قیمت فروش پایه")}</th>
-                  {user?.role !== 'TECHNICIAN' && <th className="py-3 px-4">{t("آخرین قیمت خرید")}</th>}
-                  <th className="py-3 px-4 text-center">{t("وضعیت موجودی")}</th>
-                  {(user?.role === 'MANAGER' || user?.role === 'WAREHOUSE') && (
-                    <th className="py-3 px-4 text-center">{t("عملیات")}</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {tires.map((tire) => (
-                  <tr key={tire.tire_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                      <bdi dir="auto">{tire.tire_name}</bdi>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300 font-medium">
-                      <bdi dir="auto">{tire.brand_name}</bdi>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-slate-500"><bdi dir="auto">{tire.size_name}</bdi></td>
-                    <td className="py-3 px-4 text-center font-black text-slate-900 dark:text-white tabular-nums">
-                      {tire.stock_quantity}{' '}{t("حلقه")}</td>
-                    <td className="py-3 px-4 font-bold text-brand-600 dark:text-brand-400 tabular-nums">
-                      {formatCurrency(tire.sale_price, true, currencyUnit, language)}
-                    </td>
-                    {user?.role !== 'TECHNICIAN' && (
-                      <td className="py-3 px-4 text-slate-500 tabular-nums">
-                        {tire.purchase_price
-                          ? formatCurrency(tire.purchase_price, true, currencyUnit, language)
-                          : '-'}
-                      </td>
-                    )}
-                    <td className="py-3 px-4 text-center">
-                      {tire.stock_quantity <= 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400">{t("اتمام موجودی")}</span>
-                      ) : tire.is_low_stock ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          <AlertTriangle className="w-3 h-3" />
-                          <span>{t("کسری موجودی")}</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>{t("موجود کافی")}</span>
-                        </span>
-                      )}
-                    </td>
+      {loadError ? (
+        <div className="surface-panel p-5 space-y-3" role="alert">
+          <p className="text-xs text-rose-600 dark:text-rose-400">{loadError}</p>
+          <button type="button" className="action-secondary" onClick={() => void fetchTires()}>{t("تلاش دوباره")}</button>
+        </div>
+      ) : (
+        <div className="surface-panel overflow-hidden">
+          {loading ? (
+            <div className="py-16 text-center text-xs text-slate-500 dark:text-slate-400">{t("در حال دریافت کاتالوگ...")}</div>
+          ) : tires.length === 0 ? (
+            <div className="py-16 text-center text-xs text-slate-500 dark:text-slate-400">{t("تایری با این مشخصات یافت نشد.")}</div>
+          ) : (
+            <div className="table-scroll overflow-x-auto">
+              <table className="data-table w-full text-xs text-start">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">{t("شرح و نام تایر")}</th>
+                    <th className="py-3 px-4">{t("برند")}</th>
+                    <th className="py-3 px-4">{t("سایز")}</th>
+                    <th className="py-3 px-4 text-center">{t("موجودی انبار")}</th>
+                    <th className="py-3 px-4">{t("قیمت فروش پایه")}</th>
+                    {user?.role !== 'TECHNICIAN' && <th className="py-3 px-4">{t("آخرین قیمت خرید")}</th>}
+                    <th className="py-3 px-4 text-center">{t("وضعیت موجودی")}</th>
                     {(user?.role === 'MANAGER' || user?.role === 'WAREHOUSE') && (
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => openEditModal(tire)}
-                            title={t("ویرایش نرخ و مشخصات تایر")}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-brand-600 dark:text-brand-400 transition-colors"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setAdjustingTire(tire)}
-                            title={t("ثبت انبارگردانی و اصلاح موجودی")}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
-                          >
-                            <SlidersHorizontal className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
+                      <th className="py-3 px-4 text-center">{t("عملیات")}</th>
                     )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages}
-            </span>
-            <div className="flex gap-1">
-              <button
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-                className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
-              >{t("قبلی")}</button>
-              <button
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
-              >{t("بعدی")}</button>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {tires.map((tire) => (
+                    <tr key={tire.tire_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                        <bdi dir="auto">{tire.tire_name}</bdi>
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 dark:text-slate-300 font-medium">
+                        <bdi dir="auto">{tire.brand_name}</bdi>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-500"><bdi dir="auto">{tire.size_name}</bdi></td>
+                      <td className="py-3 px-4 text-center font-black text-slate-900 dark:text-white tabular-nums">
+                        {tire.stock_quantity}{' '}{t("حلقه")}</td>
+                      <td className="py-3 px-4 font-bold text-brand-600 dark:text-brand-400 tabular-nums">
+                        {formatCurrency(tire.sale_price, true, currencyUnit, language)}
+                      </td>
+                      {user?.role !== 'TECHNICIAN' && (
+                        <td className="py-3 px-4 text-slate-500 tabular-nums">
+                          {tire.purchase_price
+                            ? formatCurrency(tire.purchase_price, true, currencyUnit, language)
+                            : '-'}
+                        </td>
+                      )}
+                      <td className="py-3 px-4 text-center">
+                        {tire.stock_quantity <= 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400">{t("اتمام موجودی")}</span>
+                        ) : tire.is_low_stock ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>{t("کسری موجودی")}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>{t("موجود کافی")}</span>
+                          </span>
+                        )}
+                      </td>
+                      {(user?.role === 'MANAGER' || user?.role === 'WAREHOUSE') && (
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(tire)}
+                              aria-label={t("ویرایش نرخ و مشخصات تایر")}
+                              title={t("ویرایش نرخ و مشخصات تایر")}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-brand-600 dark:text-brand-400 transition-colors"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAdjustingTire(tire)}
+                              aria-label={t("ثبت انبارگردانی و اصلاح موجودی")}
+                              title={t("ثبت انبارگردانی و اصلاح موجودی")}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+                            >
+                              <SlidersHorizontal className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages}
+              </span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
+                >{t("قبلی")}</button>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
+                >{t("بعدی")}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {adjustingTire && (
         <StockAdjustmentModal
@@ -403,23 +434,29 @@ export const TiresCatalog: React.FC = () => {
       )}
 
       {showAddModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+        <Modal
+          onClose={() => setShowAddModal(false)}
+          label={t("تعریف تایر جدید در کاتالوگ")}
+          busy={submittingNew}
+        >
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("تعریف تایر جدید در کاتالوگ")}</h2>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-               aria-label={t("بستن پنجره")}>
+                className="p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg"
+                aria-label={t("بستن پنجره")}
+              >
                 ×
               </button>
             </div>
 
             <form onSubmit={handleCreateTire} className="p-6 space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام کامل تایر (گل / مدل):")}</label>
+                <label htmlFor="add-tire-name" className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام کامل تایر (گل / مدل):")}</label>
                 <input
+                  id="add-tire-name"
                   type="text"
                   required
                   value={newTireName}
@@ -432,7 +469,7 @@ export const TiresCatalog: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("برند:")}</label>
+                    <label htmlFor="add-tire-brand" className="font-bold text-slate-700 dark:text-slate-300 block">{t("برند:")}</label>
                     <button
                       type="button"
                       onClick={() => {
@@ -447,6 +484,7 @@ export const TiresCatalog: React.FC = () => {
 
                   {isCustomBrand ? (
                     <input
+                      id="add-tire-brand"
                       type="text"
                       required
                       value={customBrandName}
@@ -457,6 +495,7 @@ export const TiresCatalog: React.FC = () => {
                     />
                   ) : (
                     <select
+                      id="add-tire-brand"
                       required
                       value={newBrandId}
                       onChange={(e) => {
@@ -482,7 +521,7 @@ export const TiresCatalog: React.FC = () => {
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("سایز:")}</label>
+                    <label htmlFor="add-tire-size" className="font-bold text-slate-700 dark:text-slate-300 block">{t("سایز:")}</label>
                     <button
                       type="button"
                       onClick={() => {
@@ -497,16 +536,19 @@ export const TiresCatalog: React.FC = () => {
 
                   {isCustomSize ? (
                     <input
+                      id="add-tire-size"
                       type="text"
                       required
+                      dir="ltr"
                       value={customSizeName}
                       onChange={(e) => setCustomSizeName(e.target.value)}
                       placeholder={t("سایز جدید (مثلاً: 215/55R17)")}
-                      className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-brand-400 dark:border-brand-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-mono text-xs text-end"
+                      className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-brand-400 dark:border-brand-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-mono text-xs text-start"
                       autoFocus
                     />
                   ) : (
                     <select
+                      id="add-tire-size"
                       required
                       value={newSizeId}
                       onChange={(e) => {
@@ -533,8 +575,9 @@ export const TiresCatalog: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("قیمت فروش پایه (ریال):")}</label>
+                  <label htmlFor="add-tire-sale-price" className="font-bold text-slate-700 dark:text-slate-300 block">{t("قیمت فروش پایه (ریال):")}</label>
                   <input
+                    id="add-tire-sale-price"
                     type="number"
                     required
                     min={0}
@@ -545,14 +588,15 @@ export const TiresCatalog: React.FC = () => {
                     className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end font-bold tabular-nums"
                   />
                   {newSalePrice && (
-                    <p className="text-[10px] text-slate-400">{t("معادل:")}{formatCurrency(newSalePrice, true, currencyUnit, language)}
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("معادل:")}{formatCurrency(newSalePrice, true, currencyUnit, language)}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("قیمت خرید اولیه (ریال):")}</label>
+                  <label htmlFor="add-tire-purchase-price" className="font-bold text-slate-700 dark:text-slate-300 block">{t("قیمت خرید اولیه (ریال):")}</label>
                   <input
+                    id="add-tire-purchase-price"
                     type="number"
                     min={0}
                     step={10000}
@@ -562,19 +606,20 @@ export const TiresCatalog: React.FC = () => {
                     className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end font-bold tabular-nums"
                   />
                   {newPurchasePrice && (
-                    <p className="text-[10px] text-slate-400">{t("معادل:")}{formatCurrency(newPurchasePrice, true, currencyUnit, language)}
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("معادل:")}{formatCurrency(newPurchasePrice, true, currencyUnit, language)}
                     </p>
                   )}
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("حداقل آستانه هشدار کسری انبار (حلقه):")}</label>
+                <label htmlFor="add-tire-min-stock" className="font-bold text-slate-700 dark:text-slate-300 block">{t("حداقل آستانه هشدار کسری انبار (حلقه):")}</label>
                 <input
+                  id="add-tire-min-stock"
                   type="number"
                   min={1}
                   value={newMinStock}
-                  onChange={(e) => setNewMinStock(parseInt(e.target.value) || 4)}
+                  onChange={(e) => setNewMinStock(e.target.value)}
                   className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-center font-bold"
                 />
               </div>
@@ -595,32 +640,38 @@ export const TiresCatalog: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {editingTire && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+        <Modal
+          onClose={() => setEditingTire(null)}
+          label={t("ویرایش نرخ و مشخصات تایر")}
+          busy={submittingEdit}
+        >
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
               <div>
                 <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("ویرایش نرخ و مشخصات تایر")}</h2>
-                <p className="text-[11px] text-slate-500 mt-0.5">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                   <bdi dir="auto">{editingTire.brand_name}</bdi> - <bdi dir="auto">{editingTire.size_name}</bdi>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingTire(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-               aria-label={t("بستن پنجره")}>
+                className="p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg"
+                aria-label={t("بستن پنجره")}
+              >
                 ×
               </button>
             </div>
 
             <form onSubmit={handleUpdateTire} className="p-6 space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام کامل تایر (گل / مدل):")}</label>
+                <label htmlFor="edit-tire-name" className="font-bold text-slate-700 dark:text-slate-300 block">{t("نام کامل تایر (گل / مدل):")}</label>
                 <input
+                  id="edit-tire-name"
                   type="text"
                   required
                   value={editTireName}
@@ -631,8 +682,9 @@ export const TiresCatalog: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("نرخ فروش پایه کاتالوگ (ریال):")}</label>
+                  <label htmlFor="edit-tire-sale-price" className="font-bold text-slate-700 dark:text-slate-300 block">{t("نرخ فروش پایه کاتالوگ (ریال):")}</label>
                   <input
+                    id="edit-tire-sale-price"
                     type="number"
                     required
                     min={0}
@@ -642,7 +694,7 @@ export const TiresCatalog: React.FC = () => {
                     className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end font-bold tabular-nums"
                   />
                   {editSalePrice && (
-                    <p className="text-[10px] text-slate-400">{t("معادل:")}{formatCurrency(editSalePrice, true, currencyUnit, language)}
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("معادل:")}{formatCurrency(editSalePrice, true, currencyUnit, language)}
                     </p>
                   )}
                 </div>
@@ -663,12 +715,13 @@ export const TiresCatalog: React.FC = () => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("حداقل آستانه هشدار کسری انبار (حلقه):")}</label>
+                <label htmlFor="edit-tire-min-stock" className="font-bold text-slate-700 dark:text-slate-300 block">{t("حداقل آستانه هشدار کسری انبار (حلقه):")}</label>
                 <input
+                  id="edit-tire-min-stock"
                   type="number"
                   min={1}
                   value={editMinStock}
-                  onChange={(e) => setEditMinStock(parseInt(e.target.value) || 4)}
+                  onChange={(e) => setEditMinStock(e.target.value)}
                   className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-center font-bold"
                 />
               </div>
@@ -689,7 +742,7 @@ export const TiresCatalog: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

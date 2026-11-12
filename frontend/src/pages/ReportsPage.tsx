@@ -1,5 +1,5 @@
 import { useLanguage } from '../context/LanguageContext';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   TrendingUp,
   Package,
@@ -10,6 +10,7 @@ import { InventoryValueResponse, ProfitabilityStat, SalesByDateRangeResponse } f
 import { formatCurrency } from '../utils/formatters';
 import { parseApiError } from '../utils/errorParser';
 import { useAuth } from '../context/AuthContext';
+import { createRequestSequence } from '../utils/invoiceRequests';
 
 export const ReportsPage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -25,25 +26,39 @@ export const ReportsPage: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [dateSalesResult, setDateSalesResult] = useState<SalesByDateRangeResponse | null>(null);
+  const reportRequests = useRef(createRequestSequence());
+
+  useEffect(() => {
+    return () => {
+      reportRequests.current.invalidate();
+    };
+  }, []);
 
   const loadReport = async () => {
+    const requestId = reportRequests.current.begin();
     setLoading(true);
     setError('');
     try {
       if (activeTab === 'profitability') {
         const data = await reportsApi.getProfitability();
+        if (!reportRequests.current.isCurrent(requestId)) return;
         setProfitabilityData(data);
       } else if (activeTab === 'inventory_value') {
         const data = await reportsApi.getInventoryValue();
+        if (!reportRequests.current.isCurrent(requestId)) return;
         setInventoryValueData(data);
       } else {
         const data = await reportsApi.getSalesByDateRange(startDate || undefined, endDate || undefined);
+        if (!reportRequests.current.isCurrent(requestId)) return;
         setDateSalesResult(data);
       }
     } catch (e) {
+      if (!reportRequests.current.isCurrent(requestId)) return;
       setError(parseApiError(e, t("دریافت اطلاعات ناموفق بود. اتصال را بررسی کنید و دوباره تلاش کنید."), language));
     } finally {
-      setLoading(false);
+      if (reportRequests.current.isCurrent(requestId)) {
+        setLoading(false);
+      }
     }
   };
 
@@ -165,7 +180,7 @@ export const ReportsPage: React.FC = () => {
         <div className="space-y-4">
           <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-850 text-white flex items-center justify-between border border-slate-800 shadow-md">
             <div>
-              <span className="text-xs text-slate-400 block">{t("ارزش ریالی کل موجودی انبار لاستیک:")}</span>
+              <span className="text-xs text-slate-200 block">{t("ارزش ریالی کل موجودی انبار لاستیک:")}</span>
               <div className="text-2xl font-black text-white tabular-nums mt-1">
                 {formatCurrency(inventoryValueData?.total_inventory_value ?? 0, true, currencyUnit, language)}
               </div>
@@ -226,24 +241,28 @@ export const ReportsPage: React.FC = () => {
             className="p-4 surface-panel flex flex-wrap gap-4 items-end"
           >
             <div className="space-y-1 text-xs">
-              <label className="font-bold text-slate-700 dark:text-slate-300">{t("از تاریخ (شمسی / میلادی):")}</label>
+              <label htmlFor="reports-start-date" className="font-bold text-slate-700 dark:text-slate-300">{t("از تاریخ (شمسی / میلادی):")}</label>
               <input
+                id="reports-start-date"
                 type="text"
+                dir="ltr"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 placeholder={t("1403/01/01 یا 2026-01-01")}
-                className="ui-field px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end"
+                className="ui-field px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-start"
               />
             </div>
 
             <div className="space-y-1 text-xs">
-              <label className="font-bold text-slate-700 dark:text-slate-300">{t("تا تاریخ (شمسی / میلادی):")}</label>
+              <label htmlFor="reports-end-date" className="font-bold text-slate-700 dark:text-slate-300">{t("تا تاریخ (شمسی / میلادی):")}</label>
               <input
+                id="reports-end-date"
                 type="text"
+                dir="ltr"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 placeholder={t("1403/12/29 یا 2026-12-31")}
-                className="ui-field px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end"
+                className="ui-field px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-start"
               />
             </div>
 

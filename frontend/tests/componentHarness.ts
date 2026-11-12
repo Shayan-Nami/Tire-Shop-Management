@@ -1,4 +1,5 @@
 import { translations } from '../src/utils/i18n.ts';
+import * as invoiceRequests from '../src/utils/invoiceRequests.ts';
 import { readFileSync } from 'node:fs';
 
 import { setImmediate } from 'node:timers/promises';
@@ -21,6 +22,29 @@ export function loadComponent(path: string, mocks: Record<string, unknown>, env?
   const mockedRequire = (id: string) => {
     if (id in mocks) return mocks[id];
     if (id.endsWith('/context/LanguageContext')) return { useLanguage: () => fallbackLanguage };
+    if (id.endsWith('/utils/invoiceRequests')) return invoiceRequests;
+    if (id.endsWith('/ui/Modal')) {
+      return {
+        Modal: ({ children, onClose, label, busy = false, className = '' }: Record<string, any>) =>
+          React.createElement(
+            'dialog',
+            {
+              open: true,
+              'aria-label': label,
+              'aria-busy': busy,
+              className: `app-modal ${className}`,
+              onClick: (event: any) => {
+                if (event?.target === event?.currentTarget && !busy) onClose?.();
+              },
+              onCancel: (event: any) => {
+                event?.preventDefault?.();
+                if (!busy) onClose?.();
+              },
+            },
+            children,
+          ),
+      };
+    }
     if (id === 'react') return React;
     if (id === 'lucide-react') return new Proxy({}, { get: (_target, name) => String(name) });
     throw new Error(`Unmocked component dependency: ${id}`);
@@ -61,6 +85,11 @@ export function mountComponent(path: string, exportName: string, mocks: Record<s
       const index = cursor++;
       if (!state[index] || !sameDeps(state[index].deps, deps)) state[index] = { callback, deps };
       return state[index].callback;
+    },
+    useMemo(factory: () => unknown, deps?: unknown[]) {
+      const index = cursor++;
+      if (!state[index] || !sameDeps(state[index].deps, deps)) state[index] = { value: factory(), deps };
+      return state[index].value;
     },
     useEffect(callback: () => void | (() => void), deps?: unknown[]) {
       const index = cursor++;

@@ -9,7 +9,7 @@ interface RoleGuardProps {
 }
 
 export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user, isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -17,7 +17,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
       <div className="flex h-screen items-center justify-center bg-slate-900 text-white">
         <div className="flex flex-col items-center space-y-4">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-500 border-t-transparent"></div>
-          <span className="text-sm font-medium text-slate-400">{t("در حال بارگذاری اطلاعات دسترسی...")}</span>
+          <span className="text-sm font-medium text-slate-200">{t("در حال بارگذاری اطلاعات دسترسی...")}</span>
         </div>
       </div>
     );
@@ -26,6 +26,19 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
+
+  const getRoleLabel = () => {
+    switch (user.role) {
+      case 'MANAGER':
+        return t("مدیر سیستم");
+      case 'TECHNICIAN':
+        return t("تکنسین فنی");
+      case 'WAREHOUSE':
+        return t("انباردار");
+      default:
+        return language === 'fa' ? (user.role_display || user.role) : user.role;
+    }
+  };
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return (
@@ -36,7 +49,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
           </svg>
         </div>
         <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">{t("عدم دسترسی مجاز")}</h2>
-        <p className="text-slate-500 max-w-md mb-6">{t("نقش کاربری شما (")}{user.role_display || user.role}{t(") اجازه دسترسی به این بخش از سامانه را ندارد.")}</p>
+        <p className="text-slate-600 dark:text-slate-300 max-w-md mb-6">{t("نقش کاربری شما (")}{getRoleLabel()}{t(") اجازه دسترسی به این بخش از سامانه را ندارد.")}</p>
         <Link
           to="/"
           className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-xl shadow transition-colors"

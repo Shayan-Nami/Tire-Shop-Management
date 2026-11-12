@@ -33,3 +33,23 @@ for (const [label, value, expected] of [
     assert.equal(config.server.proxy['/api'].changeOrigin, true);
   });
 }
+
+test('Vite manualChunks isolates React runtime from lucide-react on POSIX and Windows paths', () => {
+  const config = loadComponent('../../frontend/vite.config.ts', {
+    vite: {
+      defineConfig: (callback: unknown) => callback,
+      loadEnv: () => ({}),
+    },
+    '@vitejs/plugin-react': () => 'react-plugin',
+  }).default({ mode: 'production' });
+
+  const manualChunks = config.build.rollupOptions.output.manualChunks as (id: string) => string | undefined;
+  assert.equal(manualChunks('/repo/frontend/node_modules/react/index.js'), 'react-core');
+  assert.equal(manualChunks('C:\\repo\\frontend\\node_modules\\react\\jsx-runtime.js'), 'react-core');
+  assert.equal(manualChunks('C:\\repo\\frontend\\node_modules\\react-dom\\client.js'), 'react-core');
+  assert.equal(manualChunks('/repo/frontend/node_modules/scheduler/index.js'), 'react-core');
+  assert.equal(manualChunks('/repo/frontend/node_modules/react-router-dom/dist/index.js'), 'react-router');
+  assert.equal(manualChunks('C:\\repo\\frontend\\node_modules\\axios\\lib\\axios.js'), 'axios');
+  assert.equal(manualChunks('/repo/frontend/node_modules/lucide-react/dist/esm/lucide-react.js'), undefined);
+  assert.equal(manualChunks('C:\\repo\\frontend\\node_modules\\lucide-react\\dist\\esm\\icons\\x.js'), undefined);
+});

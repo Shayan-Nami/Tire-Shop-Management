@@ -12,15 +12,15 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { login, isAuthenticated, user } = useAuth();
+  const { login, isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
   const passwordChanged = new URLSearchParams(window.location.search).get('reason') === 'password-changed';
 
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isLoading === false && isAuthenticated && user) {
       navigate('/', { replace: true });
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isLoading, isAuthenticated, user, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +66,7 @@ export const Login: React.FC = () => {
           <form onSubmit={handleLogin} className="space-y-5" aria-busy={loading}>
             <div><label htmlFor="login-username">{t("نام کاربری")}</label><div className="relative"><input id="login-username" autoComplete="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder={t("نام کاربری خود را وارد کنید")} className="ui-field border" /><User className="field-icon w-4 h-4" /></div></div>
             <div><label htmlFor="login-password">{t("کلمه عبور")}</label><div className="relative"><input id="login-password" autoComplete="current-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder={t("کلمه عبور خود را وارد کنید")} className="ui-field border" /><KeyRound className="field-icon w-4 h-4" /></div></div>
-            <button type="submit" disabled={loading} className="action-primary w-full !min-h-12"><span>{loading ? t("در حال ورود...") : t("ورود به سامانه")}</span><ArrowLeft className="w-4 h-4" /></button>
+            <button type="submit" disabled={loading} className="action-primary w-full !min-h-12"><span>{loading ? t("در حال ورود...") : t("ورود به سامانه")}</span><ArrowLeft className="w-4 h-4 ltr:rotate-180" /></button>
           </form>
           <p className="text-xs text-slate-500 dark:text-slate-300 leading-7">{t("برای دسترسی به سامانه، از حسابی که مدیر فروشگاه در اختیارتان قرار داده استفاده کنید.")}</p>
         </div>

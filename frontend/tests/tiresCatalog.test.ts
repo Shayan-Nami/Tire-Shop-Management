@@ -105,11 +105,14 @@ test('new tire creation retains an editable initial purchase cost and sends its 
 });
 
 test('an older catalog response cannot overwrite a newer search result', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const initial = deferred<any>();
   const filtered = deferred<any>();
   const { h } = await setup(t, 70000, (params) => params.search ? filtered.promise : initial.promise);
   const search = find(h.tree, (node) => node.type === 'input' && node.props.placeholder?.startsWith('جستجو'));
   change(h, search, 'no-match');
+  t.mock.timers.tick(300);
+  await h.flush();
   filtered.resolve(page([]));
   await h.flush();
   assert.match(text(h.tree), /تایری با این مشخصات یافت نشد/);
@@ -117,4 +120,65 @@ test('an older catalog response cannot overwrite a newer search result', async (
   await h.flush();
   assert.match(text(h.tree), /تایری با این مشخصات یافت نشد/);
   assert.ok(!text(h.tree).includes('Stale result'));
+});
+
+test('min_stock_alert preserves raw draft text when cleared before entering a new threshold', async (t) => {
+  const { h, updates, creations } = await setup(t);
+
+  find(h.tree, (node) => node.props?.title === 'ویرایش نرخ و مشخصات تایر').props.onClick();
+  h.render();
+  const editThreshold = labeledField(h, 'حداقل آستانه هشدار کسری انبار (حلقه):');
+  change(h, editThreshold, '');
+  assert.equal(labeledField(h, 'حداقل آستانه هشدار کسری انبار (حلقه):').props.value, '');
+  change(h, labeledField(h, 'حداقل آستانه هشدار کسری انبار (حلقه):'), '9');
+  assert.equal(labeledField(h, 'حداقل آستانه هشدار کسری انبار (حلقه):').props.value, '9');
+  await find(h.tree, (node) => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  await h.flush();
+  assert.equal(updates[0].data.min_stock_alert, 9);
+
+  find(h.tree, (node) => node.type === 'button' && text(node) === 'تعریف تایر جدید').props.onClick();
+  h.render();
+  change(h, labeledField(h, 'حداقل آستانه هشدار کسری انبار (حلقه):'), '');
+  assert.equal(labeledField(h, 'حداقل آستانه هشدار کسری انبار (حلقه):').props.value, '');
+  change(h, labeledField(h, 'نام کامل تایر (گل / مدل):'), 'Cleared Draft Tire');
+  change(h, labeledField(h, 'قیمت فروش پایه (ریال):'), '140000');
+  const selectWithOption = (label: string) => find(h.tree, (node) => node.type === 'select' &&
+    nodes(node, (child) => child.type === 'option' && text(child) === label).length > 0);
+  change(h, selectWithOption('انتخاب برند...'), '2');
+  change(h, selectWithOption('انتخاب سایز...'), '3');
+  await find(h.tree, (node) => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  await h.flush();
+  assert.equal(creations[0].min_stock_alert, 4);
+});
+
+test('catalog search is debounced and shows recoverable alert when fetch fails', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const calls: Array<Record<string, unknown>> = [];
+  let shouldFail = false;
+  const { h } = await setup(t, 70000, async (params) => {
+    calls.push(params);
+    if (shouldFail) throw new Error('catalog timeout');
+    return page([]);
+  });
+  assert.equal(calls.length, 1);
+
+  const search = find(h.tree, (node) => node.type === 'input' && node.props.placeholder?.startsWith('جستجو'));
+  change(h, search, 'b');
+  change(h, find(h.tree, (node) => node.type === 'input' && node.props.placeholder?.startsWith('جستجو')), 'barez');
+  t.mock.timers.tick(299);
+  await h.flush();
+  assert.equal(calls.length, 1);
+
+  shouldFail = true;
+  t.mock.timers.tick(1);
+  await h.flush();
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].search, 'barez');
+  const alert = find(h.tree, (node) => node.props?.role === 'alert');
+  assert.match(text(alert), /catalog timeout/);
+
+  shouldFail = false;
+  find(alert, (node) => node.type === 'button').props.onClick();
+  await h.flush();
+  assert.equal(nodes(h.tree, (node) => node.props?.role === 'alert').length, 0);
 });

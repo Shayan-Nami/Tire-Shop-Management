@@ -13,11 +13,17 @@ export const Modal: React.FC<ModalProps> = ({ children, onClose, label, busy = f
 
   useEffect(() => {
     const dialog = ref.current;
-    const trigger = document.activeElement;
-    dialog?.showModal();
+    const trigger = typeof document !== 'undefined' ? document.activeElement : null;
+    if (dialog && typeof dialog.showModal === 'function' && !dialog.open) {
+      dialog.showModal();
+    }
     return () => {
-      dialog?.close();
-      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+      if (dialog?.open && typeof dialog.close === 'function') {
+        dialog.close();
+      }
+      if (typeof HTMLElement !== 'undefined' && trigger instanceof HTMLElement && trigger.isConnected) {
+        trigger.focus();
+      }
     };
   }, []);
 
@@ -27,6 +33,9 @@ export const Modal: React.FC<ModalProps> = ({ children, onClose, label, busy = f
       aria-label={label}
       aria-busy={busy}
       className={`app-modal ${className}`}
+      onClick={(event) => {
+        if (event.target === ref.current && !busy) onClose();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         if (!busy) onClose();
