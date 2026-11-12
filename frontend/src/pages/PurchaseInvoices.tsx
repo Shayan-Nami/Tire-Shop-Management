@@ -22,7 +22,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [tires, setTires] = useState<Tire[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorCause, setLoadErrorCause] = useState<{ error: unknown } | null>(null);
   const [search, setSearch] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -36,7 +36,7 @@ export const PurchaseInvoices: React.FC = () => {
     Array<{ tireId: number; tire: Tire; quantity: number; unitCost: number }>
   >([]);
   const [selectorsLoading, setSelectorsLoading] = useState(true);
-  const [selectorsError, setSelectorsError] = useState('');
+  const [selectorsErrorCause, setSelectorsErrorCause] = useState<{ error: unknown } | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const submitBusy = useRef(false);
   const purchaseRequests = useRef(createRequestSequence());
@@ -60,7 +60,9 @@ export const PurchaseInvoices: React.FC = () => {
     const trimmed = search.trim();
     if (trimmed === debouncedSearch) return;
     const timer = setTimeout(() => {
+      purchaseRequests.current.invalidate();
       setDebouncedSearch(trimmed);
+      setCurrentPage(1);
     }, 350);
     return () => clearTimeout(timer);
   }, [search, debouncedSearch]);
@@ -71,7 +73,7 @@ export const PurchaseInvoices: React.FC = () => {
     const isCurrent = () => requests.isCurrent(request);
     const loadPurchases = async () => {
       setLoading(true);
-      setLoadError(null);
+      setLoadErrorCause(null);
       try {
         const data = await invoicesApi.getPurchaseInvoices({
           search: debouncedSearch || undefined,
@@ -86,14 +88,14 @@ export const PurchaseInvoices: React.FC = () => {
         setInvoices([]);
         setTotalPages(1);
         setTotalCount(0);
-        setLoadError(parseApiError(error, t("خطا در دریافت فاکتورهای خرید"), language));
+        setLoadErrorCause({ error });
       } finally {
         if (isCurrent()) setLoading(false);
       }
     };
     void loadPurchases();
     return () => requests.invalidate();
-  }, [debouncedSearch, currentPage, refreshVersion, t, language]);
+  }, [debouncedSearch, currentPage, refreshVersion]);
 
   useEffect(() => {
     let active = true;
@@ -101,15 +103,15 @@ export const PurchaseInvoices: React.FC = () => {
     const loadSelectors = async () => {
       try {
         const [allSuppliers, allTires] = await Promise.all([
-          fetchAllPages((page) => suppliersApi.getSuppliers({ page, page_size: 100 }), isActive, language),
-          fetchAllPages((page) => catalogApi.getTires({ page, page_size: 100 }), isActive, language),
+          fetchAllPages((page) => suppliersApi.getSuppliers({ page, page_size: 100 }), isActive),
+          fetchAllPages((page) => catalogApi.getTires({ page, page_size: 100 }), isActive),
         ]);
         if (!active) return;
         setSuppliers(allSuppliers);
         setTires(allTires);
       } catch (error) {
         if (active) {
-          setSelectorsError(parseApiError(error, t("خطا در دریافت فهرست تأمین‌کنندگان و تایرها. لطفاً صفحه را دوباره بارگذاری کنید."), language));
+          setSelectorsErrorCause({ error });
         }
       } finally {
         if (active) setSelectorsLoading(false);
@@ -117,7 +119,18 @@ export const PurchaseInvoices: React.FC = () => {
     };
     void loadSelectors();
     return () => { active = false; };
-  }, [t, language]);
+  }, []);
+
+  const loadError = loadErrorCause
+    ? parseApiError(loadErrorCause.error, t("خطا در دریافت فاکتورهای خرید"), language)
+    : null;
+  const selectorsError = selectorsErrorCause
+    ? parseApiError(
+        selectorsErrorCause.error,
+        t("خطا در دریافت فهرست تأمین‌کنندگان و تایرها. لطفاً صفحه را دوباره بارگذاری کنید."),
+        language,
+      )
+    : '';
 
   const handleAddTireRow = (tireId: number) => {
     const tire = tires.find((t) => t.tire_id === tireId);
@@ -258,11 +271,7 @@ export const PurchaseInvoices: React.FC = () => {
             type="text"
             aria-label={t("جستجو در شماره فاکتور، نام تأمین‌کننده...")}
             value={search}
-            onChange={(e) => {
-              purchaseRequests.current.invalidate();
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder={t("جستجو در شماره فاکتور، نام تأمین‌کننده...")}
             className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />

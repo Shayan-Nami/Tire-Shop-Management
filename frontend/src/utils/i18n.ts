@@ -76,6 +76,34 @@ Object.assign(translations, {
     fa: 'پاسخ صفحه‌بندی نامعتبر است؛ دریافت همه گزینه‌ها ممکن نشد.',
     en: 'Invalid pagination response; failed to load all options.',
   },
+  'خطا در دریافت سوابق مرجوعی فاکتور': {
+    fa: 'خطا در دریافت سوابق مرجوعی فاکتور',
+    en: 'Could not load invoice return history',
+  },
+  'مرجوع‌شده:': {
+    fa: 'مرجوع‌شده:',
+    en: 'Returned:',
+  },
+  'قابل مرجوعی:': {
+    fa: 'قابل مرجوعی:',
+    en: 'Returnable:',
+  },
+  'تعداد همه اقلام تایر باید حداقل ۱ حلقه باشد.': {
+    fa: 'تعداد همه اقلام تایر باید حداقل ۱ حلقه باشد.',
+    en: 'All tire item quantities must be at least 1.',
+  },
+  'خطا در دریافت فاکتورهای خرید': {
+    fa: 'خطا در دریافت فاکتورهای خرید',
+    en: 'Could not load purchase invoices',
+  },
+  'خطا در دریافت اسناد مالی': {
+    fa: 'خطا در دریافت اسناد مالی',
+    en: 'Could not load payment records',
+  },
+  'جستجو در اسناد مالی...': {
+    fa: 'جستجو در اسناد مالی...',
+    en: 'Search payment records…',
+  },
 });
 
 export function translatePaymentMethod(

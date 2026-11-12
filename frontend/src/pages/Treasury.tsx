@@ -14,13 +14,14 @@ import { useAuth } from '../context/AuthContext';
 import { CancelVoucherModal } from '../components/finance/CancelVoucherModal';
 import { createRequestSequence } from '../utils/invoiceRequests';
 import { parseApiError } from '../utils/errorParser';
+import { translatePaymentMethod } from '../utils/i18n';
 
 export const Treasury: React.FC = () => {
   const { t, language } = useLanguage();
   const { currencyUnit, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'receipts' | 'payments' | 'refunds'>('receipts');
   const [loading, setLoading] = useState<boolean>(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorCause, setLoadErrorCause] = useState<{ error: unknown } | null>(null);
   const [search, setSearch] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -50,7 +51,9 @@ export const Treasury: React.FC = () => {
     const trimmed = search.trim();
     if (trimmed === debouncedSearch) return;
     const timer = setTimeout(() => {
+      treasuryRequests.current.invalidate();
       setDebouncedSearch(trimmed);
+      setCurrentPage(1);
     }, 350);
     return () => clearTimeout(timer);
   }, [search, debouncedSearch]);
@@ -62,7 +65,7 @@ export const Treasury: React.FC = () => {
 
     const loadData = async () => {
       setLoading(true);
-      setLoadError(null);
+      setLoadErrorCause(null);
       try {
         const params = {
           page: currentPage,
@@ -94,7 +97,7 @@ export const Treasury: React.FC = () => {
         setRefunds([]);
         setTotalPages(1);
         setTotalCount(0);
-        setLoadError(parseApiError(error, t("خطا در دریافت اسناد مالی"), language));
+        setLoadErrorCause({ error });
       } finally {
         if (isCurrent()) setLoading(false);
       }
@@ -102,28 +105,11 @@ export const Treasury: React.FC = () => {
 
     void loadData();
     return () => requests.invalidate();
-  }, [activeTab, currentPage, debouncedSearch, refreshVersion, t, language]);
+  }, [activeTab, currentPage, debouncedSearch, refreshVersion]);
 
-  const formatPaymentMethod = (method?: string | null, display?: string | null): string => {
-    const rawMethod = method?.trim() || '';
-    const rawDisplay = display?.trim() || '';
-    if (!rawMethod && !rawDisplay) return '-';
-    if (language === 'en') {
-      if (rawMethod) {
-        const translated = t(rawMethod);
-        if (translated && translated !== rawMethod) return translated;
-      }
-      if (rawDisplay) {
-        const translatedDisplay = t(rawDisplay);
-        if (translatedDisplay) return translatedDisplay;
-      }
-      return rawMethod || rawDisplay || '-';
-    }
-    if (rawDisplay && rawDisplay !== rawMethod) {
-      return t(rawDisplay);
-    }
-    return rawMethod ? t(rawMethod) : rawDisplay || '-';
-  };
+  const loadError = loadErrorCause
+    ? parseApiError(loadErrorCause.error, t("خطا در دریافت اسناد مالی"), language)
+    : null;
 
   const handleOpenCancel = (id: number, type: 'receipt' | 'payment' | 'refund', title: string) => {
     setCancelTarget({ id, type, title });
@@ -210,11 +196,7 @@ export const Treasury: React.FC = () => {
             type="text"
             aria-label={t("جستجو در اسناد مالی...")}
             value={search}
-            onChange={(e) => {
-              treasuryRequests.current.invalidate();
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder={t("جستجو در اسناد مالی...")}
             className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />
@@ -266,7 +248,7 @@ export const Treasury: React.FC = () => {
                           {formatCurrency(r.amount, true, currencyUnit, language)}
                         </td>
                         <td className="py-3 px-4 text-slate-600 dark:text-slate-300 font-medium">
-                          {formatPaymentMethod(r.payment_method, r.payment_method_display)}
+                          {translatePaymentMethod(r.payment_method, r.payment_method_display, language)}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-400">{r.reference_number || '-'}</td>
                         <td className="py-3 px-4 text-center">
@@ -332,7 +314,7 @@ export const Treasury: React.FC = () => {
                           {formatCurrency(p.amount, true, currencyUnit, language)}
                         </td>
                         <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                          {formatPaymentMethod(p.payment_method, p.payment_method_display)}
+                          {translatePaymentMethod(p.payment_method, p.payment_method_display, language)}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-400">{p.reference_number || '-'}</td>
                         <td className="py-3 px-4 text-center">
@@ -397,7 +379,7 @@ export const Treasury: React.FC = () => {
                           {formatCurrency(rf.amount, true, currencyUnit, language)}
                         </td>
                         <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                          {formatPaymentMethod(rf.payment_method, rf.payment_method_display)}
+                          {translatePaymentMethod(rf.payment_method, rf.payment_method_display, language)}
                         </td>
                         <td className="py-3 px-4 text-center">
                           {rf.is_cancelled ? (

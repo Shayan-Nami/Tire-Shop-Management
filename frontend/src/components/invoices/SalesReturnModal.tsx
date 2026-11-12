@@ -23,27 +23,28 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const [returnItems, setReturnItems] = useState<{ [itemId: number]: number }>({});
   const [returnedByItem, setReturnedByItem] = useState<Record<number, number>>({});
   const [loadingReturns, setLoadingReturns] = useState<boolean>(false);
-  const [returnsLoadError, setReturnsLoadError] = useState<string | null>(null);
+  const [returnsErrorCause, setReturnsErrorCause] = useState<{ error: unknown } | null>(null);
   const [returnsRetryToken, setReturnsRetryToken] = useState<number>(0);
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const submitBusy = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const activeInvoiceId = invoice?.sales_invoice_id ?? null;
+  const canFetchPriorReturns = typeof invoicesApi.getSalesReturns === 'function';
 
   useEffect(() => {
     setReturnItems({});
     setReason('');
     setErrorMessage(null);
     setReturnedByItem({});
-    setReturnsLoadError(null);
+    setReturnsErrorCause(null);
 
-    if (!invoice || typeof invoicesApi.getSalesReturns !== 'function') {
+    if (activeInvoiceId === null || !canFetchPriorReturns) {
       setLoadingReturns(false);
       return;
     }
 
     let active = true;
-    const invoiceId = invoice.sales_invoice_id;
     setLoadingReturns(true);
 
     const loadPriorReturns = async () => {
@@ -52,7 +53,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
         for (let page = 1; ; page += 1) {
           if (!active) return;
           const response = await invoicesApi.getSalesReturns({
-            sales_invoice: invoiceId,
+            sales_invoice: activeInvoiceId,
             page,
             page_size: 100,
           });
@@ -60,7 +61,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
 
           const records = response.results || [];
           for (const ret of records) {
-            if (ret.sales_invoice !== invoiceId) continue;
+            if (ret.sales_invoice !== activeInvoiceId) continue;
             for (const retItem of ret.items || []) {
               totals[retItem.sales_invoice_tire_item] =
                 (totals[retItem.sales_invoice_tire_item] || 0) + retItem.quantity;
@@ -75,7 +76,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
         }
       } catch (err: unknown) {
         if (active) {
-          setReturnsLoadError(parseApiError(err, t("خطا در دریافت سوابق مرجوعی فاکتور"), language));
+          setReturnsErrorCause({ error: err });
         }
       } finally {
         if (active) {
@@ -88,9 +89,13 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
     return () => {
       active = false;
     };
-  }, [invoice?.sales_invoice_id, returnsRetryToken, t, language]);
+  }, [activeInvoiceId, canFetchPriorReturns, returnsRetryToken]);
 
   if (!invoice) return null;
+
+  const returnsLoadError = returnsErrorCause
+    ? parseApiError(returnsErrorCause.error, t("خطا در دریافت سوابق مرجوعی فاکتور"), language)
+    : null;
 
   const getRemainingQty = (itemId: number, purchasedQty: number): number =>
     Math.max(0, purchasedQty - (returnedByItem[itemId] || 0));

@@ -21,9 +21,16 @@ function getDefaultReceiptAmount(invoice: SalesInvoice | null): string {
     String(invoice.remaining_amount).trim() !== ''
       ? invoice.remaining_amount
       : invoice.net_amount || invoice.total_amount || 0;
-  const numeric = parseFloat(String(raw));
+  const rawStr = String(raw).trim();
+  const numeric = parseFloat(rawStr);
   if (!Number.isFinite(numeric) || numeric <= 0) return '0';
-  const truncated = Math.floor(numeric * 100) / 100;
+  const plainDecimal = rawStr.match(/^(\d+)(?:\.(\d+))?$/);
+  if (plainDecimal) {
+    const intPart = String(Number(plainDecimal[1]));
+    const fracPart = (plainDecimal[2] || '').slice(0, 2).replace(/0+$/, '');
+    return fracPart ? `${intPart}.${fracPart}` : intPart;
+  }
+  const truncated = Math.floor(Number((numeric * 100).toFixed(6))) / 100;
   return String(truncated);
 }
 
