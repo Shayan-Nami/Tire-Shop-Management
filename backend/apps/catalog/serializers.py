@@ -1,10 +1,14 @@
 from __future__ import annotations
-from typing import Any
+
 from decimal import Decimal
-from rest_framework import serializers
+from typing import Any
+
 from drf_spectacular.utils import extend_schema_field
-from .models import Brand, Size, Tire, StockMovement
+from rest_framework import serializers
+
 from utils.jalali import format_jalali_date
+from .models import Brand, Size, StockMovement, Tire
+
 
 class BrandSerializer(serializers.ModelSerializer):
     tires_count = serializers.SerializerMethodField()
@@ -20,6 +24,7 @@ class BrandSerializer(serializers.ModelSerializer):
             return count
         return obj.tires.count()
 
+
 class SizeSerializer(serializers.ModelSerializer):
     tires_count = serializers.SerializerMethodField()
 
@@ -34,6 +39,7 @@ class SizeSerializer(serializers.ModelSerializer):
             return count
         return obj.tires.count()
 
+
 class TireSerializer(serializers.ModelSerializer):
     brand_name = serializers.ReadOnlyField(source='brand.brand_name')
     size_name = serializers.ReadOnlyField(source='size.size_name')
@@ -42,14 +48,14 @@ class TireSerializer(serializers.ModelSerializer):
         max_digits=14,
         decimal_places=2,
         min_value=Decimal('0.00'),
-        error_messages={'min_value': 'قیمت فروش تایر نمی‌تواند منفی باشد.'}
+        error_messages={'min_value': 'قیمت فروش تایر نمی‌تواند منفی باشد.'},
     )
     purchase_price = serializers.DecimalField(
         max_digits=14,
         decimal_places=2,
         min_value=Decimal('0.00'),
         required=False,
-        error_messages={'min_value': 'قیمت خرید تایر نمی‌تواند منفی باشد.'}
+        error_messages={'min_value': 'قیمت خرید تایر نمی‌تواند منفی باشد.'},
     )
 
     class Meta:
@@ -57,7 +63,7 @@ class TireSerializer(serializers.ModelSerializer):
         fields = [
             'tire_id', 'tire_name', 'brand', 'brand_name', 'size',
             'size_name', 'stock_quantity', 'sale_price', 'purchase_price',
-            'min_stock_alert', 'is_low_stock'
+            'min_stock_alert', 'is_low_stock',
         ]
         read_only_fields = ['stock_quantity']
 
@@ -78,28 +84,31 @@ class TireSerializer(serializers.ModelSerializer):
     def to_representation(self, instance: Tire) -> dict[str, Any]:
         data = super().to_representation(instance)
         request = self.context.get('request')
-        if request and hasattr(request.user, 'role') and request.user.role == 'TECHNICIAN':
+        user = getattr(request, 'user', None) if request else None
+        if user and not getattr(user, 'is_superuser', False) and getattr(user, 'role', None) == 'TECHNICIAN':
             data.pop('purchase_price', None)
         return data
+
 
 class StockAdjustmentSerializer(serializers.Serializer):
     counted_quantity = serializers.IntegerField(
         min_value=0,
-        error_messages={'min_value': 'موجودی شمارش‌شده نمی‌تواند منفی باشد.'}
+        error_messages={'min_value': 'موجودی شمارش‌شده نمی‌تواند منفی باشد.'},
     )
     reason = serializers.CharField(
         required=True,
         allow_blank=False,
         error_messages={
             'required': 'ثبت دلیل / شرح انبارگردانی الزامی است.',
-            'blank': 'ثبت دلیل / شرح انبارگردانی الزامی است.'
-        }
+            'blank': 'ثبت دلیل / شرح انبارگردانی الزامی است.',
+        },
     )
+
 
 class StockMovementSerializer(serializers.ModelSerializer):
     tire_name = serializers.ReadOnlyField(source='tire.tire_name')
     brand_name = serializers.ReadOnlyField(source='tire.brand.brand_name')
-    user_name = serializers.ReadOnlyField(source='user.full_name')
+    user_name = serializers.SerializerMethodField()
     movement_type_display = serializers.CharField(source='get_movement_type_display', read_only=True)
     jalali_date = serializers.SerializerMethodField()
 
@@ -108,10 +117,16 @@ class StockMovementSerializer(serializers.ModelSerializer):
         fields = [
             'movement_id', 'tire', 'tire_name', 'brand_name', 'quantity', 'movement_type',
             'movement_type_display', 'balance_after', 'sales_invoice',
-            'purchase_invoice', 'unit_cost', 'user', 'user_name',
-            'description', 'created_at', 'jalali_date'
+            'purchase_invoice', 'sales_return', 'unit_cost', 'user', 'user_name',
+            'description', 'created_at', 'jalali_date',
         ]
         read_only_fields = fields
+
+    @extend_schema_field(serializers.CharField)
+    def get_user_name(self, obj: StockMovement) -> str:
+        if obj.user is None:
+            return ''
+        return obj.user.full_name or obj.user.username
 
     @extend_schema_field(serializers.CharField)
     def get_jalali_date(self, obj: StockMovement) -> str:
@@ -120,9 +135,11 @@ class StockMovementSerializer(serializers.ModelSerializer):
     def to_representation(self, instance: StockMovement) -> dict[str, Any]:
         data = super().to_representation(instance)
         request = self.context.get('request')
-        if request and hasattr(request.user, 'role'):
-            if request.user.role in ('TECHNICIAN', 'WAREHOUSE'):
+        user = getattr(request, 'user', None) if request else None
+        if user and not getattr(user, 'is_superuser', False):
+            role = getattr(user, 'role', None)
+            if role in ('TECHNICIAN', 'WAREHOUSE'):
                 data.pop('unit_cost', None)
-            if request.user.role == 'TECHNICIAN':
+            if role == 'TECHNICIAN':
                 data.pop('purchase_invoice', None)
         return data

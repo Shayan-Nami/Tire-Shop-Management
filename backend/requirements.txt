@@ -6,8 +6,6 @@ django-filter>=24.0
 django-cors-headers>=4.4.0
 pyodbc>=5.1.0
 mssql-django>=2.0.0
-pytest>=9.0.3
-pytest-django>=4.9.0
 python-dotenv>=1.2.2
 redis>=5.0.0
 gunicorn>=23.0.0; sys_platform != 'win32'

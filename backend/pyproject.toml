@@ -4,12 +4,43 @@ line-length = 120
 extend-exclude = ["migrations"]
 
 [tool.ruff.lint]
-select = ["F", "E9"]
+select = ["F", "E4", "E7", "E9", "W6", "B", "PIE"]
+ignore = ["B904", "B905", "B017"]
 
 [tool.ruff.lint.per-file-ignores]
-"config/verification_settings.py" = ["F403"]
+"config/verification_settings.py" = ["F403", "E402"]
 
 [tool.mypy]
 python_version = "3.14"
-files = ["utils/domain.py"]
+files = [
+    "utils/__init__.py",
+    "utils/domain.py",
+    "utils/exceptions.py",
+    "utils/expressions.py",
+    "utils/jalali.py",
+    "utils/mixins.py",
+    "utils/pagination.py",
+    "utils/persian.py",
+    "utils/serializers.py",
+    "utils/throttling.py",
+]
 strict = true
+disallow_subclassing_any = false
+
+[[tool.mypy.overrides]]
+module = ["django.*", "rest_framework.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "**/test_*.py",
+    "config/asgi.py",
+    "config/wsgi.py",
+    "manage.py",
+]
+
+[tool.coverage.report]
+skip_empty = true

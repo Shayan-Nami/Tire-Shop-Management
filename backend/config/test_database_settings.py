@@ -13,6 +13,7 @@ def database_settings(monkeypatch):
         with monkeypatch.context() as env:
             defaults = {
                 'DJANGO_DEBUG': 'False',
+                'DJANGO_TESTING': 'True',
                 'DJANGO_SECRET_KEY': 'database-settings-test-only-not-a-production-secret-8274',
                 'DB_ENGINE': 'mssql',
                 'USE_SQL_SERVER': 'False',

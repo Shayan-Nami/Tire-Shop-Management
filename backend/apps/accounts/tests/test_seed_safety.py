@@ -8,6 +8,7 @@ from django.core.management.base import CommandError
 
 from apps.accounts.models import UserRole
 from apps.catalog.management.commands import seed_tire_shop
+from apps.catalog.models import Brand
 
 
 User = get_user_model()
@@ -78,6 +79,12 @@ def test_seed_twice_preserves_passwords(settings, monkeypatch, mock_business_see
             assert not user.is_superuser
         else:
             assert user.check_password(DEMO_PASSWORDS[user.username])
+            if user.username == 'admin':
+                assert user.is_staff
+                assert user.is_superuser
+            else:
+                assert not user.is_staff
+                assert not user.is_superuser
             original_set_password(user, f'Changed-{user.username}!8274')
             user.save(update_fields=['password'])
     retained_hashes = dict(User.objects.filter(username__in=DEMO_PASSWORDS).values_list('username', 'password'))
@@ -94,3 +101,19 @@ def test_seed_twice_preserves_passwords(settings, monkeypatch, mock_business_see
     invoice, stock = mock_business_seed
     invoice.assert_not_called()
     stock.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_seed_rolls_back_atomically_on_failure(settings, monkeypatch):
+    settings.DEBUG = True
+    settings.ALLOW_DEMO_SEED = True
+
+    def fail_on_stock(*args, **kwargs):
+        raise RuntimeError('simulated seed failure')
+
+    monkeypatch.setattr(seed_tire_shop.StockMovement.objects, 'create', fail_on_stock)
+    with pytest.raises(RuntimeError, match='simulated seed failure'):
+        call_command('seed_tire_shop', stdout=StringIO())
+
+    assert not User.objects.filter(username__in=DEMO_PASSWORDS).exists()
+    assert not Brand.objects.filter(brand_name='بارز').exists()

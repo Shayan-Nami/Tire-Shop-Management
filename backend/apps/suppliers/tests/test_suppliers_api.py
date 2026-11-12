@@ -58,3 +58,38 @@ class TestSuppliersAPI:
         assert res.status_code == 200
         assert len(res.data['results']) == 1
         assert res.data['results'][0]['supplier_name'] == 'صنایع لاستیک گلدستون'
+
+    def test_supplier_phone_normalization_and_validation(self, auth_client_warehouse):
+        url = reverse('supplier-list')
+
+        res_persian = auth_client_warehouse.post(
+            url,
+            {'supplier_name': 'تأمین‌کننده فارسی', 'phone_number': ' ۰۲۱۸۸۹۹۰۰۱۱ '},
+            format='json',
+        )
+        assert res_persian.status_code == 201
+        assert res_persian.data['phone_number'] == '02188990011'
+
+        res_mobile = auth_client_warehouse.post(
+            url,
+            {'supplier_name': 'تأمین‌کننده موبایل', 'phone_number': '۰۹۱۲۳۴۵۶۷۸۹'},
+            format='json',
+        )
+        assert res_mobile.status_code == 201
+        assert res_mobile.data['phone_number'] == '09123456789'
+
+        res_blank = auth_client_warehouse.post(
+            url,
+            {'supplier_name': 'تأمین‌کننده بدون تلفن', 'phone_number': '   '},
+            format='json',
+        )
+        assert res_blank.status_code == 201
+        assert res_blank.data['phone_number'] is None
+
+        res_invalid = auth_client_warehouse.post(
+            url,
+            {'supplier_name': 'تأمین‌کننده نامعتبر', 'phone_number': '12345'},
+            format='json',
+        )
+        assert res_invalid.status_code == 400
+        assert 'phone_number' in str(res_invalid.data)

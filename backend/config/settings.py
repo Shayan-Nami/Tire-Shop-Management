@@ -1,15 +1,26 @@
 import os
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
 from django.core.exceptions import ImproperlyConfigured
 import dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-dotenv.load_dotenv(BASE_DIR / '.env')
+if os.environ.get('PYTHON_DOTENV_DISABLED', '').lower() not in ('1', 'true', 'yes'):
+    dotenv.load_dotenv(BASE_DIR / '.env')
 
-DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in ('true', '1', 'yes')
-ALLOW_DEMO_SEED = os.environ.get('ALLOW_DEMO_SEED', 'False').lower() in ('true', '1', 'yes')
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    default_str = 'True' if default else 'False'
+    return os.environ.get(name, default_str).lower() in ('true', '1', 'yes')
+
+
+DEBUG = _env_bool('DJANGO_DEBUG', False)
+TESTING = _env_bool('DJANGO_TESTING', False)
+_strict_prod = not DEBUG and not TESTING
+ALLOW_DEMO_SEED = _env_bool('ALLOW_DEMO_SEED', False)
+ENABLE_DOCS_IN_PROD = _env_bool('ENABLE_DOCS_IN_PROD', False)
 
 INSECURE_DEFAULT_SECRET = 'django-insecure-tire-shop-production-secret-key-shayan-nami-2026'
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
@@ -29,6 +40,8 @@ elif not DEBUG and SECRET_KEY == INSECURE_DEFAULT_SECRET:
 _allowed_hosts_env = os.environ.get('ALLOWED_HOSTS')
 if _allowed_hosts_env:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
+elif _strict_prod:
+    ALLOWED_HOSTS = []
 else:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
 
@@ -152,6 +165,8 @@ else:
 _cors_allowed_env = os.environ.get('CORS_ALLOWED_ORIGINS')
 if _cors_allowed_env:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_allowed_env.split(',') if o.strip()]
+elif _strict_prod:
+    CORS_ALLOWED_ORIGINS = []
 else:
     CORS_ALLOWED_ORIGINS = [
         'http://localhost:3000',
@@ -165,6 +180,8 @@ CORS_ALLOW_CREDENTIALS = True
 _csrf_trusted_env = os.environ.get('CSRF_TRUSTED_ORIGINS')
 if _csrf_trusted_env:
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_trusted_env.split(',') if o.strip()]
+elif _strict_prod:
+    CSRF_TRUSTED_ORIGINS = []
 else:
     CSRF_TRUSTED_ORIGINS = [
         'http://localhost:3000',
@@ -183,6 +200,10 @@ if REDIS_CACHE_URL:
             'LOCATION': REDIS_CACHE_URL,
         }
     }
+elif _strict_prod:
+    raise ImproperlyConfigured(
+        "خطای امنیتی پروداکشن: در حالت DEBUG=False، متغیر محیطی REDIS_CACHE_URL باید مقداردهی شود."
+    )
 else:
     CACHES = {
         'default': {
@@ -193,6 +214,14 @@ else:
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_RENDERER_CLASSES': (
+        (
+            'rest_framework.renderers.JSONRenderer',
+            'rest_framework.renderers.BrowsableAPIRenderer',
+        )
+        if DEBUG
+        else ('rest_framework.renderers.JSONRenderer',)
+    ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
@@ -234,17 +263,17 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-if os.environ.get('SECURE_PROXY_SSL_HEADER', 'False').lower() in ('true', '1', 'yes'):
+if _env_bool('SECURE_PROXY_SSL_HEADER', False):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 else:
     SECURE_PROXY_SSL_HEADER = None
 
-SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')
-CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')
-SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() in ('true', '1', 'yes')
-SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
-SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() in ('true', '1', 'yes')
-SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'False').lower() in ('true', '1', 'yes')
+SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', _strict_prod)
+CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE', _strict_prod)
+SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT', _strict_prod)
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000' if _strict_prod else '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', _strict_prod)
+SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', _strict_prod)
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'سامانه مدیریت فروشگاه لاستیک - API Documentation',
@@ -295,15 +324,21 @@ LOGGING = {
         },
         'file_errors': {
             'level': 'WARNING',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOGS_DIR / 'backend_errors.log',
+            'maxBytes': 10 * 1024 * 1024,
+            'backupCount': 5,
+            'delay': True,
             'formatter': 'verbose',
             'encoding': 'utf-8',
         },
         'file_security': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOGS_DIR / 'security.log',
+            'maxBytes': 10 * 1024 * 1024,
+            'backupCount': 5,
+            'delay': True,
             'formatter': 'verbose',
             'encoding': 'utf-8',
         },

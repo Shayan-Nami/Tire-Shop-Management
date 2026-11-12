@@ -56,3 +56,18 @@ class TestServicesAPI:
         assert res.status_code == 200
         assert len(res.data['results']) == 1
         assert res.data['results'][0]['service_name'] == 'آپارات گرم لاستیک'
+
+    def test_duplicate_service_name_case_insensitive_rejected(self, auth_client_manager):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        url = reverse('service-list')
+        res1 = auth_client_manager.post(url, {'service_name': 'Wheel Alignment', 'price': '150000.00'}, format='json')
+        assert res1.status_code == 201
+
+        res_dup = auth_client_manager.post(url, {'service_name': '  wheel alignment  ', 'price': '150000.00'}, format='json')
+        assert res_dup.status_code == 400
+        assert 'service_name' in str(res_dup.data)
+
+        dup_model = Service(service_name='WHEEL ALIGNMENT', price=Decimal('150000.00'))
+        with pytest.raises(DjangoValidationError):
+            dup_model.full_clean()

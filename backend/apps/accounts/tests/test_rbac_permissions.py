@@ -1,5 +1,13 @@
+from types import SimpleNamespace
+
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.urls import reverse
+
+from apps.accounts.permissions import IsDocManagerOrDebug
+from apps.catalog.models import Brand
+from apps.suppliers.models import Supplier
+
 
 @pytest.mark.django_db
 class TestRBACPermissionsAndAuth:
@@ -8,7 +16,7 @@ class TestRBACPermissionsAndAuth:
         url = reverse('token_obtain_pair')
         response = api_client.post(url, {
             'username': 'test_manager',
-            'password': 'pass123'
+            'password': 'pass123',
         })
         assert response.status_code == 200
         assert 'access' in response.data
@@ -42,3 +50,49 @@ class TestRBACPermissionsAndAuth:
         if len(res_manager.data['results']) > 0:
             first_tire = res_manager.data['results'][0]
             assert 'purchase_price' in first_tire
+
+    def test_warehouse_can_create_and_update_but_cannot_delete_catalog_or_suppliers(
+        self,
+        auth_client_manager,
+        auth_client_warehouse,
+        auth_client_technician,
+    ):
+        brand_list = reverse('brand-list')
+        assert auth_client_technician.post(brand_list, {'brand_name': 'TechBrand'}, format='json').status_code == 403
+
+        res_brand = auth_client_warehouse.post(brand_list, {'brand_name': 'WarehouseBrand'}, format='json')
+        assert res_brand.status_code == 201
+        brand_detail = reverse('brand-detail', args=[res_brand.data['brand_id']])
+        assert auth_client_warehouse.patch(brand_detail, {'brand_name': 'WarehouseBrand2'}, format='json').status_code == 200
+        assert auth_client_warehouse.delete(brand_detail).status_code == 403
+        assert Brand.objects.filter(pk=res_brand.data['brand_id']).exists()
+        assert auth_client_manager.delete(brand_detail).status_code == 204
+
+        supplier_list = reverse('supplier-list')
+        res_sup = auth_client_warehouse.post(
+            supplier_list,
+            {'supplier_name': 'WarehouseSupplier', 'phone_number': '02155667788'},
+            format='json',
+        )
+        assert res_sup.status_code == 201
+        sup_detail = reverse('supplier-detail', args=[res_sup.data['supplier_id']])
+        assert auth_client_warehouse.patch(sup_detail, {'phone_number': '02155667799'}, format='json').status_code == 200
+        assert auth_client_warehouse.delete(sup_detail).status_code == 403
+        assert Supplier.objects.filter(pk=res_sup.data['supplier_id']).exists()
+        assert auth_client_manager.delete(sup_detail).status_code == 204
+
+    def test_doc_permission_reads_settings_flag(self, settings, monkeypatch, manager_user, warehouse_user):
+        perm = IsDocManagerOrDebug()
+        anon_req = SimpleNamespace(user=AnonymousUser())
+        wh_req = SimpleNamespace(user=warehouse_user)
+        mgr_req = SimpleNamespace(user=manager_user)
+
+        settings.DEBUG = False
+        settings.ENABLE_DOCS_IN_PROD = False
+        monkeypatch.setenv('ENABLE_DOCS_IN_PROD', 'True')
+        assert perm.has_permission(anon_req, None) is False
+        assert perm.has_permission(wh_req, None) is False
+        assert perm.has_permission(mgr_req, None) is True
+
+        settings.ENABLE_DOCS_IN_PROD = True
+        assert perm.has_permission(anon_req, None) is True

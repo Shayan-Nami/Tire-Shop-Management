@@ -12,7 +12,9 @@ admin.site.index_title = 'میز کار مدیریت سیستم'
 
 def health_check_view(request):
     try:
-        connection.ensure_connection()
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
         db_healthy = True
     except Exception:
         db_healthy = False

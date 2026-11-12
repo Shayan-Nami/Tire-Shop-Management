@@ -1,16 +1,13 @@
+from django.core.exceptions import ValidationError
 from django.db import models
-from django.core.validators import RegexValidator
-from utils.persian import normalize_digits
 
-phone_validator = RegexValidator(
-    regex=r'^09\d{9}$',
-    message='شماره موبایل باید با 09 شروع شده و ۱۱ رقم باشد.'
+from utils.persian import (
+    national_code_validator,
+    normalize_digits,
+    normalize_optional_digits,
+    phone_validator,
 )
 
-national_code_validator = RegexValidator(
-    regex=r'^\d{10}$',
-    message='کد ملی باید ۱۰ رقم عددی باشد.'
-)
 
 class Customer(models.Model):
     customer_id = models.AutoField(primary_key=True)
@@ -29,57 +26,46 @@ class Customer(models.Model):
             models.UniqueConstraint(
                 fields=['phone_number'],
                 name='unique_customer_phone_number_not_null',
-                condition=models.Q(phone_number__isnull=False) & ~models.Q(phone_number='')
+                condition=models.Q(phone_number__isnull=False) & models.Q(phone_number__gt=''),
             ),
             models.UniqueConstraint(
                 fields=['national_code'],
                 name='unique_customer_national_code_not_null',
-                condition=models.Q(national_code__isnull=False) & ~models.Q(national_code='')
+                condition=models.Q(national_code__isnull=False) & models.Q(national_code__gt=''),
             ),
         ]
 
     def clean_fields(self, exclude=None):
-        if self.phone_number is not None:
-            norm_p = normalize_digits(str(self.phone_number).strip())
-            self.phone_number = norm_p if norm_p else None
-        if self.national_code is not None:
-            norm_nc = normalize_digits(str(self.national_code).strip())
-            self.national_code = norm_nc if norm_nc else None
+        self.phone_number = normalize_optional_digits(self.phone_number)
+        self.national_code = normalize_optional_digits(self.national_code)
         super().clean_fields(exclude=exclude)
 
     def clean(self):
         super().clean()
-        from django.core.exceptions import ValidationError
-        if self.phone_number is not None:
-            norm_p = normalize_digits(str(self.phone_number).strip())
-            self.phone_number = norm_p if norm_p else None
-            if self.phone_number:
-                qs = Customer.objects.filter(phone_number=self.phone_number)
-                if self.pk:
-                    qs = qs.exclude(pk=self.pk)
-                if qs.exists():
-                    raise ValidationError({'phone_number': 'این شماره تماس قبلاً برای مشتری دیگری ثبت شده است.'})
-        if self.national_code is not None:
-            norm_nc = normalize_digits(str(self.national_code).strip())
-            self.national_code = norm_nc if norm_nc else None
-            if self.national_code:
-                qs = Customer.objects.filter(national_code=self.national_code)
-                if self.pk:
-                    qs = qs.exclude(pk=self.pk)
-                if qs.exists():
-                    raise ValidationError({'national_code': 'این کد ملی قبلاً برای مشتری دیگری ثبت شده است.'})
+        self.phone_number = normalize_optional_digits(self.phone_number)
+        if self.phone_number:
+            qs = Customer.objects.filter(phone_number=self.phone_number)
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError({'phone_number': 'این شماره تماس قبلاً برای مشتری دیگری ثبت شده است.'})
+
+        self.national_code = normalize_optional_digits(self.national_code)
+        if self.national_code:
+            qs = Customer.objects.filter(national_code=self.national_code)
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError({'national_code': 'این کد ملی قبلاً برای مشتری دیگری ثبت شده است.'})
 
     def save(self, *args, **kwargs):
-        if self.phone_number is not None:
-            norm_p = normalize_digits(str(self.phone_number).strip())
-            self.phone_number = norm_p if norm_p else None
-        if self.national_code is not None:
-            norm_nc = normalize_digits(str(self.national_code).strip())
-            self.national_code = norm_nc if norm_nc else None
+        self.phone_number = normalize_optional_digits(self.phone_number)
+        self.national_code = normalize_optional_digits(self.national_code)
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.full_name} ({self.phone_number})"
+
 
 class Vehicle(models.Model):
     vehicle_id = models.AutoField(primary_key=True)
@@ -87,7 +73,7 @@ class Vehicle(models.Model):
         Customer,
         on_delete=models.CASCADE,
         related_name='vehicles',
-        verbose_name='مشتری'
+        verbose_name='مشتری',
     )
     license_plate = models.CharField(max_length=20, unique=True, verbose_name='شماره پلاک')
     model = models.CharField(max_length=100, verbose_name='مدل خودرو')

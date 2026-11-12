@@ -1,40 +1,58 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+import hashlib
+from typing import Any
+
 from rest_framework.throttling import SimpleRateThrottle
 
 
 class LoginIPRateThrottle(SimpleRateThrottle):
     scope = 'login_ip'
 
-    def get_cache_key(self, request, view):
-        return self.cache_format % {
-            'scope': self.scope,
-            'ident': self.get_ident(request)
-        }
+    def get_cache_key(self, request: Any, view: Any) -> str:
+        return str(
+            self.cache_format % {
+                'scope': self.scope,
+                'ident': self.get_ident(request),
+            }
+        )
 
 
 class LoginUsernameRateThrottle(SimpleRateThrottle):
     scope = 'login_username'
 
-    def get_cache_key(self, request, view):
-        if not hasattr(request, 'data') or not isinstance(request.data, dict):
+    def get_cache_key(self, request: Any, view: Any) -> str | None:
+        data = getattr(request, 'data', None)
+        if not isinstance(data, Mapping):
             return None
-        username = request.data.get('username') or request.data.get('phone_number')
+        username = data.get('username') or data.get('phone_number')
         if not username:
             return None
-        return self.cache_format % {
-            'scope': self.scope,
-            'ident': str(username).strip().lower()
-        }
+        normalized = str(username).strip().lower()
+        if not normalized:
+            return None
+        username_hash = hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+        return str(
+            self.cache_format % {
+                'scope': self.scope,
+                'ident': username_hash,
+            }
+        )
 
 
 class TokenRefreshRateThrottle(SimpleRateThrottle):
     scope = 'token_refresh'
 
-    def get_cache_key(self, request, view):
-        if request.user and request.user.is_authenticated:
-            ident = request.user.pk
+    def get_cache_key(self, request: Any, view: Any) -> str:
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated:
+            ident: Any = user.pk
         else:
             ident = self.get_ident(request)
-        return self.cache_format % {
-            'scope': self.scope,
-            'ident': ident
-        }
+        return str(
+            self.cache_format % {
+                'scope': self.scope,
+                'ident': ident,
+            }
+        )

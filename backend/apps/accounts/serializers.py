@@ -1,14 +1,30 @@
 from __future__ import annotations
+
 from typing import Any
+
+from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
-from django.db import transaction
-from .models import User
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth.password_validation import validate_password
-from utils.persian import normalize_digits
+
+from utils.persian import normalize_optional_digits, phone_validator
+from utils.serializers import PersianNormalizedCharField
+from .models import User
 from .services import set_password_and_revoke_tokens
+
+
+def _validate_unique_user_phone(value: str | None, instance: User | None) -> str | None:
+    norm = normalize_optional_digits(value)
+    if not norm:
+        return None
+    qs = User.objects.filter(phone_number=norm)
+    if instance:
+        qs = qs.exclude(pk=instance.pk)
+    if qs.exists():
+        raise serializers.ValidationError("این شماره موبایل قبلاً برای کاربر دیگری ثبت شده است.")
+    return norm
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -27,9 +43,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'username': self.user.username,
             'full_name': self.user.full_name or self.user.username,
             'role': self.user.role,
-            'phone_number': self.user.phone_number
+            'phone_number': self.user.phone_number,
         }
         return data
+
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
@@ -46,29 +63,21 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'full_name', 'phone_number', 'role', 'role_display', 'is_active', 'date_joined']
         read_only_fields = ['id', 'date_joined']
 
+
 class UserCreateUpdateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    phone_number = PersianNormalizedCharField(
+        max_length=20,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[phone_validator],
+        error_messages={'unique': 'این شماره موبایل قبلاً برای کاربر دیگری ثبت شده است.'},
+    )
 
     class Meta:
         model = User
         fields = ['id', 'username', 'password', 'full_name', 'phone_number', 'role', 'is_active']
-        extra_kwargs = {
-            'phone_number': {
-                'error_messages': {
-                    'unique': 'این شماره موبایل قبلاً برای کاربر دیگری ثبت شده است.'
-                }
-            }
-        }
-
-    def to_internal_value(self, data: Any) -> dict[str, Any]:
-        data = data.copy() if hasattr(data, 'copy') else dict(data)
-        if 'phone_number' in data:
-            if data['phone_number']:
-                norm = normalize_digits(str(data['phone_number']).strip())
-                data['phone_number'] = norm if norm else None
-            else:
-                data['phone_number'] = None
-        return super().to_internal_value(data)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         attrs = super().validate(attrs)
@@ -96,24 +105,17 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_phone_number(self, value: str | None) -> str | None:
-        if not value:
-            return None
-        norm = normalize_digits(str(value).strip())
-        qs = User.objects.filter(phone_number=norm)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError("این شماره موبایل قبلاً برای کاربر دیگری ثبت شده است.")
-        return norm
+        return _validate_unique_user_phone(value, self.instance)
 
+    @transaction.atomic
     def create(self, validated_data: dict[str, Any]) -> User:
         password = validated_data.pop('password', None)
-        user = super().create(validated_data)
+        user = User(**validated_data)
         if password:
             user.set_password(password)
         else:
             user.set_unusable_password()
-        user.save(update_fields=['password'])
+        user.save()
         return user
 
     @transaction.atomic
@@ -126,20 +128,21 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    phone_number = PersianNormalizedCharField(
+        max_length=20,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[phone_validator],
+        error_messages={'unique': 'این شماره موبایل قبلاً برای کاربر دیگری ثبت شده است.'},
+    )
+
     class Meta:
         model = User
         fields = ['full_name', 'phone_number']
 
     def validate_phone_number(self, value: str | None) -> str | None:
-        if not value:
-            return None
-        norm = normalize_digits(str(value).strip())
-        qs = User.objects.filter(phone_number=norm)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError("این شماره موبایل قبلاً برای کاربر دیگری ثبت شده است.")
-        return norm
+        return _validate_unique_user_phone(value, self.instance)
 
 
 class ChangePasswordSerializer(serializers.Serializer):

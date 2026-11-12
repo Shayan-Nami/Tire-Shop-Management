@@ -1,20 +1,28 @@
 from __future__ import annotations
-from typing import Any
-from rest_framework import serializers
-from .models import Customer, Vehicle
-from utils.persian import normalize_digits
 
-class PersianNormalizedCharField(serializers.CharField):
-    def to_internal_value(self, data: Any) -> str | None:
-        if data is None:
-            return None
-        val = super().to_internal_value(data)
-        if isinstance(val, str):
-            norm = normalize_digits(val.strip())
-            if not norm:
-                return None if self.allow_null else ''
-            return norm
-        return val
+from rest_framework import serializers
+
+from utils.persian import national_code_validator, normalize_optional_digits, phone_validator
+from utils.serializers import PersianNormalizedCharField
+from .models import Customer, Vehicle
+
+
+def _validate_unique_customer_field(
+    field_name: str,
+    value: str | None,
+    instance: Customer | None,
+    error_message: str,
+) -> str | None:
+    norm = normalize_optional_digits(value)
+    if not norm:
+        return None
+    qs = Customer.objects.filter(**{field_name: norm})
+    if instance:
+        qs = qs.exclude(pk=instance.pk)
+    if qs.exists():
+        raise serializers.ValidationError(error_message)
+    return norm
+
 
 class VehicleSerializer(serializers.ModelSerializer):
     customer_name = serializers.ReadOnlyField(source='customer.full_name')
@@ -24,15 +32,24 @@ class VehicleSerializer(serializers.ModelSerializer):
         model = Vehicle
         fields = ['vehicle_id', 'customer', 'customer_name', 'license_plate', 'model', 'year', 'tire_size_recommended', 'notes']
 
+
 class CustomerSerializer(serializers.ModelSerializer):
     vehicles = VehicleSerializer(many=True, read_only=True)
     phone_number = PersianNormalizedCharField(
-        max_length=20, required=False, allow_null=True, allow_blank=True,
-        error_messages={'unique': 'این شماره تماس قبلاً برای مشتری دیگری ثبت شده است.'}
+        max_length=20,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[phone_validator],
+        error_messages={'unique': 'این شماره تماس قبلاً برای مشتری دیگری ثبت شده است.'},
     )
     national_code = PersianNormalizedCharField(
-        max_length=10, required=False, allow_null=True, allow_blank=True,
-        error_messages={'unique': 'این کد ملی قبلاً برای مشتری دیگری ثبت شده است.'}
+        max_length=10,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[national_code_validator],
+        error_messages={'unique': 'این کد ملی قبلاً برای مشتری دیگری ثبت شده است.'},
     )
 
     class Meta:
@@ -41,27 +58,17 @@ class CustomerSerializer(serializers.ModelSerializer):
         read_only_fields = ['customer_id', 'created_at', 'updated_at']
 
     def validate_phone_number(self, value: str | None) -> str | None:
-        if not value:
-            return None
-        norm = normalize_digits(str(value).strip())
-        if not norm:
-            return None
-        qs = Customer.objects.filter(phone_number=norm)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError("این شماره تماس قبلاً برای مشتری دیگری ثبت شده است.")
-        return norm
+        return _validate_unique_customer_field(
+            'phone_number',
+            value,
+            self.instance,
+            'این شماره تماس قبلاً برای مشتری دیگری ثبت شده است.',
+        )
 
     def validate_national_code(self, value: str | None) -> str | None:
-        if not value:
-            return None
-        norm = normalize_digits(str(value).strip())
-        if not norm:
-            return None
-        qs = Customer.objects.filter(national_code=norm)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError("این کد ملی قبلاً برای مشتری دیگری ثبت شده است.")
-        return norm
+        return _validate_unique_customer_field(
+            'national_code',
+            value,
+            self.instance,
+            'این کد ملی قبلاً برای مشتری دیگری ثبت شده است.',
+        )

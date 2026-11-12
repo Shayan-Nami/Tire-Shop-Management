@@ -1,25 +1,56 @@
 from __future__ import annotations
+
+from decimal import Decimal
 from typing import TYPE_CHECKING
+
+from django.db import transaction
+from django.db.models import F, Sum
+
+from utils.domain import DomainValidationError as ValidationError, StockConflict, validate_money, validate_quantity
+from .models import StockMovement, StockMovementType, StockProjectionRepair, Tire
 
 if TYPE_CHECKING:
     from apps.accounts.models import User
-    from apps.invoices.models import SalesInvoice, PurchaseInvoice, SalesReturn
+    from apps.invoices.models import PurchaseInvoice, SalesInvoice, SalesReturn
 
-from decimal import Decimal
-from django.db import transaction
-from django.db.models import Sum, F
-from utils.domain import DomainValidationError as ValidationError, StockConflict, validate_money, validate_quantity
-from .models import Tire, StockMovement, StockMovementType, StockProjectionRepair
+
+def create_stock_movement_entry(
+    *,
+    tire: Tire,
+    quantity: int,
+    movement_type: str,
+    balance_after: int,
+    unit_cost: Decimal,
+    user: User | None = None,
+    sales_invoice: SalesInvoice | None = None,
+    purchase_invoice: PurchaseInvoice | None = None,
+    sales_return: SalesReturn | None = None,
+    description: str = '',
+    movement_cls: type[StockMovement] = StockMovement,
+) -> StockMovement:
+    return movement_cls.objects.create(
+        tire=tire,
+        quantity=quantity,
+        movement_type=movement_type,
+        balance_after=balance_after,
+        sales_invoice=sales_invoice,
+        purchase_invoice=purchase_invoice,
+        sales_return=sales_return,
+        unit_cost=unit_cost,
+        user=user,
+        description=description,
+    )
+
 
 @transaction.atomic
-def record_stock_movements(movements_data: list[dict], user: User | None=None) -> list[StockMovement]:
+def record_stock_movements(movements_data: list[dict], user: User | None = None) -> list[StockMovement]:
     if not movements_data:
         return []
 
     try:
-        tire_ids = sorted(list({int(item['tire_id']) for item in movements_data}))
-    except (TypeError, ValueError, KeyError):
-        raise ValidationError("شناسه تایر در اطلاعات گردش انبار نامعتبر است.")
+        tire_ids = sorted({int(item['tire_id']) for item in movements_data})
+    except (TypeError, ValueError, KeyError) as exc:
+        raise ValidationError("شناسه تایر در اطلاعات گردش انبار نامعتبر است.") from exc
 
     locked_tires = {
         tire.pk: tire
@@ -35,8 +66,8 @@ def record_stock_movements(movements_data: list[dict], user: User | None=None) -
         try:
             tid = int(item['tire_id'])
             delta = validate_quantity(item['quantity_delta'])
-        except (TypeError, ValueError, KeyError):
-            raise ValidationError("مقادیر گردش انبار نامعتبر است.")
+        except (TypeError, ValueError, KeyError) as exc:
+            raise ValidationError("مقادیر گردش انبار نامعتبر است.") from exc
         projected_balances[tid] += delta
         if projected_balances[tid] < 0:
             tire_name = locked_tires[tid].tire_name
@@ -54,7 +85,7 @@ def record_stock_movements(movements_data: list[dict], user: User | None=None) -
 
         tire = locked_tires[tid]
         previous_stock = tire.stock_quantity
-        updates = {'stock_quantity': F('stock_quantity') + delta}
+        updates: dict = {'stock_quantity': F('stock_quantity') + delta}
 
         new_purchase_price = item.get('new_purchase_price')
         if new_purchase_price is not None:
@@ -69,7 +100,7 @@ def record_stock_movements(movements_data: list[dict], user: User | None=None) -
         raw_unit_cost = item.get('unit_cost')
         unit_cost = validate_money(raw_unit_cost if raw_unit_cost is not None else tire.purchase_price)
 
-        movement = StockMovement.objects.create(
+        movement = create_stock_movement_entry(
             tire=tire,
             quantity=delta,
             movement_type=item['movement_type'],
@@ -79,24 +110,25 @@ def record_stock_movements(movements_data: list[dict], user: User | None=None) -
             sales_return=item.get('sales_return'),
             unit_cost=unit_cost,
             user=user or item.get('user'),
-            description=item.get('description', '')
+            description=item.get('description', ''),
         )
         created_movements.append(movement)
 
     return created_movements
+
 
 @transaction.atomic
 def record_stock_movement(
     tire_id: int,
     quantity_delta: int,
     movement_type: str,
-    user: User | None=None,
-    sales_invoice: SalesInvoice | None=None,
-    purchase_invoice: PurchaseInvoice | None=None,
-    sales_return: SalesReturn | None=None,
-    unit_cost: Decimal | None=None,
+    user: User | None = None,
+    sales_invoice: SalesInvoice | None = None,
+    purchase_invoice: PurchaseInvoice | None = None,
+    sales_return: SalesReturn | None = None,
+    unit_cost: Decimal | None = None,
     description: str = '',
-    new_purchase_price: Decimal | None=None
+    new_purchase_price: Decimal | None = None,
 ) -> StockMovement | None:
     movements = record_stock_movements(
         movements_data=[{
@@ -108,15 +140,15 @@ def record_stock_movement(
             'sales_return': sales_return,
             'unit_cost': unit_cost,
             'description': description,
-            'new_purchase_price': new_purchase_price
+            'new_purchase_price': new_purchase_price,
         }],
-        user=user
+        user=user,
     )
     return movements[0] if movements else None
 
 
 @transaction.atomic
-def adjust_tire_stock_service(tire: Tire, counted_quantity: int, reason: str, user: User | None=None) -> StockMovement:
+def adjust_tire_stock_service(tire: Tire, counted_quantity: int, reason: str, user: User | None = None) -> StockMovement:
     counted_quantity = validate_quantity(counted_quantity)
     if counted_quantity < 0:
         raise ValidationError("موجودی شمارش‌شده نمی‌تواند منفی باشد.")
@@ -138,14 +170,14 @@ def adjust_tire_stock_service(tire: Tire, counted_quantity: int, reason: str, us
 
     unit_cost = Decimal(str(locked_tire.purchase_price if locked_tire.purchase_price is not None else '0.00'))
 
-    return StockMovement.objects.create(
+    return create_stock_movement_entry(
         tire=locked_tire,
         quantity=delta,
         movement_type=StockMovementType.MANUAL_ADJUSTMENT,
         balance_after=locked_tire.stock_quantity,
         unit_cost=unit_cost,
         user=user,
-        description=reason.strip()
+        description=reason.strip(),
     )
 
 
@@ -156,7 +188,10 @@ def repair_stock_projection_service(tire_id: int, reason: str, user: User | None
     if not user or not user.is_active or not (user.is_superuser or user.role == 'MANAGER'):
         raise ValidationError('An active manager must authorize projection recovery.')
 
-    tire = Tire.objects.select_for_update().get(pk=tire_id)
+    try:
+        tire = Tire.objects.select_for_update().get(pk=tire_id)
+    except Tire.DoesNotExist as exc:
+        raise ValidationError(f"تایر با شناسه {tire_id} یافت نشد.") from exc
     movements = StockMovement.objects.filter(tire=tire)
     ledger_stock = movements.aggregate(total=Sum('quantity'))['total'] or 0
     if ledger_stock < 0:

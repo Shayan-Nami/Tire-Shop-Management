@@ -1,16 +1,21 @@
-from rest_framework import viewsets, filters, status
+from django.db.models import Count, F
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import F, Count
-from .models import Brand, Size, Tire, StockMovement
+
+from apps.accounts.models import UserRole
+from apps.accounts.permissions import IsWarehouse, ReadOnlyOrWarehouse
+from .models import Brand, Size, StockMovement, Tire
 from .serializers import (
-    BrandSerializer, SizeSerializer, TireSerializer,
-    StockAdjustmentSerializer, StockMovementSerializer
+    BrandSerializer,
+    SizeSerializer,
+    StockAdjustmentSerializer,
+    StockMovementSerializer,
+    TireSerializer,
 )
 from .services import adjust_tire_stock_service
-from apps.accounts.models import UserRole
-from apps.accounts.permissions import ReadOnlyOrWarehouse, IsWarehouse
+
 
 class BrandViewSet(viewsets.ModelViewSet):
     queryset = Brand.objects.annotate(tires_count=Count('tires')).order_by('brand_name')
@@ -19,12 +24,14 @@ class BrandViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['brand_name']
 
+
 class SizeViewSet(viewsets.ModelViewSet):
     queryset = Size.objects.annotate(tires_count=Count('tires')).order_by('size_name')
     serializer_class = SizeSerializer
     permission_classes = [ReadOnlyOrWarehouse]
     filter_backends = [filters.SearchFilter]
     search_fields = ['size_name']
+
 
 class TireViewSet(viewsets.ModelViewSet):
     queryset = Tire.objects.select_related('brand', 'size').all().order_by('brand__brand_name', 'tire_name')
@@ -38,7 +45,8 @@ class TireViewSet(viewsets.ModelViewSet):
     def ordering_fields(self):
         fields = ['stock_quantity', 'sale_price', 'purchase_price']
         request = getattr(self, 'request', None)
-        if request and hasattr(request, 'user') and getattr(request.user, 'role', None) == UserRole.TECHNICIAN:
+        user = getattr(request, 'user', None) if request else None
+        if user and not getattr(user, 'is_superuser', False) and getattr(user, 'role', None) == UserRole.TECHNICIAN:
             return ['stock_quantity', 'sale_price']
         return fields
 
@@ -47,9 +55,11 @@ class TireViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='low-stock')
     def low_stock(self, request):
-        low_stock_tires = Tire.objects.select_related('brand', 'size').filter(
-            stock_quantity__lte=F('min_stock_alert')
-        ).order_by('stock_quantity')
+        low_stock_tires = self.filter_queryset(
+            self.get_queryset().filter(stock_quantity__lte=F('min_stock_alert'))
+        )
+        if not request.query_params.get('ordering'):
+            low_stock_tires = low_stock_tires.order_by('stock_quantity')
         page = self.paginate_queryset(low_stock_tires)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -69,22 +79,23 @@ class TireViewSet(viewsets.ModelViewSet):
             tire=tire,
             counted_quantity=counted_qty,
             reason=reason,
-            user=request.user
+            user=request.user,
         )
         tire.refresh_from_db()
         return Response({
             'message': f"موجودی تایر '{tire.tire_name}' با موفقیت به {tire.stock_quantity} اصلاح شد.",
             'movement_id': movement.movement_id,
             'difference': movement.quantity,
-            'current_stock': tire.stock_quantity
+            'current_stock': tire.stock_quantity,
         }, status=status.HTTP_200_OK)
+
 
 class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = StockMovement.objects.all()
     serializer_class = StockMovementSerializer
     permission_classes = [IsWarehouse]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['tire', 'movement_type', 'sales_invoice', 'purchase_invoice']
+    filterset_fields = ['tire', 'movement_type', 'sales_invoice', 'purchase_invoice', 'sales_return']
     search_fields = ['tire__tire_name', 'description']
     ordering_fields = ['created_at', 'quantity']
 
@@ -94,7 +105,5 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
             return StockMovement.objects.none()
 
         return StockMovement.objects.select_related(
-            'tire__brand', 'tire__size', 'user', 'sales_invoice', 'purchase_invoice'
+            'tire__brand', 'tire__size', 'user', 'sales_invoice', 'purchase_invoice', 'sales_return'
         ).all().order_by('-created_at', '-movement_id')
-
-

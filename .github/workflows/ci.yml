@@ -48,6 +48,7 @@ jobs:
       PYTHON_DOTENV_DISABLED: '1'
       DJANGO_SECRET_KEY: ci-only-disposable-signing-key-not-for-deployment
       DJANGO_DEBUG: 'False'
+      DJANGO_TESTING: 'True'
       ALLOWED_HOSTS: localhost,127.0.0.1,testserver
       DB_ENGINE: postgres
       DB_NAME: tire_shop_ci
@@ -86,6 +87,6 @@ jobs:
       - run: python manage.py migrate --noinput
       - run: python manage.py migrate --check
       - name: PostgreSQL tests and frontend contract integration
-        run: python -m pytest --ds=config.settings
+        run: python -m pytest --ds=config.settings --cov=. --cov-report=term-missing --cov-fail-under=90
       - name: Isolated SQLite tests and frontend contract integration
         run: python -m pytest --ds=config.verification_settings
