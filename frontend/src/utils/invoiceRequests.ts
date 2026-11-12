@@ -1,4 +1,5 @@
 import type { PaginatedResponse, Vehicle } from '../types/index.ts';
+import { translateMessage, type Language } from './i18n.ts';
 
 export function createRequestSequence() {
   let sequence = 0;
@@ -12,6 +13,7 @@ export function createRequestSequence() {
 export async function fetchAllPages<T>(
   fetchPage: (page: number) => Promise<PaginatedResponse<T>>,
   isCurrent: () => boolean = () => true,
+  language: Language = 'fa',
 ): Promise<T[]> {
   const results: T[] = [];
   for (let page = 1; ; page += 1) {
@@ -19,13 +21,13 @@ export async function fetchAllPages<T>(
     const response = await fetchPage(page);
     if (!isCurrent()) return [];
     if (response.current_page !== page) {
-      throw new Error('پاسخ صفحه‌بندی نامعتبر است؛ صفحه درخواستی دریافت نشد.');
+      throw new Error(translateMessage('پاسخ صفحه‌بندی نامعتبر است؛ صفحه درخواستی دریافت نشد.', language));
     }
     results.push(...response.results);
     const hasMore = Boolean(response.next) || page < response.total_pages;
     if (!hasMore) return results;
     if (response.results.length === 0) {
-      throw new Error('پاسخ صفحه‌بندی نامعتبر است؛ دریافت همه گزینه‌ها ممکن نشد.');
+      throw new Error(translateMessage('پاسخ صفحه‌بندی نامعتبر است؛ دریافت همه گزینه‌ها ممکن نشد.', language));
     }
   }
 }
@@ -41,7 +43,13 @@ export function isCurrentInvoiceVehicle(
   );
 }
 
-export function invoiceSubmitLabel(status: 'DRAFT' | 'CONFIRMED', submitting: boolean): string {
-  if (status === 'DRAFT') return submitting ? 'در حال ذخیره پیش‌نویس...' : 'ذخیره پیش‌نویس فاکتور';
-  return submitting ? 'در حال صدور فاکتور...' : 'صدور و نهایی‌سازی فاکتور';
+export function invoiceSubmitLabel(
+  status: 'DRAFT' | 'CONFIRMED',
+  submitting: boolean,
+  language: Language = 'fa',
+): string {
+  if (status === 'DRAFT') {
+    return translateMessage(submitting ? 'در حال ذخیره پیش‌نویس...' : 'ذخیره پیش‌نویس فاکتور', language);
+  }
+  return translateMessage(submitting ? 'در حال صدور فاکتور...' : 'صدور و نهایی‌سازی فاکتور', language);
 }

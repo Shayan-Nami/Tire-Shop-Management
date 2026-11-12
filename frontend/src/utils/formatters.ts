@@ -18,10 +18,10 @@ export function formatCurrency(
   if (!Number.isFinite(numeric)) return language === 'en' ? '0' : '۰';
 
   if (unit === 'toman') {
-    numeric = Math.floor(numeric / 10);
+    numeric = Math.trunc(numeric / 10);
   }
 
-  const formatted = Math.floor(numeric).toLocaleString('en-US');
+  const formatted = (Math.trunc(numeric) || 0).toLocaleString('en-US');
   const persianFormatted = language === 'fa' ? toPersianDigits(formatted) : formatted;
 
   if (!showUnit) return persianFormatted;

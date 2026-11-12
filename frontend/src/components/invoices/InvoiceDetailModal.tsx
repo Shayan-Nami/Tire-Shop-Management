@@ -138,6 +138,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
             </div>
 
             <button
+              type="button"
               onClick={handlePrint}
               className="action-primary flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
             >
@@ -145,7 +146,9 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               <span className="hidden sm:inline">{t("چاپ")}</span>
             </button>
             <button
+              type="button"
               onClick={onClose}
+              aria-label={t("بستن")}
               className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <X className="w-5 h-5" />
@@ -154,13 +157,13 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
         </div>
 
         {errorMessage && (
-          <div className="mx-6 mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 text-sm no-print">
+          <div role="alert" className="mx-6 mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 text-sm no-print">
             {errorMessage}
           </div>
         )}
 
         {printFormat === 'A4' && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 text-slate-800 dark:text-slate-200 font-sans print:p-0">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 text-slate-800 dark:text-slate-200 font-sans print:p-0 print:overflow-visible print:max-h-none">
             <div className="border-b-2 border-slate-800 pb-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center text-2xl font-black">
@@ -346,7 +349,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
         )}
 
         {printFormat === 'THERMAL' && (
-          <div className="flex-1 overflow-y-auto p-6 flex justify-center bg-slate-100 dark:bg-slate-950/60 print:bg-white print:p-0">
+          <div className="flex-1 overflow-y-auto p-6 flex justify-center bg-slate-100 dark:bg-slate-950/60 print:bg-white print:p-0 print:overflow-visible print:max-h-none">
             <div className="w-[340px] max-w-full bg-white dark:bg-slate-900 p-5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs space-y-3 font-mono shadow-sm thermal-receipt-mode">
               <div className="text-center space-y-1 pb-2 border-b border-dashed border-slate-300 dark:border-slate-700">
                 <div className="text-2xl mb-1">🛞</div>
@@ -374,7 +377,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 {invoice.vehicle_plate && (
                   <div className="flex justify-between items-center pt-1">
                     <span className="text-slate-500">{t("پلاک:")}</span>
-                    <span className="font-bold dir-ltr">{invoice.vehicle_plate}</span>
+                    <span dir="ltr" className="font-bold">{invoice.vehicle_plate}</span>
                   </div>
                 )}
               </div>
@@ -462,8 +465,9 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
 
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 flex flex-wrap items-center justify-between gap-3 no-print">
           <div className="flex items-center gap-2">
-            {invoice.status === 'DRAFT' && (
+            {(user?.role === 'MANAGER' || user?.role === 'TECHNICIAN') && invoice.status === 'DRAFT' && (
               <button
+                type="button"
                 onClick={handleConfirm}
                 disabled={loadingAction}
                 className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors"
@@ -475,6 +479,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
 
             {user?.role === 'MANAGER' && invoice.status === 'CONFIRMED' && invoice.payment_status !== 'PAID' && onOpenReceipt && (
               <button
+                type="button"
                 onClick={() => onOpenReceipt(invoice)}
                 className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors"
               >
@@ -485,6 +490,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
 
             {user?.role === 'MANAGER' && invoice.status === 'CONFIRMED' && onOpenReturn && (
               <button
+                type="button"
                 onClick={() => onOpenReturn(invoice)}
                 className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors"
               >
@@ -495,6 +501,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
 
             {user?.role === 'MANAGER' && invoice.status !== 'CANCELLED' && (
               <button
+                type="button"
                 onClick={handleCancel}
                 disabled={loadingAction}
                 className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors"
@@ -506,6 +513,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition-colors"
           >{t("بستن")}</button>

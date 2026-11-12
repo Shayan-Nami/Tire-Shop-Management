@@ -90,7 +90,11 @@ export const invoicesApi = {
     return response.data;
   },
 
-  getSalesReturns: async (params?: { page?: number }): Promise<PaginatedResponse<SalesReturn>> => {
+  getSalesReturns: async (params?: {
+    sales_invoice?: number;
+    page?: number;
+    page_size?: number;
+  }): Promise<PaginatedResponse<SalesReturn>> => {
     const response = await apiClient.get<PaginatedResponse<SalesReturn>>('/invoices/returns/', { params });
     return response.data;
   },

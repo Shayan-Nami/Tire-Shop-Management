@@ -223,7 +223,6 @@ export interface SalesReturnItem {
 
 export interface ReceiptVoucher {
   receipt_id: number;
-  voucher_id?: number;
   sales_invoice: number;
   customer_name?: string;
   amount: string | number;
@@ -244,7 +243,6 @@ export interface ReceiptVoucher {
 
 export interface PaymentVoucher {
   payment_id: number;
-  voucher_id?: number;
   purchase_invoice: number;
   supplier_name?: string;
   amount: string | number;
@@ -265,7 +263,6 @@ export interface PaymentVoucher {
 
 export interface CustomerRefundVoucher {
   refund_id: number;
-  voucher_id?: number;
   sales_invoice: number;
   sales_return?: number | null;
   customer_name?: string;

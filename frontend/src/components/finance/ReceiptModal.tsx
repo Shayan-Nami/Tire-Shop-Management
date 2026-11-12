@@ -13,6 +13,20 @@ interface ReceiptModalProps {
   onSuccess: () => void;
 }
 
+function getDefaultReceiptAmount(invoice: SalesInvoice | null): string {
+  if (!invoice) return '0';
+  const raw =
+    invoice.remaining_amount !== undefined &&
+    invoice.remaining_amount !== null &&
+    String(invoice.remaining_amount).trim() !== ''
+      ? invoice.remaining_amount
+      : invoice.net_amount || invoice.total_amount || 0;
+  const numeric = parseFloat(String(raw));
+  if (!Number.isFinite(numeric) || numeric <= 0) return '0';
+  const truncated = Math.floor(numeric * 100) / 100;
+  return String(truncated);
+}
+
 export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   invoice,
   onClose,
@@ -20,14 +34,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 }) => {
   const { t, language } = useLanguage();
   const { currencyUnit } = useAuth();
-  const rawAmount = invoice
-    ? (invoice.remaining_amount !== undefined && invoice.remaining_amount !== null && String(invoice.remaining_amount).trim() !== ''
-        ? invoice.remaining_amount
-        : invoice.net_amount || invoice.total_amount || 0)
-    : 0;
-  const defaultAmount = Math.max(0, Math.round(parseFloat(String(rawAmount)) || 0));
 
-  const [amount, setAmount] = useState<string>(defaultAmount.toString());
+  const [amount, setAmount] = useState<string>(() => getDefaultReceiptAmount(invoice));
   const [paymentMethod, setPaymentMethod] = useState<'POS' | 'CASH' | 'CARD_TO_CARD' | 'CHEQUE'>('POS');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -37,11 +45,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
   React.useEffect(() => {
     if (invoice) {
-      const raw = invoice.remaining_amount !== undefined && invoice.remaining_amount !== null && String(invoice.remaining_amount).trim() !== ''
-        ? invoice.remaining_amount
-        : invoice.net_amount || invoice.total_amount || 0;
-      const def = Math.max(0, Math.round(parseFloat(String(raw)) || 0));
-      setAmount(def.toString());
+      setAmount(getDefaultReceiptAmount(invoice));
+      setPaymentMethod('POS');
+      setReferenceNumber('');
+      setNotes('');
+      setErrorMessage(null);
     }
   }, [invoice]);
 
@@ -86,7 +94,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("ثبت سند دریافت وجه از مشتری")}</h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label={t("بستن")}
             className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
           >
             <X className="w-5 h-5" />
@@ -108,16 +118,18 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </div>
 
           {errorMessage && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl">
+            <div role="alert" className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl">
               {errorMessage}
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("مبلغ دریافتی (ریال):")}</label>
+            <label htmlFor="receipt-amount" className="font-bold text-slate-700 dark:text-slate-300 block">{t("مبلغ دریافتی (ریال):")}</label>
             <input
+              id="receipt-amount"
               type="number"
-              min={1}
+              min={0.01}
+              step="any"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               required
@@ -128,10 +140,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("روش دریافت وجه:")}</label>
+            <label htmlFor="receipt-method" className="font-bold text-slate-700 dark:text-slate-300 block">{t("روش دریافت وجه:")}</label>
             <select
+              id="receipt-method"
               value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as any)}
+              onChange={(e) => setPaymentMethod(e.target.value as 'POS' | 'CASH' | 'CARD_TO_CARD' | 'CHEQUE')}
               className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
             >
               <option value="POS">{t("کارتخوان بانکی (POS)")}</option>
@@ -142,8 +155,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("شماره پیگیری / شماره ارجاع تراکنش:")}</label>
+            <label htmlFor="receipt-reference" className="font-bold text-slate-700 dark:text-slate-300 block">{t("شماره پیگیری / شماره ارجاع تراکنش:")}</label>
             <input
+              id="receipt-reference"
               type="text"
               value={referenceNumber}
               onChange={(e) => setReferenceNumber(e.target.value)}
@@ -153,8 +167,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("توضیحات و بابت:")}</label>
+            <label htmlFor="receipt-notes" className="font-bold text-slate-700 dark:text-slate-300 block">{t("توضیحات و بابت:")}</label>
             <input
+              id="receipt-notes"
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

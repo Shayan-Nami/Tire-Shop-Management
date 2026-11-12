@@ -27,6 +27,7 @@ interface SelectedTireRow {
   tireId: number;
   tire: Tire;
   quantity: number;
+  quantityInput: string;
   unitPrice: number;
 }
 
@@ -162,11 +163,12 @@ export const CreateInvoice: React.FC = () => {
       setIsSearchingCustomer(true);
       setCustomerError(null);
       try {
-        const found = await fetchAllPages(
-          (page) => crmApi.getCustomers({ search: customerSearch.trim() || undefined, page, page_size: 100 }),
-          isCurrent,
-        );
+        const response = await crmApi.getCustomers({
+          search: customerSearch.trim() || undefined,
+          page_size: 20,
+        });
         if (!isCurrent()) return;
+        const found = response.results || [];
         setCustomers((previous) => {
           const selected = previous.find((customer) => customer.customer_id === selectedCustomerIdRef.current);
           return selected && !found.some((customer) => customer.customer_id === selected.customer_id)
@@ -183,6 +185,12 @@ export const CreateInvoice: React.FC = () => {
       requests.invalidate();
     };
   }, [customerSearch, t, language]);
+
+  useEffect(() => {
+    if (status === 'DRAFT') {
+      setPaymentStatus('UNPAID');
+    }
+  }, [status]);
 
   const handleCustomerChange = (custId: number | '') => {
     quickCreateRequests.current.invalidate();
@@ -222,9 +230,11 @@ export const CreateInvoice: React.FC = () => {
         return;
       }
       setTireItems(
-        tireItems.map((item) =>
-          item.tireId === tireId ? { ...item, quantity: item.quantity + 1 } : item
-        )
+        tireItems.map((item) => {
+          if (item.tireId !== tireId) return item;
+          const nextQty = item.quantity + 1;
+          return { ...item, quantity: nextQty, quantityInput: String(nextQty) };
+        })
       );
     } else {
       setTireItems([
@@ -233,30 +243,67 @@ export const CreateInvoice: React.FC = () => {
           tireId: tire.tire_id,
           tire,
           quantity: 1,
+          quantityInput: '1',
           unitPrice: parseFloat(String(tire.sale_price)) || 0,
         },
       ]);
     }
   };
 
-  const updateTireItemQty = (tireId: number, qty: number) => {
-    const tire = tires.find((t) => t.tire_id === tireId);
+  const updateTireItemQty = (tireId: number, rawValue: string) => {
+    const tire = tires.find((item) => item.tire_id === tireId);
     if (!tire) return;
 
-    if (qty > tire.stock_quantity) {
-      alert(t("حداکثر موجودی قابل فروش این تایر {0} حلقه است.", undefined, { 0: tire.stock_quantity }));
-      qty = tire.stock_quantity;
+    const trimmed = rawValue.trim();
+    if (trimmed === '') {
+      setTireItems(
+        tireItems.map((item) =>
+          item.tireId === tireId ? { ...item, quantity: 0, quantityInput: '' } : item
+        )
+      );
+      return;
     }
 
-    if (qty <= 0) {
-      removeTireItem(tireId);
+    const parsed = parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) {
       return;
+    }
+
+    let nextQty = parsed;
+    let nextInput = rawValue;
+    if (nextQty > tire.stock_quantity) {
+      alert(t("حداکثر موجودی قابل فروش این تایر {0} حلقه است.", undefined, { 0: tire.stock_quantity }));
+      nextQty = tire.stock_quantity;
+      nextInput = String(nextQty);
+    } else if (nextQty < 0) {
+      nextQty = 0;
+      nextInput = '0';
     }
 
     setTireItems(
       tireItems.map((item) =>
-        item.tireId === tireId ? { ...item, quantity: qty } : item
+        item.tireId === tireId ? { ...item, quantity: nextQty, quantityInput: nextInput } : item
       )
+    );
+  };
+
+  const commitTireItemQty = (tireId: number) => {
+    const tire = tires.find((item) => item.tire_id === tireId);
+    if (!tire) return;
+
+    setTireItems(
+      tireItems.map((item) => {
+        if (item.tireId !== tireId) return item;
+        const parsed = parseInt(item.quantityInput, 10);
+        const clamped = Number.isNaN(parsed) || parsed < 1
+          ? Math.min(1, tire.stock_quantity)
+          : Math.min(parsed, tire.stock_quantity);
+        return {
+          ...item,
+          quantity: clamped,
+          quantityInput: String(clamped),
+        };
+      })
     );
   };
 
@@ -423,7 +470,12 @@ export const CreateInvoice: React.FC = () => {
       setErrorMessage(t("حداقل یک حلقه لاستیک یا یک خدمت فنی باید به فاکتور افزوده شود."));
       return;
     }
+    if (tireItems.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1)) {
+      setErrorMessage(t("تعداد همه اقلام تایر باید حداقل ۱ حلقه باشد."));
+      return;
+    }
 
+    const effectivePaymentStatus = status === 'DRAFT' ? 'UNPAID' : paymentStatus;
     submitBusy.current = true;
     setSubmitting(true);
     setErrorMessage(null);
@@ -445,7 +497,7 @@ export const CreateInvoice: React.FC = () => {
         discount_amount: numDiscountPercent > 0 ? 0 : numDiscountAmount,
         discount_percent: numDiscountPercent,
         status,
-        payment_status: paymentStatus,
+        payment_status: effectivePaymentStatus,
         notes: notes.trim() || undefined,
       });
 
@@ -659,10 +711,10 @@ export const CreateInvoice: React.FC = () => {
                             type="number"
                             min={1}
                             max={item.tire.stock_quantity}
-                            value={item.quantity}
-                            onChange={(e) =>
-                              updateTireItemQty(item.tireId, parseInt(e.target.value) || 0)
-                            }
+                            aria-label={t("تعداد (حلقه)")}
+                            value={item.quantityInput}
+                            onChange={(e) => updateTireItemQty(item.tireId, e.target.value)}
+                            onBlur={() => commitTireItemQty(item.tireId)}
                             className="ui-field w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center font-bold text-xs"
                           />
                         </td>
@@ -706,6 +758,7 @@ export const CreateInvoice: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => removeTireItem(item.tireId)}
+                            aria-label={t("حذف")}
                             className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -916,7 +969,10 @@ export const CreateInvoice: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStatus('DRAFT')}
+                  onClick={() => {
+                    setStatus('DRAFT');
+                    setPaymentStatus('UNPAID');
+                  }}
                   aria-pressed={status === 'DRAFT'}
                   className={`py-2 px-3 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-1.5 ${
                     status === 'DRAFT'
@@ -935,8 +991,12 @@ export const CreateInvoice: React.FC = () => {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setPaymentStatus('PAID')}
-                  className={`py-2 px-3 rounded-xl font-bold transition-all text-xs ${
+                  disabled={status === 'DRAFT'}
+                  aria-pressed={paymentStatus === 'PAID'}
+                  onClick={() => {
+                    if (status !== 'DRAFT') setPaymentStatus('PAID');
+                  }}
+                  className={`py-2 px-3 rounded-xl font-bold transition-all text-xs disabled:opacity-50 disabled:cursor-not-allowed ${
                     paymentStatus === 'PAID'
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
@@ -944,6 +1004,7 @@ export const CreateInvoice: React.FC = () => {
                 >{t("تسویه کامل نقدی/پوز")}</button>
                 <button
                   type="button"
+                  aria-pressed={paymentStatus === 'UNPAID'}
                   onClick={() => setPaymentStatus('UNPAID')}
                   className={`py-2 px-3 rounded-xl font-bold transition-all text-xs ${
                     paymentStatus === 'UNPAID'

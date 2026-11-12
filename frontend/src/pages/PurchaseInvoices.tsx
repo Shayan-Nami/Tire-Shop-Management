@@ -1,5 +1,5 @@
 import { useLanguage } from '../context/LanguageContext';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Search,
   PackagePlus,
@@ -9,27 +9,11 @@ import {
 import { invoicesApi } from '../api/invoices';
 import { catalogApi } from '../api/catalog';
 import { suppliersApi } from '../api/suppliers';
-import { PaginatedResponse, PurchaseInvoice, Supplier, Tire } from '../types';
+import { PurchaseInvoice, Supplier, Tire } from '../types';
 import { parseApiError } from '../utils/errorParser';
 import { formatCurrency, formatIsoToJalali } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
-
-async function fetchAllPages<T>(
-  fetchPage: (page: number) => Promise<PaginatedResponse<T>>,
-  isActive: () => boolean
-): Promise<T[]> {
-  const results: T[] = [];
-  for (let page = 1; isActive(); page += 1) {
-    const data = await fetchPage(page);
-    if (!isActive()) return [];
-    if (data.current_page !== page || (data.next && data.results.length === 0)) {
-      throw new Error('پاسخ صفحه‌بندی سرور معتبر نیست. لطفاً دوباره تلاش کنید.');
-    }
-    results.push(...data.results);
-    if (!data.next) return results;
-  }
-  return [];
-}
+import { createRequestSequence, fetchAllPages } from '../utils/invoiceRequests';
 
 export const PurchaseInvoices: React.FC = () => {
   const { t, language } = useLanguage();
@@ -38,10 +22,13 @@ export const PurchaseInvoices: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [tires, setTires] = useState<Tire[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [refreshVersion, setRefreshVersion] = useState<number>(0);
 
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | ''>('');
@@ -52,23 +39,61 @@ export const PurchaseInvoices: React.FC = () => {
   const [selectorsError, setSelectorsError] = useState('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const submitBusy = useRef(false);
+  const purchaseRequests = useRef(createRequestSequence());
 
-  const fetchPurchases = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await invoicesApi.getPurchaseInvoices({
-        search: search.trim() || undefined,
-        page: currentPage,
-      });
-      setInvoices(data.results || []);
-      setTotalPages(data.total_pages || 1);
-      setTotalCount(data.count || 0);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, currentPage]);
+  const fetchPurchases = () => {
+    purchaseRequests.current.invalidate();
+    setRefreshVersion((version) => version + 1);
+  };
+
+  const resetCreateForm = () => {
+    setSelectedSupplierId('');
+    setPurchaseItems([]);
+  };
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    resetCreateForm();
+  };
+
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === debouncedSearch) return;
+    const timer = setTimeout(() => {
+      setDebouncedSearch(trimmed);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search, debouncedSearch]);
+
+  useEffect(() => {
+    const requests = purchaseRequests.current;
+    const request = requests.begin();
+    const isCurrent = () => requests.isCurrent(request);
+    const loadPurchases = async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const data = await invoicesApi.getPurchaseInvoices({
+          search: debouncedSearch || undefined,
+          page: currentPage,
+        });
+        if (!isCurrent()) return;
+        setInvoices(data.results || []);
+        setTotalPages(data.total_pages || 1);
+        setTotalCount(data.count || 0);
+      } catch (error) {
+        if (!isCurrent()) return;
+        setInvoices([]);
+        setTotalPages(1);
+        setTotalCount(0);
+        setLoadError(parseApiError(error, t("خطا در دریافت فاکتورهای خرید"), language));
+      } finally {
+        if (isCurrent()) setLoading(false);
+      }
+    };
+    void loadPurchases();
+    return () => requests.invalidate();
+  }, [debouncedSearch, currentPage, refreshVersion, t, language]);
 
   useEffect(() => {
     let active = true;
@@ -76,8 +101,8 @@ export const PurchaseInvoices: React.FC = () => {
     const loadSelectors = async () => {
       try {
         const [allSuppliers, allTires] = await Promise.all([
-          fetchAllPages((page) => suppliersApi.getSuppliers({ page, page_size: 100 }), isActive),
-          fetchAllPages((page) => catalogApi.getTires({ page, page_size: 100 }), isActive),
+          fetchAllPages((page) => suppliersApi.getSuppliers({ page, page_size: 100 }), isActive, language),
+          fetchAllPages((page) => catalogApi.getTires({ page, page_size: 100 }), isActive, language),
         ]);
         if (!active) return;
         setSuppliers(allSuppliers);
@@ -93,10 +118,6 @@ export const PurchaseInvoices: React.FC = () => {
     void loadSelectors();
     return () => { active = false; };
   }, [t, language]);
-
-  useEffect(() => {
-    void fetchPurchases();
-  }, [fetchPurchases]);
 
   const handleAddTireRow = (tireId: number) => {
     const tire = tires.find((t) => t.tire_id === tireId);
@@ -170,8 +191,7 @@ export const PurchaseInvoices: React.FC = () => {
         })),
       });
 
-      setShowCreateModal(false);
-      setPurchaseItems([]);
+      closeCreateModal();
       fetchPurchases();
     } catch (err) {
       alert(parseApiError(err, t("خطا در ثبت ورود کالا به انبار"), language));
@@ -204,7 +224,7 @@ export const PurchaseInvoices: React.FC = () => {
   );
 
   return (
-    <div className="page-stack">
+    <div className="page-stack" aria-busy={loading}>
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("فاکتورهای خرید و ورود به انبار")}</h1>
@@ -212,7 +232,11 @@ export const PurchaseInvoices: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setShowCreateModal(true)}
+          type="button"
+          onClick={() => {
+            resetCreateForm();
+            setShowCreateModal(true);
+          }}
           disabled={selectorsLoading || !!selectorsError}
           className="action-primary inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-brand-600/30 transition-all active:scale-[0.98]"
         >
@@ -232,8 +256,10 @@ export const PurchaseInvoices: React.FC = () => {
         <div className="relative w-full md:w-80">
           <input
             type="text"
+            aria-label={t("جستجو در شماره فاکتور، نام تأمین‌کننده...")}
             value={search}
             onChange={(e) => {
+              purchaseRequests.current.invalidate();
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
@@ -244,10 +270,17 @@ export const PurchaseInvoices: React.FC = () => {
         </div>
       </div>
 
+      {loadError && (
+        <div role="alert" className="p-4 text-xs text-rose-700 dark:text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+          <span>{loadError}</span>
+          <button type="button" onClick={fetchPurchases} className="ms-3 underline font-semibold">{t("تلاش مجدد")}</button>
+        </div>
+      )}
+
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال دریافت فاکتورهای خرید...")}</div>
-        ) : invoices.length === 0 ? (
+        ) : loadError ? null : invoices.length === 0 ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("سند خریدی یافت نشد.")}</div>
         ) : (
           <div className="table-scroll overflow-x-auto">
@@ -309,8 +342,10 @@ export const PurchaseInvoices: React.FC = () => {
                       <td className="py-3 px-4 text-center">
                         {inv.status === 'CONFIRMED' && (
                           <button
+                            type="button"
                             onClick={() => handleCancelPurchase(inv)}
                             title={t("لغو فاکتور خرید و کسر از انبار")}
+                            aria-label={t("لغو فاکتور خرید و کسر از انبار")}
                             className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors"
                           >
                             <XCircle className="w-3.5 h-3.5" />
@@ -331,11 +366,13 @@ export const PurchaseInvoices: React.FC = () => {
             </span>
             <div className="flex gap-1">
               <button
+                type="button"
                 disabled={currentPage <= 1}
                 onClick={() => setCurrentPage((p) => p - 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
               >{t("قبلی")}</button>
               <button
+                type="button"
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage((p) => p + 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40"
@@ -352,20 +389,21 @@ export const PurchaseInvoices: React.FC = () => {
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("ثبت ورود کالا و فاکتور خرید از تأمین‌کننده")}</h2>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={closeCreateModal}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-               aria-label={t("بستن پنجره")}>
+                aria-label={t("بستن پنجره")}>
                 ×
               </button>
             </div>
 
             <form onSubmit={handleCreatePurchase} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300 block">{t("تأمین‌کننده کالا:")}</label>
+                <label htmlFor="purchase-supplier" className="font-bold text-slate-700 dark:text-slate-300 block">{t("تأمین‌کننده کالا:")}</label>
                 <select
+                  id="purchase-supplier"
                   required
                   value={selectedSupplierId}
-                  onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
+                  onChange={(e) => setSelectedSupplierId(e.target.value ? Number(e.target.value) : '')}
                   className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                 >
                   <option value="">{t("انتخاب تأمین‌کننده...")}</option>
@@ -379,8 +417,9 @@ export const PurchaseInvoices: React.FC = () => {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-700 dark:text-slate-300">{t("اقلام تایر خریداری‌شده:")}</label>
+                  <label htmlFor="purchase-add-tire" className="font-bold text-slate-700 dark:text-slate-300">{t("اقلام تایر خریداری‌شده:")}</label>
                   <select
+                    id="purchase-add-tire"
                     onChange={(e) => {
                       if (e.target.value) {
                         handleAddTireRow(Number(e.target.value));
@@ -447,6 +486,7 @@ export const PurchaseInvoices: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleRemoveRow(item.tireId)}
+                                aria-label={t("حذف")}
                                 className="p-1 text-slate-400 hover:text-rose-600"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -470,7 +510,7 @@ export const PurchaseInvoices: React.FC = () => {
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={closeCreateModal}
                   className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300"
                 >{t("انصراف")}</button>
                 <button

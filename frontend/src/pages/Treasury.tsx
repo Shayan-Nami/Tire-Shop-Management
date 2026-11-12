@@ -1,25 +1,32 @@
 import { useLanguage } from '../context/LanguageContext';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowDownLeft,
   ArrowUpRight,
   RotateCcw,
   Ban,
+  Search,
 } from 'lucide-react';
 import { financeApi } from '../api/finance';
 import { ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher } from '../types';
 import { formatCurrency, formatIsoToJalali } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 import { CancelVoucherModal } from '../components/finance/CancelVoucherModal';
+import { createRequestSequence } from '../utils/invoiceRequests';
+import { parseApiError } from '../utils/errorParser';
 
 export const Treasury: React.FC = () => {
   const { t, language } = useLanguage();
   const { currencyUnit, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'receipts' | 'payments' | 'refunds'>('receipts');
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [search, setSearch] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [refreshVersion, setRefreshVersion] = useState<number>(0);
 
   const [receipts, setReceipts] = useState<ReceiptVoucher[]>([]);
   const [payments, setPayments] = useState<PaymentVoucher[]>([]);
@@ -32,35 +39,91 @@ export const Treasury: React.FC = () => {
     title: string;
   } | null>(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      if (activeTab === 'receipts') {
-        const res = await financeApi.getReceipts({ page: currentPage });
-        setReceipts(res.results || []);
-        setTotalPages(res.total_pages || 1);
-        setTotalCount(res.count || 0);
-      } else if (activeTab === 'payments') {
-        const res = await financeApi.getPayments({ page: currentPage });
-        setPayments(res.results || []);
-        setTotalPages(res.total_pages || 1);
-        setTotalCount(res.count || 0);
-      } else {
-        const res = await financeApi.getCustomerRefunds({ page: currentPage });
-        setRefunds(res.results || []);
-        setTotalPages(res.total_pages || 1);
-        setTotalCount(res.count || 0);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, currentPage]);
+  const treasuryRequests = useRef(createRequestSequence());
+
+  const refreshData = () => {
+    treasuryRequests.current.invalidate();
+    setRefreshVersion((version) => version + 1);
+  };
 
   useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === debouncedSearch) return;
+    const timer = setTimeout(() => {
+      setDebouncedSearch(trimmed);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search, debouncedSearch]);
+
+  useEffect(() => {
+    const requests = treasuryRequests.current;
+    const request = requests.begin();
+    const isCurrent = () => requests.isCurrent(request);
+
+    const loadData = async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const params = {
+          page: currentPage,
+          search: debouncedSearch || undefined,
+        };
+        if (activeTab === 'receipts') {
+          const res = await financeApi.getReceipts(params);
+          if (!isCurrent()) return;
+          setReceipts(res.results || []);
+          setTotalPages(res.total_pages || 1);
+          setTotalCount(res.count || 0);
+        } else if (activeTab === 'payments') {
+          const res = await financeApi.getPayments(params);
+          if (!isCurrent()) return;
+          setPayments(res.results || []);
+          setTotalPages(res.total_pages || 1);
+          setTotalCount(res.count || 0);
+        } else {
+          const res = await financeApi.getCustomerRefunds(params);
+          if (!isCurrent()) return;
+          setRefunds(res.results || []);
+          setTotalPages(res.total_pages || 1);
+          setTotalCount(res.count || 0);
+        }
+      } catch (error) {
+        if (!isCurrent()) return;
+        setReceipts([]);
+        setPayments([]);
+        setRefunds([]);
+        setTotalPages(1);
+        setTotalCount(0);
+        setLoadError(parseApiError(error, t("خطا در دریافت اسناد مالی"), language));
+      } finally {
+        if (isCurrent()) setLoading(false);
+      }
+    };
+
     void loadData();
-  }, [loadData]);
+    return () => requests.invalidate();
+  }, [activeTab, currentPage, debouncedSearch, refreshVersion, t, language]);
+
+  const formatPaymentMethod = (method?: string | null, display?: string | null): string => {
+    const rawMethod = method?.trim() || '';
+    const rawDisplay = display?.trim() || '';
+    if (!rawMethod && !rawDisplay) return '-';
+    if (language === 'en') {
+      if (rawMethod) {
+        const translated = t(rawMethod);
+        if (translated && translated !== rawMethod) return translated;
+      }
+      if (rawDisplay) {
+        const translatedDisplay = t(rawDisplay);
+        if (translatedDisplay) return translatedDisplay;
+      }
+      return rawMethod || rawDisplay || '-';
+    }
+    if (rawDisplay && rawDisplay !== rawMethod) {
+      return t(rawDisplay);
+    }
+    return rawMethod ? t(rawMethod) : rawDisplay || '-';
+  };
 
   const handleOpenCancel = (id: number, type: 'receipt' | 'payment' | 'refund', title: string) => {
     setCancelTarget({ id, type, title });
@@ -76,11 +139,11 @@ export const Treasury: React.FC = () => {
     } else {
       await financeApi.cancelCustomerRefund(cancelTarget.id, reason);
     }
-    loadData();
+    refreshData();
   };
 
   return (
-    <div className="page-stack">
+    <div className="page-stack" aria-busy={loading}>
       <div className="page-heading">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("خزانه‌داری و مدیریت اسناد مالی")}</h1>
@@ -90,7 +153,9 @@ export const Treasury: React.FC = () => {
 
       <div className="tab-bar">
         <button
+          type="button"
           onClick={() => {
+            treasuryRequests.current.invalidate();
             setActiveTab('receipts');
             setCurrentPage(1);
           }}
@@ -105,7 +170,9 @@ export const Treasury: React.FC = () => {
         </button>
 
         <button
+          type="button"
           onClick={() => {
+            treasuryRequests.current.invalidate();
             setActiveTab('payments');
             setCurrentPage(1);
           }}
@@ -120,7 +187,9 @@ export const Treasury: React.FC = () => {
         </button>
 
         <button
+          type="button"
           onClick={() => {
+            treasuryRequests.current.invalidate();
             setActiveTab('refunds');
             setCurrentPage(1);
           }}
@@ -135,10 +204,35 @@ export const Treasury: React.FC = () => {
         </button>
       </div>
 
+      <div className="filter-bar">
+        <div className="relative w-full md:w-80">
+          <input
+            type="text"
+            aria-label={t("جستجو در اسناد مالی...")}
+            value={search}
+            onChange={(e) => {
+              treasuryRequests.current.invalidate();
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder={t("جستجو در اسناد مالی...")}
+            className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+          />
+          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-3" />
+        </div>
+      </div>
+
+      {loadError && (
+        <div role="alert" className="p-4 text-xs text-rose-700 dark:text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+          <span>{loadError}</span>
+          <button type="button" onClick={refreshData} className="ms-3 underline font-semibold">{t("تلاش مجدد")}</button>
+        </div>
+      )}
+
       <div className="surface-panel overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">{t("در حال بارگذاری اسناد مالی...")}</div>
-        ) : activeTab === 'receipts' ? (
+        ) : loadError ? null : activeTab === 'receipts' ? (
           receipts.length === 0 ? (
             <div className="py-16 text-center text-xs text-slate-400">{t("هیچ سند دریافتی ثبت نشده است.")}</div>
           ) : (
@@ -158,7 +252,7 @@ export const Treasury: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {receipts.map((r) => {
-                    const rId = r.receipt_id ?? r.voucher_id ?? 0;
+                    const rId = r.receipt_id;
                     return (
                       <tr key={rId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                         <td className="py-3 px-4 font-mono text-slate-400">#{rId}</td>
@@ -172,7 +266,7 @@ export const Treasury: React.FC = () => {
                           {formatCurrency(r.amount, true, currencyUnit, language)}
                         </td>
                         <td className="py-3 px-4 text-slate-600 dark:text-slate-300 font-medium">
-                          {language === 'en' ? t(r.payment_method) : (r.payment_method_display || t(r.payment_method))}
+                          {formatPaymentMethod(r.payment_method, r.payment_method_display)}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-400">{r.reference_number || '-'}</td>
                         <td className="py-3 px-4 text-center">
@@ -186,9 +280,11 @@ export const Treasury: React.FC = () => {
                           <td className="py-3 px-4 text-center">
                             {!r.is_cancelled && (
                               <button
+                                type="button"
                                 onClick={() => handleOpenCancel(rId, 'receipt', t("ابطال سند دریافت شماره #{0}", undefined, { 0: rId }))}
                                 className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                                 title={t("ابطال سند با ذکر دلیل")}
+                                aria-label={t("ابطال سند با ذکر دلیل")}
                               >
                                 <Ban className="w-3.5 h-3.5" />
                               </button>
@@ -222,7 +318,7 @@ export const Treasury: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {payments.map((p) => {
-                    const pId = p.payment_id ?? p.voucher_id ?? 0;
+                    const pId = p.payment_id;
                     return (
                       <tr key={pId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                         <td className="py-3 px-4 font-mono text-slate-400">#{pId}</td>
@@ -236,7 +332,7 @@ export const Treasury: React.FC = () => {
                           {formatCurrency(p.amount, true, currencyUnit, language)}
                         </td>
                         <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                          {language === 'en' ? t(p.payment_method) : (p.payment_method_display || t(p.payment_method))}
+                          {formatPaymentMethod(p.payment_method, p.payment_method_display)}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-400">{p.reference_number || '-'}</td>
                         <td className="py-3 px-4 text-center">
@@ -250,9 +346,11 @@ export const Treasury: React.FC = () => {
                           <td className="py-3 px-4 text-center">
                             {!p.is_cancelled && (
                               <button
+                                type="button"
                                 onClick={() => handleOpenCancel(pId, 'payment', t("ابطال سند پرداخت شماره #{0}", undefined, { 0: pId }))}
                                 className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                                 title={t("ابطال سند با ذکر دلیل")}
+                                aria-label={t("ابطال سند با ذکر دلیل")}
                               >
                                 <Ban className="w-3.5 h-3.5" />
                               </button>
@@ -285,7 +383,7 @@ export const Treasury: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {refunds.map((rf) => {
-                    const rfId = rf.refund_id ?? rf.voucher_id ?? 0;
+                    const rfId = rf.refund_id;
                     return (
                       <tr key={rfId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                         <td className="py-3 px-4 font-mono text-slate-400">#{rfId}</td>
@@ -299,7 +397,7 @@ export const Treasury: React.FC = () => {
                           {formatCurrency(rf.amount, true, currencyUnit, language)}
                         </td>
                         <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                          {language === 'en' ? t(rf.payment_method) : (rf.payment_method_display || t(rf.payment_method))}
+                          {formatPaymentMethod(rf.payment_method, rf.payment_method_display)}
                         </td>
                         <td className="py-3 px-4 text-center">
                           {rf.is_cancelled ? (
@@ -312,9 +410,11 @@ export const Treasury: React.FC = () => {
                           <td className="py-3 px-4 text-center">
                             {!rf.is_cancelled && (
                               <button
+                                type="button"
                                 onClick={() => handleOpenCancel(rfId, 'refund', t("ابطال سند استرداد شماره #{0}", undefined, { 0: rfId }))}
                                 className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                                 title={t("ابطال سند با ذکر دلیل")}
+                                aria-label={t("ابطال سند با ذکر دلیل")}
                               >
                                 <Ban className="w-3.5 h-3.5" />
                               </button>
@@ -335,11 +435,13 @@ export const Treasury: React.FC = () => {
             <span>{t("صفحه")}{' '}{currentPage} {' '}{t("از")} {totalPages} {t("(مجموع")} {totalCount}{' '}{t("سند)")}</span>
             <div className="flex gap-1">
               <button
+                type="button"
                 disabled={currentPage <= 1}
                 onClick={() => setCurrentPage((p) => p - 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >{t("قبلی")}</button>
               <button
+                type="button"
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage((p) => p + 1)}
                 className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"

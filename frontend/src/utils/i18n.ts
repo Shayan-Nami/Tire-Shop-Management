@@ -52,7 +52,56 @@ export const translations: Record<string, { fa: string; en: string }> = {
 for (const [fa, en] of Object.entries(englishMessages)) translations[fa] = { fa, en };
 
 export function translateMessage(message: string, language: Language): string {
-  return language === 'en' ? (translations[message]?.en || message) : message;
+  return translations[message]?.[language] || message;
 }
 
-Object.assign(translations, { MANAGER: { fa: 'مدیر سیستم', en: 'Manager' }, TECHNICIAN: { fa: 'تکنسین فنی', en: 'Technician' }, WAREHOUSE: { fa: 'انباردار', en: 'Warehouse staff' } });
+Object.assign(translations, {
+  MANAGER: { fa: 'مدیر سیستم', en: 'Manager' },
+  TECHNICIAN: { fa: 'تکنسین فنی', en: 'Technician' },
+  WAREHOUSE: { fa: 'انباردار', en: 'Warehouse staff' },
+  POS: { fa: 'کارتخوان (POS)', en: 'Card terminal' },
+  CASH: { fa: 'نقدی', en: 'Cash' },
+  CARD_TO_CARD: { fa: 'کارت به کارت', en: 'Card to card' },
+  BANK_TRANSFER: { fa: 'انتقال بانکی / حواله', en: 'Bank transfer' },
+  TRANSFER: { fa: 'حواله بانکی', en: 'Bank transfer' },
+  CHEQUE: { fa: 'چک', en: 'Cheque' },
+  CHECK: { fa: 'چک', en: 'Cheque' },
+  'کارتخوان / نقدی': { fa: 'کارتخوان / نقدی', en: 'Card terminal / cash' },
+  'حواله / چک': { fa: 'حواله / چک', en: 'Bank transfer / cheque' },
+  'پاسخ صفحه‌بندی نامعتبر است؛ صفحه درخواستی دریافت نشد.': {
+    fa: 'پاسخ صفحه‌بندی نامعتبر است؛ صفحه درخواستی دریافت نشد.',
+    en: 'Invalid pagination response; requested page was not returned.',
+  },
+  'پاسخ صفحه‌بندی نامعتبر است؛ دریافت همه گزینه‌ها ممکن نشد.': {
+    fa: 'پاسخ صفحه‌بندی نامعتبر است؛ دریافت همه گزینه‌ها ممکن نشد.',
+    en: 'Invalid pagination response; failed to load all options.',
+  },
+});
+
+export function translatePaymentMethod(
+  method?: string | null,
+  display?: string | null,
+  language: Language = 'fa',
+): string {
+  const rawMethod = method?.trim() || '';
+  const rawDisplay = display?.trim() || '';
+  if (!rawMethod && !rawDisplay) return '-';
+
+  if (language === 'en') {
+    if (rawMethod && translations[rawMethod]?.en) {
+      return translations[rawMethod].en;
+    }
+    if (rawDisplay && translations[rawDisplay]?.en) {
+      return translations[rawDisplay].en;
+    }
+    return rawMethod || rawDisplay || '-';
+  }
+
+  if (rawDisplay && rawDisplay !== rawMethod) {
+    return translations[rawDisplay]?.fa || rawDisplay;
+  }
+  if (rawMethod && translations[rawMethod]?.fa) {
+    return translations[rawMethod].fa;
+  }
+  return rawMethod || rawDisplay || '-';
+}

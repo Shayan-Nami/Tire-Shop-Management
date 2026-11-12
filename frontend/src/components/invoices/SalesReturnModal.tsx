@@ -1,5 +1,5 @@
 import { useLanguage } from '../../context/LanguageContext';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, RotateCcw, AlertTriangle } from 'lucide-react';
 import { SalesInvoice } from '../../types';
 import { invoicesApi } from '../../api/invoices';
@@ -21,12 +21,84 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const { t, language } = useLanguage();
   const { currencyUnit } = useAuth();
   const [returnItems, setReturnItems] = useState<{ [itemId: number]: number }>({});
+  const [returnedByItem, setReturnedByItem] = useState<Record<number, number>>({});
+  const [loadingReturns, setLoadingReturns] = useState<boolean>(false);
+  const [returnsLoadError, setReturnsLoadError] = useState<string | null>(null);
+  const [returnsRetryToken, setReturnsRetryToken] = useState<number>(0);
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const submitBusy = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    setReturnItems({});
+    setReason('');
+    setErrorMessage(null);
+    setReturnedByItem({});
+    setReturnsLoadError(null);
+
+    if (!invoice || typeof invoicesApi.getSalesReturns !== 'function') {
+      setLoadingReturns(false);
+      return;
+    }
+
+    let active = true;
+    const invoiceId = invoice.sales_invoice_id;
+    setLoadingReturns(true);
+
+    const loadPriorReturns = async () => {
+      try {
+        const totals: Record<number, number> = {};
+        for (let page = 1; ; page += 1) {
+          if (!active) return;
+          const response = await invoicesApi.getSalesReturns({
+            sales_invoice: invoiceId,
+            page,
+            page_size: 100,
+          });
+          if (!active) return;
+
+          const records = response.results || [];
+          for (const ret of records) {
+            if (ret.sales_invoice !== invoiceId) continue;
+            for (const retItem of ret.items || []) {
+              totals[retItem.sales_invoice_tire_item] =
+                (totals[retItem.sales_invoice_tire_item] || 0) + retItem.quantity;
+            }
+          }
+
+          const hasMore = Boolean(response.next) || page < (response.total_pages || 1);
+          if (!hasMore || records.length === 0) break;
+        }
+        if (active) {
+          setReturnedByItem(totals);
+        }
+      } catch (err: unknown) {
+        if (active) {
+          setReturnsLoadError(parseApiError(err, t("خطا در دریافت سوابق مرجوعی فاکتور"), language));
+        }
+      } finally {
+        if (active) {
+          setLoadingReturns(false);
+        }
+      }
+    };
+
+    void loadPriorReturns();
+    return () => {
+      active = false;
+    };
+  }, [invoice?.sales_invoice_id, returnsRetryToken, t, language]);
+
   if (!invoice) return null;
+
+  const getRemainingQty = (itemId: number, purchasedQty: number): number =>
+    Math.max(0, purchasedQty - (returnedByItem[itemId] || 0));
+
+  const totalRemainingQty = invoice.tire_items.reduce(
+    (sum, item) => sum + getRemainingQty(item.id, item.quantity),
+    0
+  );
 
   const handleQtyChange = (itemId: number, qty: number, maxQty: number) => {
     const val = Math.max(0, Math.min(qty, maxQty));
@@ -38,15 +110,23 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitBusy.current) return;
+    if (submitBusy.current || loadingReturns) return;
     setErrorMessage(null);
 
+    const remainingById = new Map(
+      invoice.tire_items.map((item) => [item.id, getRemainingQty(item.id, item.quantity)])
+    );
+
     const itemsToReturn = Object.entries(returnItems)
-      .filter(([, qty]) => qty > 0)
-      .map(([itemId, qty]) => ({
-        sales_invoice_tire_item_id: Number(itemId),
-        quantity: qty,
-      }));
+      .map(([itemId, qty]) => {
+        const numericId = Number(itemId);
+        const maxRemaining = remainingById.get(numericId) ?? 0;
+        return {
+          sales_invoice_tire_item_id: numericId,
+          quantity: Math.min(qty, maxRemaining),
+        };
+      })
+      .filter((item) => item.quantity > 0);
 
     if (itemsToReturn.length === 0) {
       setErrorMessage(t("حداقل باید یک حلقه تایر را برای مرجوعی انتخاب فرمایید."));
@@ -63,7 +143,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
       });
       onSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setErrorMessage(parseApiError(err, t("خطا در ثبت سند مرجوعی کالا"), language));
     } finally {
       submitBusy.current = false;
@@ -81,7 +161,9 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
             </h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label={t("بستن")}
             className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
           >
             <X className="w-5 h-5" />
@@ -94,8 +176,21 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
             <span>{t("کالای مرجوعی فوراً به موجودی قابل فروش در انبار اضافه می‌گردد و سهم تخفیف فاکتور بر مبلغ استردادی اعمال خواهد شد.")}</span>
           </div>
 
+          {returnsLoadError && (
+            <div role="alert" className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl text-xs flex items-center justify-between gap-2">
+              <span>{returnsLoadError}</span>
+              <button
+                type="button"
+                onClick={() => setReturnsRetryToken((prev) => prev + 1)}
+                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold shrink-0"
+              >
+                {t("تلاش مجدد")}
+              </button>
+            </div>
+          )}
+
           {errorMessage && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl text-xs">
+            <div role="alert" className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl text-xs">
               {errorMessage}
             </div>
           )}
@@ -104,7 +199,9 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
             <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block">{t("اقلام تایر خریداری‌شده در فاکتور:")}</label>
 
             {invoice.tire_items.map((item) => {
-              const currentReturnQty = returnItems[item.id] || 0;
+              const returnedQty = returnedByItem[item.id] || 0;
+              const remainingQty = getRemainingQty(item.id, item.quantity);
+              const currentReturnQty = Math.min(returnItems[item.id] || 0, remainingQty);
               return (
                 <div
                   key={item.id}
@@ -114,8 +211,14 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                     <p className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate">
                       <bdi dir="auto">{item.tire_name}</bdi>
                     </p>
-                    <p className="text-[11px] text-slate-500">{t("خریداری‌شده:")}{item.quantity} {' '}{t("حلقه | نرخ:")} {formatCurrency(item.unit_price, true, currencyUnit, language)}
+                    <p className="text-[11px] text-slate-500">
+                      {t("خریداری‌شده:")}{item.quantity} {' '}{t("حلقه | نرخ:")} {formatCurrency(item.unit_price, true, currencyUnit, language)}
                     </p>
+                    {returnedQty > 0 && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-0.5">
+                        {t("مرجوع‌شده:")} {returnedQty} | {t("قابل مرجوعی:")} {remainingQty}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 ms-3">
@@ -123,10 +226,12 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                     <input
                       type="number"
                       min={0}
-                      max={item.quantity}
+                      max={remainingQty}
+                      disabled={loadingReturns || remainingQty === 0}
+                      aria-label={t("تعداد مرجوعی:")}
                       value={currentReturnQty}
-                      onChange={(e) => handleQtyChange(item.id, parseInt(e.target.value) || 0, item.quantity)}
-                      className="ui-field w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center text-xs font-bold"
+                      onChange={(e) => handleQtyChange(item.id, parseInt(e.target.value, 10) || 0, remainingQty)}
+                      className="ui-field w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center text-xs font-bold disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -135,8 +240,9 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block">{t("علت مرجوعی کالا:")}</label>
+            <label htmlFor="sales-return-reason" className="text-xs font-bold text-slate-600 dark:text-slate-400 block">{t("علت مرجوعی کالا:")}</label>
             <textarea
+              id="sales-return-reason"
               rows={2}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -153,8 +259,8 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
             >{t("انصراف")}</button>
             <button
               type="submit"
-              disabled={submitting}
-              className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"
+              disabled={submitting || loadingReturns || Boolean(returnsLoadError) || totalRemainingQty === 0}
+              className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
             >
               {submitting ? t("در حال ثبت...") : t("تایید و ثبت مرجوعی")}
             </button>

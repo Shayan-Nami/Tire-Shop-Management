@@ -183,7 +183,7 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
 .login-form-card { width: 100%; max-width: 390px; }
 .login-form-card h1 { font-size: 28px; font-weight: 800; color: var(--ink); }
 .login-form-card label { display: block; margin-bottom: 8px; color: var(--ink); font-size: 13px; font-weight: 650; }
-.login-form-card .ui-field { width: 100%; min-height: 48px; padding: 10px 42px 10px 14px; }
+.login-form-card .ui-field { width: 100%; min-height: 48px; padding-block: 10px; padding-inline-start: 42px; padding-inline-end: 14px; }
 .login-form-card .field-icon { position: absolute; inset-inline-start: 14px; top: 16px; color: var(--muted); pointer-events: none; }
 .login-form-card .password-input { padding-inline-end: 48px; }
 .login-form-card .password-toggle { position: absolute; inset-inline-end: 5px; top: 4px; color: var(--muted); }
@@ -284,14 +284,26 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
 @media print {
   .app-modal[open] { display: block; height: auto; }
   .app-modal::backdrop { background: transparent; }
-  html, body {
+  html, body, #root, .app-shell, .workspace, main {
     background: #ffffff !important;
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
     height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     overflow: visible !important;
-    visibility: hidden;
+  }
+
+  .app-shell,
+  .app-shell > div {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body:has(.invoice-modal-overlay) .app-shell *:not(:has(.invoice-modal-overlay)):not(.invoice-modal-overlay):not(.invoice-modal-overlay *) {
+    display: none !important;
   }
 
   header, aside, .no-print, .no-print * {
@@ -306,25 +318,26 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
   .invoice-modal-overlay {
     position: static !important;
     display: block !important;
-    background: transparent !important;
+    background: #ffffff !important;
     padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+    height: auto !important;
     overflow: visible !important;
     box-shadow: none !important;
   }
 
   .invoice-modal-card {
     visibility: visible !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
+    display: block !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
+    height: auto !important;
     max-height: none !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -333,8 +346,16 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
     margin: 0 !important;
   }
 
+  .invoice-modal-card > div {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
   .invoice-modal-card * {
     visibility: visible;
+    color: #000000 !important;
+    background: #ffffff !important;
   }
 
   .invoice-modal-card .no-print,
@@ -343,9 +364,17 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
     visibility: hidden !important;
   }
 
+  body:has(.thermal-receipt-mode),
+  .invoice-modal-overlay:has(.thermal-receipt-mode),
+  .invoice-modal-card:has(.thermal-receipt-mode),
+  .thermal-receipt-mode {
+    page: thermal;
+  }
+
   .thermal-receipt-mode {
     width: 80mm !important;
     max-width: 80mm !important;
+    box-sizing: border-box !important;
     margin: 0 auto !important;
     padding: 2mm !important;
     font-size: 11px !important;
@@ -362,6 +391,11 @@ textarea.ui-field { padding-block: 10px; min-height: 88px; resize: vertical; }
 
   @page {
     margin: 8mm;
+  }
+
+  @page thermal {
+    size: 80mm auto;
+    margin: 0;
   }
 }
 

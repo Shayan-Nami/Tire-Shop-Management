@@ -15,7 +15,7 @@ export async function getAllResults<T>(url: string): Promise<T[]> {
   return fetchAllPages(async (page) => {
     if (page === 1) return firstPage;
     const data = await getPage(page);
-    if (Array.isArray(data)) throw new Error('پاسخ صفحه‌بندی سرور معتبر نیست.');
+    if (Array.isArray(data)) throw new Error('پاسخ صفحه‌بندی سرور معتبر نیست. لطفاً دوباره تلاش کنید.');
     return data;
   });
 }

@@ -230,16 +230,20 @@ export const SalesInvoices: React.FC = () => {
                     <td className="py-3 px-4 text-center">
                       <div className="inline-flex items-center gap-1.5">
                         <button
+                          type="button"
                           onClick={() => setSelectedInvoice(inv)}
                           title={t("مشاهده جزئیات و چاپ")}
+                          aria-label={t("مشاهده جزئیات و چاپ")}
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                         {user?.role === 'MANAGER' && inv.status === 'CONFIRMED' && inv.payment_status !== 'PAID' && (
                           <button
+                            type="button"
                             onClick={() => setReceiptInvoice(inv)}
                             title={t("ثبت دریافت وجه")}
+                            aria-label={t("ثبت دریافت وجه")}
                             className="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 transition-colors"
                           >
                             <CreditCard className="w-3.5 h-3.5" />
@@ -247,8 +251,10 @@ export const SalesInvoices: React.FC = () => {
                         )}
                         {user?.role === 'MANAGER' && inv.status === 'CONFIRMED' && (
                           <button
+                            type="button"
                             onClick={() => setReturnInvoice(inv)}
                             title={t("ثبت مرجوعی کالا")}
+                            aria-label={t("ثبت مرجوعی کالا")}
                             className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition-colors"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />

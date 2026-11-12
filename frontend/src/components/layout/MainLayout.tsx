@@ -16,14 +16,14 @@ export const MainLayout: React.FC = () => {
   }, [pathname]);
 
   return (
-    <div className="app-shell flex h-dvh bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans">
+    <div className="app-shell flex h-dvh bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans print:block print:h-auto print:overflow-visible">
       <a href="#main-content" className="skip-link">{t("رفتن به محتوای اصلی")}</a>
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:block print:h-auto print:overflow-visible">
         <Navbar onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} />
 
-        <main ref={mainRef} id="main-content" tabIndex={-1} className="workspace flex-1 overflow-y-auto">
+        <main ref={mainRef} id="main-content" tabIndex={-1} className="workspace flex-1 overflow-y-auto print:h-auto print:overflow-visible">
           <div className="max-w-[1440px] mx-auto w-full">
             <Outlet />
           </div>
