@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
+from django.conf import settings
+from django.contrib.auth.models import update_last_login
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from rest_framework_simplejwt.utils import datetime_from_epoch, datetime_to_epoch
 
 from utils.persian import normalize_optional_digits, phone_validator
 from utils.serializers import PersianNormalizedCharField
 from .models import User
 from .services import set_password_and_revoke_tokens
+
+_SESSION_EXPIRED_MESSAGE = 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.'
 
 
 def _validate_unique_user_phone(value: str | None, instance: User | None) -> str | None:
@@ -34,10 +43,25 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         token['role'] = user.role
         token['full_name'] = user.full_name or user.username
+        max_hours = getattr(settings, 'JWT_MAX_SESSION_HOURS', 12)
+        session_exp = datetime_to_epoch(token.current_time + timedelta(hours=max_hours))
+        token['session_exp'] = session_exp
+        token['exp'] = min(int(token['exp']), session_exp)
+        OutstandingToken.objects.filter(jti=token[api_settings.JTI_CLAIM]).update(
+            expires_at=datetime_from_epoch(int(token['exp'])),
+            token=str(token),
+        )
         return token
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        data = super().validate(attrs)
+        data = super(TokenObtainPairSerializer, self).validate(attrs)
+        refresh = self.get_token(self.user)
+        access = refresh.access_token
+        access['exp'] = min(int(access['exp']), int(refresh['session_exp']))
+        data['refresh'] = str(refresh)
+        data['access'] = str(access)
+        if api_settings.UPDATE_LAST_LOGIN:
+            update_last_login(None, self.user)
         data['user'] = {
             'id': self.user.id,
             'username': self.user.username,
@@ -51,8 +75,48 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         refresh = self.token_class(attrs['refresh'])
-        JWTAuthentication().get_user(refresh)
-        return super().validate(attrs)
+        session_exp = self._resolve_and_check_session_exp(refresh)
+
+        user = JWTAuthentication().get_user(refresh)
+        if not api_settings.USER_AUTHENTICATION_RULE(user):
+            raise AuthenticationFailed(self.error_messages['no_active_account'], 'no_active_account')
+
+        access = refresh.access_token
+        access['exp'] = min(int(access['exp']), session_exp)
+        data: dict[str, Any] = {'access': str(access)}
+
+        if api_settings.ROTATE_REFRESH_TOKENS:
+            if api_settings.BLACKLIST_AFTER_ROTATION:
+                try:
+                    refresh.blacklist()
+                except AttributeError:
+                    pass
+
+            refresh.set_jti()
+            refresh.set_exp()
+            refresh.set_iat()
+            refresh['session_exp'] = session_exp
+            refresh['exp'] = min(int(refresh['exp']), session_exp)
+            refresh.outstand()
+            data['refresh'] = str(refresh)
+
+        return data
+
+    @staticmethod
+    def _resolve_and_check_session_exp(refresh: RefreshToken) -> int:
+        if 'session_exp' in refresh.payload:
+            try:
+                refresh.check_exp('session_exp')
+            except TokenError as exc:
+                raise InvalidToken(_SESSION_EXPIRED_MESSAGE) from exc
+            return int(refresh.payload['session_exp'])
+
+        max_hours = getattr(settings, 'JWT_MAX_SESSION_HOURS', 12)
+        iat_epoch = int(refresh.payload.get('iat') or datetime_to_epoch(refresh.current_time))
+        session_exp = iat_epoch + max_hours * 3600
+        if datetime_from_epoch(session_exp) <= refresh.current_time:
+            raise InvalidToken(_SESSION_EXPIRED_MESSAGE)
+        return session_exp
 
 
 class UserSerializer(serializers.ModelSerializer):

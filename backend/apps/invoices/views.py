@@ -12,11 +12,13 @@ from rest_framework.exceptions import MethodNotAllowed, ValidationError
 from drf_spectacular.utils import extend_schema
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
-from apps.finance.models import ReceiptVoucher, CustomerRefundVoucher
+from apps.finance.models import ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher
 from .models import SalesInvoice, PurchaseInvoice, SalesReturn
 from .serializers import (
     SalesInvoiceSerializer, SalesInvoiceCreateSerializer,
+    SalesInvoiceConfirmResponseSerializer, SalesInvoiceCancelResponseSerializer,
     PurchaseInvoiceSerializer, PurchaseInvoiceCreateSerializer,
+    PurchaseInvoiceCancelResponseSerializer,
     SalesReturnSerializer, SalesReturnCreateSerializer
 )
 from .services import (
@@ -182,7 +184,7 @@ class SalesInvoiceViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSet):
         read_serializer = SalesInvoiceSerializer(instance, context={'request': request})
         return Response(read_serializer.data, status=status.HTTP_201_CREATED)
 
-    @extend_schema(request=None, responses={200: SalesInvoiceSerializer})
+    @extend_schema(request=None, responses={200: SalesInvoiceConfirmResponseSerializer})
     @action(detail=True, methods=['post'], url_path='confirm', permission_classes=[SalesInvoicePermission])
     def confirm(self, request, pk=None):
         invoice = self.get_object()
@@ -205,7 +207,7 @@ class SalesInvoiceViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         raise MethodNotAllowed('DELETE', detail='حذف فاکتور مجاز نیست. لطفاً از عملیات لغو استفاده کنید.')
 
-    @extend_schema(request=None, responses={200: SalesInvoiceSerializer})
+    @extend_schema(request=None, responses={200: SalesInvoiceCancelResponseSerializer})
     @action(detail=True, methods=['post'], url_path='cancel', permission_classes=[IsManager])
     def cancel(self, request, pk=None):
         invoice = self.get_object()
@@ -219,12 +221,34 @@ class SalesInvoiceViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSet):
 
 class PurchaseInvoiceViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSet):
     immutable_document_name = 'فاکتور خرید'
-    queryset = PurchaseInvoice.objects.select_related(
-        'supplier', 'created_by'
-    ).prefetch_related(
-        'tire_items__tire__brand',
-        'tire_items__tire__size'
-    ).all().order_by('-invoice_date')
+    queryset = PurchaseInvoice.objects.all()
+
+    def get_queryset(self):
+        money_field = models.DecimalField(max_digits=14, decimal_places=2)
+        payments_subquery = PaymentVoucher.objects.filter(
+            purchase_invoice=OuterRef('pk'),
+            is_cancelled=False,
+        ).values('purchase_invoice').annotate(
+            total=Sum('amount')
+        ).values('total')
+
+        return PurchaseInvoice.objects.select_related(
+            'supplier', 'created_by'
+        ).prefetch_related(
+            'tire_items__tire__brand',
+            'tire_items__tire__size'
+        ).annotate(
+            paid_amount_annotated=Coalesce(
+                Subquery(payments_subquery, output_field=money_field),
+                Value(Decimal('0.00'), output_field=money_field),
+            )
+        ).annotate(
+            remaining_amount_annotated=Greatest(
+                F('total_amount') - F('paid_amount_annotated'),
+                Value(Decimal('0.00'), output_field=money_field),
+                output_field=money_field,
+            )
+        ).order_by('-invoice_date')
 
     permission_classes = [IsWarehouse]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -247,7 +271,7 @@ class PurchaseInvoiceViewSet(ImmutableDocumentViewSetMixin, viewsets.ModelViewSe
         read_serializer = PurchaseInvoiceSerializer(instance, context={'request': request})
         return Response(read_serializer.data, status=status.HTTP_201_CREATED)
 
-    @extend_schema(request=None, responses={200: PurchaseInvoiceSerializer})
+    @extend_schema(request=None, responses={200: PurchaseInvoiceCancelResponseSerializer})
     @action(detail=True, methods=['post'], url_path='cancel', permission_classes=[IsManager])
     def cancel(self, request, pk=None):
         invoice = self.get_object()

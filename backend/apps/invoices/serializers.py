@@ -76,6 +76,8 @@ class SalesInvoiceSerializer(serializers.ModelSerializer):
     excess_amount = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     paid_amount = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     remaining_amount = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    subtotal_amount = serializers.DecimalField(max_digits=None, decimal_places=2, read_only=True)
+    effective_discount_amount = serializers.DecimalField(max_digits=None, decimal_places=2, read_only=True)
 
     class Meta:
         model = SalesInvoice
@@ -83,20 +85,35 @@ class SalesInvoiceSerializer(serializers.ModelSerializer):
             'sales_invoice_id', 'invoice_number', 'invoice_date', 'jalali_date', 'customer',
             'customer_name', 'customer_phone', 'vehicle', 'vehicle_plate',
             'vehicle_model', 'status', 'status_display', 'payment_status',
-            'payment_status_display', 'discount_amount', 'discount_percent',
-            'total_amount', 'returned_amount', 'net_amount', 'excess_amount',
+            'payment_status_display', 'subtotal_amount', 'discount_amount', 'discount_percent',
+            'effective_discount_amount', 'total_amount', 'returned_amount', 'net_amount', 'excess_amount',
             'paid_amount', 'remaining_amount', 'notes',
             'created_by', 'created_by_name', 'tire_items', 'service_items'
         ]
         read_only_fields = [
-            'sales_invoice_id', 'invoice_number', 'total_amount', 'returned_amount',
-            'net_amount', 'excess_amount', 'paid_amount', 'remaining_amount', 'created_by'
+            'sales_invoice_id', 'invoice_number', 'subtotal_amount', 'effective_discount_amount',
+            'total_amount', 'returned_amount', 'net_amount', 'excess_amount',
+            'paid_amount', 'remaining_amount', 'created_by'
         ]
 
 
     @extend_schema_field(serializers.CharField)
     def get_jalali_date(self, obj: SalesInvoice) -> str:
         return format_jalali_date(obj.invoice_date)
+
+
+class SalesInvoiceConfirmResponseSerializer(SalesInvoiceSerializer):
+    message = serializers.CharField(read_only=True)
+    invoice = SalesInvoiceSerializer(read_only=True)
+
+    class Meta(SalesInvoiceSerializer.Meta):
+        fields = [*SalesInvoiceSerializer.Meta.fields, 'message', 'invoice']
+        read_only_fields = [*SalesInvoiceSerializer.Meta.read_only_fields, 'message', 'invoice']
+
+
+class SalesInvoiceCancelResponseSerializer(serializers.Serializer):
+    message = serializers.CharField(read_only=True)
+    invoice = SalesInvoiceSerializer(read_only=True)
 
 class SalesInvoiceTireItemInputSerializer(serializers.Serializer):
     tire = serializers.PrimaryKeyRelatedField(
@@ -250,6 +267,8 @@ class PurchaseInvoiceSerializer(serializers.ModelSerializer):
     jalali_date = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     payment_status_display = serializers.CharField(source='get_payment_status_display', read_only=True)
+    paid_amount = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    remaining_amount = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 
     class Meta:
         model = PurchaseInvoice
@@ -257,13 +276,22 @@ class PurchaseInvoiceSerializer(serializers.ModelSerializer):
             'purchase_invoice_id', 'invoice_number', 'invoice_date', 'jalali_date',
             'supplier', 'supplier_name', 'status', 'status_display',
             'payment_status', 'payment_status_display',
-            'total_amount', 'created_by', 'created_by_name', 'tire_items'
+            'total_amount', 'paid_amount', 'remaining_amount',
+            'created_by', 'created_by_name', 'tire_items'
         ]
-        read_only_fields = ['purchase_invoice_id', 'invoice_number', 'payment_status', 'total_amount', 'created_by']
+        read_only_fields = [
+            'purchase_invoice_id', 'invoice_number', 'payment_status',
+            'total_amount', 'paid_amount', 'remaining_amount', 'created_by'
+        ]
 
     @extend_schema_field(serializers.CharField)
     def get_jalali_date(self, obj: PurchaseInvoice) -> str:
         return format_jalali_date(obj.invoice_date)
+
+
+class PurchaseInvoiceCancelResponseSerializer(serializers.Serializer):
+    message = serializers.CharField(read_only=True)
+    invoice = PurchaseInvoiceSerializer(read_only=True)
 
 class PurchaseInvoiceTireItemInputSerializer(serializers.Serializer):
     tire = serializers.PrimaryKeyRelatedField(
@@ -374,6 +402,9 @@ class SalesReturnCreateSerializer(serializers.Serializer):
         }
     )
     items = SalesReturnItemInputSerializer(many=True, required=True)
+    auto_refund = serializers.BooleanField(required=False, default=True)
+    payment_method = serializers.CharField(max_length=50, required=False, allow_blank=True, default='کارتخوان / نقدی')
+    reference_number = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
 
     def validate_return_date(self, value: Any) -> Any:
         if value and value > timezone.now():
@@ -418,6 +449,8 @@ class SalesReturnCreateSerializer(serializers.Serializer):
             reason=validated_data['reason'],
             return_date=validated_data.get('return_date'),
             user=user,
-            auto_refund=True
+            auto_refund=validated_data.get('auto_refund', True),
+            payment_method=validated_data.get('payment_method') or 'کارتخوان / نقدی',
+            reference_number=validated_data.get('reference_number', ''),
         )
 

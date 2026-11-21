@@ -1,5 +1,6 @@
 import logging
 import runpy
+from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -24,6 +25,11 @@ def _load_settings(monkeypatch, overrides):
         'SECURE_HSTS_SECONDS': None,
         'SECURE_HSTS_INCLUDE_SUBDOMAINS': None,
         'SECURE_HSTS_PRELOAD': None,
+        'JWT_ACCESS_MINUTES': None,
+        'JWT_REFRESH_HOURS': None,
+        'JWT_REFRESH_DAYS': None,
+        'JWT_MAX_SESSION_HOURS': None,
+        'JWT_ROTATE_REFRESH_TOKENS': None,
     }
     with monkeypatch.context() as env:
         for key, value in {**defaults, **overrides}.items():
@@ -112,3 +118,68 @@ def test_health_check_executes_select_1_and_handles_failure(client, monkeypatch)
     res_down = client.get('/api/health/')
     assert res_down.status_code == 503
     assert res_down.json() == {'status': 'unhealthy', 'database': 'disconnected'}
+
+
+def test_jwt_and_admin_session_defaults(monkeypatch):
+    cfg = _load_settings(monkeypatch, {'DJANGO_TESTING': 'True'})
+    assert cfg['SIMPLE_JWT']['ACCESS_TOKEN_LIFETIME'] == timedelta(minutes=30)
+    assert cfg['SIMPLE_JWT']['REFRESH_TOKEN_LIFETIME'] == timedelta(hours=12)
+    assert cfg['SIMPLE_JWT']['ROTATE_REFRESH_TOKENS'] is True
+    assert cfg['SIMPLE_JWT']['BLACKLIST_AFTER_ROTATION'] is True
+    assert cfg['SIMPLE_JWT']['CHECK_REVOKE_TOKEN'] is True
+    assert cfg['JWT_MAX_SESSION_HOURS'] == 12
+    assert cfg['SESSION_COOKIE_AGE'] == 43200
+    assert cfg['SESSION_EXPIRE_AT_BROWSER_CLOSE'] is True
+
+
+def test_jwt_refresh_days_fallback_and_explicit_overrides(monkeypatch):
+    fallback_cfg = _load_settings(
+        monkeypatch,
+        {
+            'DJANGO_TESTING': 'True',
+            'JWT_REFRESH_DAYS': '2',
+        },
+    )
+    assert fallback_cfg['SIMPLE_JWT']['REFRESH_TOKEN_LIFETIME'] == timedelta(hours=48)
+    assert fallback_cfg['JWT_MAX_SESSION_HOURS'] == 48
+    assert fallback_cfg['SESSION_COOKIE_AGE'] == 48 * 3600
+
+    blank_hours_cfg = _load_settings(
+        monkeypatch,
+        {
+            'DJANGO_TESTING': 'True',
+            'JWT_REFRESH_HOURS': '   ',
+            'JWT_REFRESH_DAYS': '1',
+        },
+    )
+    assert blank_hours_cfg['SIMPLE_JWT']['REFRESH_TOKEN_LIFETIME'] == timedelta(hours=24)
+    assert blank_hours_cfg['JWT_MAX_SESSION_HOURS'] == 24
+
+    override_cfg = _load_settings(
+        monkeypatch,
+        {
+            'DJANGO_TESTING': 'True',
+            'JWT_ACCESS_MINUTES': '15',
+            'JWT_REFRESH_HOURS': '6',
+            'JWT_REFRESH_DAYS': '14',
+            'JWT_MAX_SESSION_HOURS': '10',
+            'JWT_ROTATE_REFRESH_TOKENS': 'False',
+        },
+    )
+    assert override_cfg['SIMPLE_JWT']['ACCESS_TOKEN_LIFETIME'] == timedelta(minutes=15)
+    assert override_cfg['SIMPLE_JWT']['REFRESH_TOKEN_LIFETIME'] == timedelta(hours=6)
+    assert override_cfg['JWT_MAX_SESSION_HOURS'] == 10
+    assert override_cfg['SIMPLE_JWT']['ROTATE_REFRESH_TOKENS'] is False
+    assert override_cfg['SESSION_COOKIE_AGE'] == 10 * 3600
+    assert override_cfg['SESSION_EXPIRE_AT_BROWSER_CLOSE'] is True
+
+    refresh_only_cfg = _load_settings(
+        monkeypatch,
+        {
+            'DJANGO_TESTING': 'True',
+            'JWT_REFRESH_HOURS': '8',
+        },
+    )
+    assert refresh_only_cfg['SIMPLE_JWT']['REFRESH_TOKEN_LIFETIME'] == timedelta(hours=8)
+    assert refresh_only_cfg['JWT_MAX_SESSION_HOURS'] == 8
+    assert refresh_only_cfg['SESSION_COOKIE_AGE'] == 8 * 3600

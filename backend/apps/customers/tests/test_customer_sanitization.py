@@ -118,3 +118,32 @@ class TestCustomerUniqueAndSanitization:
         with pytest.raises(ValidationError) as exc:
             dup_customer.full_clean()
         assert 'این شماره تماس قبلاً برای مشتری دیگری ثبت شده است' in str(exc.value)
+
+    def test_vehicle_duplicate_license_plate_returns_field_validation_error(self, auth_client_manager):
+        customer = Customer.objects.create(full_name='مشتری پلاک تکراری', phone_number='09124445566')
+        url = reverse('vehicle-list')
+
+        res_create = auth_client_manager.post(url, {
+            'customer': customer.pk,
+            'license_plate': '۱۲ب۳۴۵-ایران۱۱',
+            'model': 'پژو ۲۰۷',
+        }, format='json')
+        assert res_create.status_code == 201
+        assert res_create.data['license_plate'] == '12ب345-ایران11'
+
+        res_dup = auth_client_manager.post(url, {
+            'customer': customer.pk,
+            'license_plate': '12ب345-ایران11',
+            'model': 'سمند',
+        }, format='json')
+        assert res_dup.status_code == 400
+        assert 'license_plate' in res_dup.data['errors']
+        assert 'قبلاً ثبت شده است' in str(res_dup.data['errors']['license_plate'])
+
+        res_self_patch = auth_client_manager.patch(
+            reverse('vehicle-detail', kwargs={'pk': res_create.data['vehicle_id']}),
+            {'license_plate': '12ب345-ایران11', 'model': 'پژو ۲۰۷ اتوماتیک'},
+            format='json',
+        )
+        assert res_self_patch.status_code == 200
+        assert res_self_patch.data['model'] == 'پژو ۲۰۷ اتوماتیک'

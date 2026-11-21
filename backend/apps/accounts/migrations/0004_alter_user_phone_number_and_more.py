@@ -17,6 +17,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='user',
-            constraint=models.UniqueConstraint(condition=models.Q(('phone_number__isnull', False), models.Q(('phone_number', ''), _negated=True)), fields=('phone_number',), name='unique_user_phone_number_not_null'),
+            constraint=models.UniqueConstraint(condition=models.Q(('phone_number__isnull', False), ('phone_number__gt', '')), fields=('phone_number',), name='unique_user_phone_number_not_null'),
         ),
     ]

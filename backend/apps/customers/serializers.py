@@ -32,6 +32,14 @@ class VehicleSerializer(serializers.ModelSerializer):
         model = Vehicle
         fields = ['vehicle_id', 'customer', 'customer_name', 'license_plate', 'model', 'year', 'tire_size_recommended', 'notes']
 
+    def validate_license_plate(self, value: str) -> str:
+        qs = Vehicle.objects.filter(license_plate=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('خودرویی با این شماره پلاک قبلاً ثبت شده است.')
+        return value
+
 
 class CustomerSerializer(serializers.ModelSerializer):
     vehicles = VehicleSerializer(many=True, read_only=True)

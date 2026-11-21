@@ -25,7 +25,19 @@ def test_logout_cannot_revoke_another_users_refresh(api_client, technician_user,
     api_client.force_authenticate(technician_user)
     response = api_client.post('/api/v1/auth/logout/', {'refresh': str(refresh)})
     assert response.status_code == 400
+    assert response.data['success'] is False
+    assert response.data['status_code'] == 400
+    assert 'detail' in response.data['errors']
     RefreshToken(str(refresh))
+
+
+def test_logout_invalid_token_uses_standard_error_envelope(api_client, technician_user):
+    api_client.force_authenticate(technician_user)
+    response = api_client.post('/api/v1/auth/logout/', {'refresh': 'not-a-valid-jwt'}, format='json')
+    assert response.status_code == 400
+    assert response.data['success'] is False
+    assert response.data['status_code'] == 400
+    assert 'detail' in response.data['errors']
 
 
 @pytest.mark.parametrize('amount', ['NaN', 'Infinity', '-Infinity', '0.001'])

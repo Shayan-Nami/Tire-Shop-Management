@@ -70,7 +70,7 @@ class LogoutView(APIView):
             token.blacklist()
             return Response({'detail': 'خروج با موفقیت انجام شد و توکن در لیست سیاه قرار گرفت.'}, status=status.HTTP_200_OK)
         except TokenError:
-            return Response({'detail': 'توکن نامعتبر یا منقضی شده است.'}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({'detail': 'توکن نامعتبر یا منقضی شده است.'})
 
 
 class UserViewSet(viewsets.ModelViewSet):

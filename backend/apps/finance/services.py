@@ -24,7 +24,9 @@ def sync_sales_invoice_payment_status(invoice_or_id: SalesInvoice | int) -> str:
     effective_paid = max(Decimal('0.00'), valid_received - valid_refunded)
     net_amount = invoice.net_amount
 
-    if net_amount == Decimal('0.00'):
+    if invoice.status == InvoiceStatus.DRAFT:
+        new_status = PaymentStatus.UNPAID
+    elif net_amount == Decimal('0.00'):
         new_status = PaymentStatus.PAID
     elif effective_paid == Decimal('0.00'):
         new_status = PaymentStatus.UNPAID

@@ -4,7 +4,7 @@ from django.db import models, transaction
 from django.db.models import F, OuterRef, Subquery, Sum, Value
 from django.db.models.functions import Coalesce, Greatest
 from apps.finance.models import CustomerRefundVoucher, PaymentVoucher, ReceiptVoucher
-from apps.invoices.models import PaymentStatus, PurchaseInvoice, SalesInvoice, SalesReturn
+from apps.invoices.models import InvoiceStatus, PaymentStatus, PurchaseInvoice, SalesInvoice, SalesReturn
 
 
 class Command(BaseCommand):
@@ -66,7 +66,9 @@ class Command(BaseCommand):
                 effective_paid = max(Decimal('0.00'), valid_received - valid_refunded)
                 net_amount = inv.net_amount
 
-                if net_amount == Decimal('0.00'):
+                if inv.status == InvoiceStatus.DRAFT:
+                    expected_status = PaymentStatus.UNPAID
+                elif net_amount == Decimal('0.00'):
                     expected_status = PaymentStatus.PAID
                 elif effective_paid == Decimal('0.00'):
                     expected_status = PaymentStatus.UNPAID

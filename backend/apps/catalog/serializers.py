@@ -105,6 +105,13 @@ class StockAdjustmentSerializer(serializers.Serializer):
     )
 
 
+class StockAdjustmentResponseSerializer(serializers.Serializer):
+    message = serializers.CharField(read_only=True)
+    movement_id = serializers.IntegerField(read_only=True)
+    difference = serializers.IntegerField(read_only=True)
+    current_stock = serializers.IntegerField(read_only=True)
+
+
 class StockMovementSerializer(serializers.ModelSerializer):
     tire_name = serializers.ReadOnlyField(source='tire.tire_name')
     brand_name = serializers.ReadOnlyField(source='tire.brand.brand_name')

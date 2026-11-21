@@ -1,5 +1,6 @@
 from django.db.models import Count, F
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -10,6 +11,7 @@ from .models import Brand, Size, StockMovement, Tire
 from .serializers import (
     BrandSerializer,
     SizeSerializer,
+    StockAdjustmentResponseSerializer,
     StockAdjustmentSerializer,
     StockMovementSerializer,
     TireSerializer,
@@ -53,6 +55,7 @@ class TireViewSet(viewsets.ModelViewSet):
     def get_ordering_fields(self):
         return self.ordering_fields
 
+    @extend_schema(responses={200: TireSerializer(many=True)})
     @action(detail=False, methods=['get'], url_path='low-stock')
     def low_stock(self, request):
         low_stock_tires = self.filter_queryset(
@@ -67,6 +70,7 @@ class TireViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(low_stock_tires, many=True)
         return Response(serializer.data)
 
+    @extend_schema(request=StockAdjustmentSerializer, responses={200: StockAdjustmentResponseSerializer})
     @action(detail=True, methods=['post'], url_path='adjust-stock', permission_classes=[IsWarehouse])
     def adjust_stock(self, request, pk=None):
         tire = self.get_object()

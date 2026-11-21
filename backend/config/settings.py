@@ -251,13 +251,26 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'utils.exceptions.custom_exception_handler',
 }
 
-_jwt_access_minutes = int(os.environ.get('JWT_ACCESS_MINUTES', '60'))
-_jwt_refresh_days = int(os.environ.get('JWT_REFRESH_DAYS', '14'))
+_jwt_access_minutes = int(os.environ.get('JWT_ACCESS_MINUTES', '30'))
+if os.environ.get('JWT_REFRESH_HOURS', '').strip():
+    _jwt_refresh_hours = int(os.environ['JWT_REFRESH_HOURS'])
+elif os.environ.get('JWT_REFRESH_DAYS', '').strip():
+    _jwt_refresh_hours = int(os.environ['JWT_REFRESH_DAYS']) * 24
+else:
+    _jwt_refresh_hours = 12
+
+if os.environ.get('JWT_MAX_SESSION_HOURS', '').strip():
+    _jwt_max_session_hours = int(os.environ['JWT_MAX_SESSION_HOURS'])
+else:
+    _jwt_max_session_hours = _jwt_refresh_hours
+
+_jwt_rotate_refresh_tokens = _env_bool('JWT_ROTATE_REFRESH_TOKENS', True)
+JWT_MAX_SESSION_HOURS = _jwt_max_session_hours
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=_jwt_access_minutes),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=_jwt_refresh_days),
-    'ROTATE_REFRESH_TOKENS': True,
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=_jwt_refresh_hours),
+    'ROTATE_REFRESH_TOKENS': _jwt_rotate_refresh_tokens,
     'BLACKLIST_AFTER_ROTATION': True,
     'CHECK_REVOKE_TOKEN': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
@@ -268,6 +281,8 @@ if _env_bool('SECURE_PROXY_SSL_HEADER', False):
 else:
     SECURE_PROXY_SSL_HEADER = None
 
+SESSION_COOKIE_AGE = _jwt_max_session_hours * 3600
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', _strict_prod)
 CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE', _strict_prod)
 SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT', _strict_prod)

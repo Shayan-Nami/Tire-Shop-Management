@@ -83,7 +83,9 @@ jobs:
       - run: python manage.py check
       - run: python manage.py makemigrations --check --dry-run
       - name: Validate OpenAPI schema
-        run: python manage.py spectacular --validate --fail-on-warn --file "$RUNNER_TEMP/openapi.yml"
+        run: |
+          python manage.py spectacular --validate --fail-on-warn --file "$RUNNER_TEMP/openapi.yml"
+          diff -u schema.yml "$RUNNER_TEMP/openapi.yml"
       - run: python manage.py migrate --noinput
       - run: python manage.py migrate --check
       - name: PostgreSQL tests and frontend contract integration

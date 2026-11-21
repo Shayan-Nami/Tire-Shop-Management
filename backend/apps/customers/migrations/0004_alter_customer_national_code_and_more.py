@@ -21,10 +21,10 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='customer',
-            constraint=models.UniqueConstraint(condition=models.Q(('phone_number__isnull', False), models.Q(('phone_number', ''), _negated=True)), fields=('phone_number',), name='unique_customer_phone_number_not_null'),
+            constraint=models.UniqueConstraint(condition=models.Q(('phone_number__isnull', False), ('phone_number__gt', '')), fields=('phone_number',), name='unique_customer_phone_number_not_null'),
         ),
         migrations.AddConstraint(
             model_name='customer',
-            constraint=models.UniqueConstraint(condition=models.Q(('national_code__isnull', False), models.Q(('national_code', ''), _negated=True)), fields=('national_code',), name='unique_customer_national_code_not_null'),
+            constraint=models.UniqueConstraint(condition=models.Q(('national_code__isnull', False), ('national_code__gt', '')), fields=('national_code',), name='unique_customer_national_code_not_null'),
         ),
     ]

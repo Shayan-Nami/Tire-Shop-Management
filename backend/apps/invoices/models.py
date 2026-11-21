@@ -113,6 +113,29 @@ class SalesInvoice(models.Model):
             models.Index(fields=['invoice_date'], name='sales_inv_date_idx'),
             models.Index(fields=['status', 'payment_status'], name='sales_inv_status_idx'),
         ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=[InvoiceStatus.CONFIRMED, InvoiceStatus.CANCELLED])
+                | models.Q(payment_status=PaymentStatus.UNPAID),
+                name='sales_invoice_draft_must_be_unpaid',
+            ),
+        ]
+
+    @property
+    def subtotal_amount(self) -> Decimal:
+        tire_total = sum((Decimal(str(i.quantity)) * i.unit_price for i in self.tire_items.all()), Decimal('0.00'))
+        service_total = sum((Decimal(str(s.quantity)) * s.unit_price for s in self.service_items.all()), Decimal('0.00'))
+        items_subtotal = tire_total + service_total
+        if items_subtotal > Decimal('0.00'):
+            return items_subtotal
+        return self.total_amount + self.discount_amount
+
+    @property
+    def effective_discount_amount(self) -> Decimal:
+        subtotal = self.subtotal_amount
+        if subtotal > self.total_amount:
+            return (subtotal - self.total_amount).quantize(Decimal('0.01'))
+        return self.discount_amount
 
     @property
     def returned_amount(self) -> Decimal:
@@ -296,6 +319,19 @@ class PurchaseInvoice(models.Model):
             models.Index(fields=['invoice_date'], name='purch_inv_date_idx'),
             models.Index(fields=['status', 'payment_status'], name='purch_inv_status_idx'),
         ]
+
+    @property
+    def paid_amount(self) -> Decimal:
+        if hasattr(self, 'paid_amount_annotated') and self.paid_amount_annotated is not None:
+            return self.paid_amount_annotated
+        valid_paid = self.payments.filter(is_cancelled=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+        return valid_paid
+
+    @property
+    def remaining_amount(self) -> Decimal:
+        if hasattr(self, 'remaining_amount_annotated') and self.remaining_amount_annotated is not None:
+            return self.remaining_amount_annotated
+        return max(self.total_amount - self.paid_amount, Decimal('0.00'))
 
     def __str__(self):
         return f"فاکتور خرید #{self.purchase_invoice_id} - {self.supplier.supplier_name} ({self.get_status_display()})"

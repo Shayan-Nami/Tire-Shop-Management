@@ -258,3 +258,21 @@ def test_dummy_patch_unused_import_guard():
     with patch('utils.exceptions.logger') as mock_logger:
         custom_exception_handler(IntegrityError('x'), {})
         assert mock_logger.warning.called
+
+
+def test_standard_pagination_respects_configured_page_size(settings):
+    from rest_framework.request import Request
+    from utils.pagination import StandardResultsSetPagination
+
+    paginator = StandardResultsSetPagination()
+    req_default = Request(APIRequestFactory().get('/'))
+    assert paginator.get_page_size(req_default) == 20
+
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK, 'PAGE_SIZE': 35}
+    assert paginator.get_page_size(req_default) == 35
+
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK, 'PAGE_SIZE': 500}
+    assert paginator.get_page_size(req_default) == 100
+
+    req_override = Request(APIRequestFactory().get('/?page_size=12'))
+    assert paginator.get_page_size(req_override) == 12

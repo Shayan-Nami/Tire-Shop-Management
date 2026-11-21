@@ -19,7 +19,11 @@ from .models import (
 )
 from apps.catalog.models import Tire, StockMovement, StockMovementType
 from apps.catalog.services import record_stock_movements
-from apps.finance.services import create_receipt_voucher_service
+from apps.finance.services import (
+    create_customer_refund_voucher_service,
+    create_receipt_voucher_service,
+    sync_sales_invoice_payment_status,
+)
 from utils.jalali import get_jalali_year
 
 
@@ -218,7 +222,9 @@ def create_sales_invoice_service(customer: Customer, vehicle: Vehicle | None,
 
     invoice.total_amount = max(total, Decimal('0.00'))
     _validate_invoice_total(invoice)
-    if invoice.total_amount == Decimal('0.00'):
+    if invoice.status == InvoiceStatus.DRAFT:
+        invoice.payment_status = PaymentStatus.UNPAID
+    elif invoice.total_amount == Decimal('0.00'):
         invoice.payment_status = PaymentStatus.PAID
     elif payment_status is not None:
         invoice.payment_status = payment_status
@@ -308,6 +314,9 @@ def confirm_sales_invoice_service(invoice: SalesInvoice | int, user: User | None
 
     locked_invoice.status = InvoiceStatus.CONFIRMED
     locked_invoice.save(update_fields=['status', 'updated_at'])
+
+    sync_sales_invoice_payment_status(locked_invoice)
+    locked_invoice.refresh_from_db(fields=['payment_status', 'updated_at'])
     return locked_invoice
 
 @transaction.atomic
@@ -513,7 +522,16 @@ def cancel_purchase_invoice_service(invoice: PurchaseInvoice | int, user: User |
     return locked_invoice
 
 @transaction.atomic
-def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[dict], reason: str, return_date: datetime | None=None, user: User | None=None, auto_refund: bool = False) -> SalesReturn:
+def create_sales_return_service(
+    invoice: SalesInvoice | int,
+    items_data: list[dict],
+    reason: str,
+    return_date: datetime | None = None,
+    user: User | None = None,
+    auto_refund: bool = False,
+    payment_method: str = 'کارتخوان / نقدی',
+    reference_number: str = '',
+) -> SalesReturn:
     invoice_id = invoice.pk if hasattr(invoice, 'pk') else int(invoice)
     locked_invoice = SalesInvoice.objects.select_for_update().get(pk=invoice_id)
 
@@ -669,18 +687,17 @@ def create_sales_return_service(invoice: SalesInvoice | int, items_data: list[di
     sales_return.total_refund_amount = total_refund
     sales_return.save(update_fields=['total_refund_amount'])
 
-    from apps.finance.services import sync_sales_invoice_payment_status
     sync_sales_invoice_payment_status(locked_invoice)
 
     if auto_refund:
         excess = locked_invoice.excess_amount
         if excess > Decimal('0.00'):
-            from apps.finance.services import create_customer_refund_voucher_service
             create_customer_refund_voucher_service(
                 sales_invoice=locked_invoice,
                 amount=excess,
                 sales_return=sales_return,
-                payment_method='کارتخوان / نقدی',
+                payment_method=payment_method or 'کارتخوان / نقدی',
+                reference_number=reference_number or '',
                 notes=f'استرداد وجه بابت مرجوعی شماره {sales_return.sales_return_id}',
                 user=user
             )
