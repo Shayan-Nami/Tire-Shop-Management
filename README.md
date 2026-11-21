@@ -12,8 +12,15 @@
 
 A Django REST API and React/TypeScript application that connects customer and vehicle records with stock movements, sales and purchase documents, returns, and treasury vouchers. Designed around Persian-language shop workflows, with role-specific screens, Iranian license-plate handling, Jalali display dates, and rial/toman display preferences.
 
+## UI preview
+
+![Manager Panel Walkthrough](docs/assets/admin-panel-demo.gif)
+
+*Live walkthrough of signing into the manager workspace: login screen, KPI dashboard and brand sales chart, sales invoices with Iranian license plates, A4 and 80mm thermal receipt preview, invoice builder, tire catalog, treasury vouchers, profitability reports, and dark theme.*
+
 ## Contents
 
+- [UI preview](#ui-preview)
 - [Overview and features](#overview-and-features)
 - [Architecture and technology](#architecture-and-technology)
 - [Backend architecture](#backend-architecture)
@@ -262,11 +269,11 @@ User/audit references, the independent `InvoiceSequence` counter, stock-projecti
 ## Authentication and authorization
 
 - `POST /api/v1/auth/login/` returns an access token, refresh token, and user identity.
-- Requests send `Authorization: Bearer <access_token>`. Default token lifetimes are **60 minutes** and **14 days**.
-- Refresh tokens rotate; the old refresh token is blacklisted. Concurrent browser 401 responses share one refresh, and each failed request is replayed at most once.
+- Requests send `Authorization: Bearer <access_token>`. Default token lifetimes are **30 minutes** (access) and **12 hours** (refresh), bounded by a **12-hour** non-sliding absolute session ceiling (`session_exp`).
+- Refresh tokens rotate; the old refresh token is blacklisted. Concurrent browser 401 responses coordinate through `navigator.locks` and share one refresh, and each failed request is replayed at most once.
 - Logout verifies that the supplied refresh token belongs to the authenticated user before blacklisting it, and the frontend clears the browser session. **An already issued access token remains valid until expiry** unless separately revoked by the password-binding checks.
 - Password changes invalidate password-bound tokens and blacklist outstanding refresh tokens.
-- Django session authentication is also enabled. Session-authenticated writes require CSRF protection; Django admin uses the session flow.
+- Django session authentication is also enabled (`SESSION_EXPIRE_AT_BROWSER_CLOSE=True`, aligned with the 12-hour ceiling). Session-authenticated writes require CSRF protection; Django admin uses the session flow.
 
 | Role | Intended workflow |
 | --- | --- |
@@ -276,7 +283,7 @@ User/audit references, the independent `InvoiceSequence` counter, stock-projecti
 
 Backend permissions and querysets enforce actual access; frontend guards are navigation aids. Permissions vary by endpoint, and most manager checks also allow Django superusers. For predictable SPA navigation, give administrators the `MANAGER` application role in addition to Django superuser status.
 
-**Browser token security:** access and refresh tokens are stored in `localStorage`, not HttpOnly cookies. Malicious same-origin JavaScript can read them. Review XSS controls, scripts, and hosting security headers before exposure.
+**Browser token security:** access and refresh tokens default to `sessionStorage` (cleared when the tab or browser closes) and move to `localStorage` only when the user opts into **Remember me**, paired with a 15-minute client idle timeout (`VITE_IDLE_TIMEOUT_MINUTES`). Tokens live in Web Storage rather than HttpOnly cookies, so malicious same-origin JavaScript can read them. Review XSS controls, scripts, and hosting security headers before exposure.
 
 ## REST API
 
@@ -483,9 +490,11 @@ An unknown `DB_ENGINE` silently falls back to SQLite. Verify the actual selected
 | --- | --- | --- |
 | `CORS_ALLOWED_ORIGINS` | localhost/127.0.0.1 on ports 3000 and 5173 | Comma-separated trusted browser origins; wildcard access is disabled |
 | `CSRF_TRUSTED_ORIGINS` | Same development origins | Trusted origins for CSRF-protected session requests |
-| `JWT_ACCESS_MINUTES` | `60` | Access-token lifetime |
-| `JWT_REFRESH_DAYS` | `14` | Refresh-token lifetime |
-| `REDIS_CACHE_URL` | Empty | Enable Django Redis cache; otherwise cache is process-local |
+| `JWT_ACCESS_MINUTES` | `30` | Access-token lifetime in minutes |
+| `JWT_REFRESH_HOURS` | `12` | Refresh-token lifetime in hours (falls back to `JWT_REFRESH_DAYS` when unset) |
+| `JWT_MAX_SESSION_HOURS` | `12` | Non-sliding absolute session ceiling (`session_exp`) and Django session cookie age |
+| `JWT_ROTATE_REFRESH_TOKENS` | `True` | Rotate refresh tokens and blacklist previous tokens on refresh |
+| `REDIS_CACHE_URL` | Empty | Enable Django Redis cache (required when `DJANGO_DEBUG=False` and `DJANGO_TESTING=False`) |
 | `NUM_PROXIES` | `0` | Number of trusted proxy hops for DRF client-IP handling |
 | `THROTTLE_ANON_RATE` / `THROTTLE_USER_RATE` | `30/minute` / `300/minute` | General API throttle rates |
 | `THROTTLE_LOGIN_IP_RATE` / `THROTTLE_LOGIN_USER_RATE` | `5/minute` each | Login throttles by IP and username |
@@ -497,7 +506,7 @@ An unknown `DB_ENGINE` silently falls back to SQLite. Verify the actual selected
 | `SECURE_HSTS_INCLUDE_SUBDOMAINS` / `SECURE_HSTS_PRELOAD` | `False` | Explicit HSTS policy decisions |
 | `ENABLE_DOCS_IN_PROD` | `False` | Explicitly make API docs public outside debug; normally leave off |
 
-`PAGINATION_PAGE_SIZE` is present in REST framework settings, but the current pagination class fixes its default at 20. Use the supported `page_size` request parameter (maximum 100); do not rely on this environment variable to change that default.
+`PAGINATION_PAGE_SIZE` configures `REST_FRAMEWORK['PAGE_SIZE']` (default `20`), which `StandardResultsSetPagination` reads automatically; clients may request up to `?page_size=100`.
 
 Generate a production key with `python -c "import secrets; print(secrets.token_urlsafe(50))"`. Store it through your deployment secret mechanism. Secure cookies, HTTPS redirects, HSTS, proxy trust, and shared Redis are **not automatically configured** by installing this project.
 
@@ -507,6 +516,7 @@ Generate a production key with `python -c "import secrets; print(secrets.token_u
 | --- | --- | --- |
 | `VITE_API_BASE_URL` | `/api/v1` | API prefix/origin used by ordinary requests and token refresh; embedded at build time |
 | `VITE_API_PROXY_TARGET` | `http://127.0.0.1:8000` | Destination for Vite's development `/api` proxy; no production routing effect |
+| `VITE_IDLE_TIMEOUT_MINUTES` | `15` | Client inactivity timeout in minutes before clearing the session and redirecting to `/login` |
 
 Restart Vite after configuration changes; rebuild production assets when changing `VITE_API_BASE_URL`. A separate API origin also needs deliberate backend CORS/CSRF configuration. Keep the relative default for same-origin reverse-proxy hosting.
 
@@ -531,7 +541,7 @@ The schema command validates and prints OpenAPI without overwriting the tracked 
 
 pytest covers permissions/token security, model/serializer validation, stock history, invoice lifecycle, returns, financial reconciliation, and discount-aware reports. The suite is pytest-based; `python manage.py test` is not an equivalent discovery path for all tests. SQLite contention has a dedicated regression test; row-lock/backend-specific tests still skip under SQLite. Run those separately with the intended database settings and a dedicated PostgreSQL or SQL Server test database. Test fixtures clear the configured cache, so use a disposable cache when overriding the verification settings.
 
-Ruff checks backend linting and unused imports, and mypy validates type annotations in `utils/domain.py`.
+Ruff checks backend linting and unused imports, and strict mypy validates type annotations across `backend/utils/` (10 files).
 
 ### Frontend
 
@@ -608,6 +618,8 @@ Tire-Shop-Management/
 |   |-- tsconfig*.json
 |   `-- vite.config.ts
 |-- docs/
+|   |-- assets/
+|   |   `-- admin-panel-demo.gif
 |   |-- API_REFERENCE.md
 |   |-- ARCHITECTURE.md
 |   |-- DATABASE_DESIGN.md

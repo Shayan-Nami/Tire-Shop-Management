@@ -71,12 +71,15 @@ accounts only when absent: `admin` / `admin123`, `technician` / `tech123`, and
 only with disposable local data. Rotate all seeded passwords or remove the demo
 accounts before any exposure; disabling the seed flag does not remove accounts.
 
-The browser stores JWT access/refresh tokens in `localStorage`, not HttpOnly
-cookies. Same-origin malicious JavaScript can steal them. Treat XSS prevention,
-third-party script review, and appropriate host security headers as deployment
-concerns; HTTPS alone does not address that threat. Logout blacklists the refresh
-token but does not revoke an existing access token. Password changes revoke
-password-bound tokens; verify that workflow and force credential rotation when needed.
+The browser stores JWT access/refresh tokens in `sessionStorage` by default
+(or `localStorage` when the user opts into **Remember me**), not HttpOnly
+cookies, paired with a 15-minute client idle timeout and a 12-hour non-sliding
+backend session ceiling. Same-origin malicious JavaScript can steal Web Storage
+tokens. Treat XSS prevention, third-party script review, and appropriate host
+security headers as deployment concerns; HTTPS alone does not address that threat.
+Logout blacklists the refresh token but does not revoke an existing access token.
+Password changes revoke password-bound tokens; verify that workflow and force
+credential rotation when needed.
 
 ## Release checklist
 

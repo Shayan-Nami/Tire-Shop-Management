@@ -127,12 +127,15 @@ and refreshes the profile on startup.
 English and document direction. Currency preference affects rial/toman display;
 backend amounts remain IRR.
 
-The [Axios client](../frontend/src/api/client.ts) adds access tokens, queues
-concurrent 401 failures behind one refresh, stores rotated tokens, and retries a
-request once. `VITE_API_BASE_URL` defaults to `/api/v1`; it is public build-time
-configuration. Access/refresh tokens and user information are in `localStorage`,
-so malicious same-origin JavaScript can read them. Frontend guards and cached
-roles are not authorization controls; server checks remain authoritative.
+The [Axios client](../frontend/src/api/client.ts) adds access tokens, coordinates
+concurrent 401 failures across tabs with `navigator.locks` behind one refresh,
+stores rotated tokens, and retries a request once. `VITE_API_BASE_URL` defaults to
+`/api/v1`; it is public build-time configuration. Access/refresh tokens and user
+information default to `sessionStorage` and persist to `localStorage` only when
+**Remember me** is selected, alongside a 15-minute client idle timeout. Because
+tokens stay in Web Storage rather than HttpOnly cookies, malicious same-origin
+JavaScript can read them. Frontend guards and cached roles are not authorization
+controls; server checks remain authoritative.
 
 See the [frontend guide](../frontend/README.md) for scripts and test boundaries,
 and the [deployment guide](DEPLOYMENT_GUIDE.md) for hardening and verification.

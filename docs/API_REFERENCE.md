@@ -74,7 +74,8 @@ Login's `user` contains `id`,
 include `role_display`, `is_active`, and `date_joined`.
 
 The only roles are `MANAGER`, `TECHNICIAN`, and `WAREHOUSE`. Default access-token
-lifetime is 60 minutes; refresh lifetime is 14 days, configurable in settings.
+lifetime is 30 minutes and refresh lifetime is 12 hours, bounded by a 12-hour
+non-sliding absolute session ceiling (`session_exp`), all configurable in settings.
 Refresh rotation blacklists the old refresh token in the database. Password changes
 invalidate password-bound access/refresh tokens and blacklist outstanding refresh
 tokens. Logout blacklists the submitted refresh token; it does **not** revoke an
@@ -90,7 +91,7 @@ include direct PUT, PATCH, or DELETE.
 | --- | --- | --- |
 | `crm/customers/` | CRUD | All authenticated users; delete manager-only |
 | `crm/vehicles/` | CRUD; filter by `customer` | All authenticated users; delete manager-only |
-| `catalog/brands/`, `catalog/sizes/`, `catalog/tires/` | CRUD | Read by all; write manager/warehouse |
+| `catalog/brands/`, `catalog/sizes/`, `catalog/tires/` | CRUD | Read by all; create/update manager/warehouse; delete manager-only |
 | `catalog/tires/low-stock/` | GET | All authenticated users |
 | `catalog/tires/{pk}/adjust-stock/` | POST | Manager/warehouse |
 | `catalog/stock-movements/` | List/retrieve only | Manager/warehouse |

@@ -153,11 +153,11 @@ Visual changes should follow [DESIGN.md](../DESIGN.md): a charcoal (`#202a35`) a
 
 ## Authentication and local preferences
 
-Login uses `/auth/login/`. The app stores `access_token`, `refresh_token` and `user_info` in localStorage and validates the saved identity through `/auth/profile/` during initialization.
+Login uses `/auth/login/`. Through `src/utils/authStorage.ts`, the app stores `access_token`, `refresh_token`, and `user_info` in `sessionStorage` by default (cleared when the browser or tab closes) and persists to `localStorage` only when **Remember me** is checked, validating the saved identity through `/auth/profile/` during initialization alongside a 15-minute inactivity timeout (`VITE_IDLE_TIMEOUT_MINUTES`).
 
-The Axios client attaches the bearer token, queues simultaneous 401 responses behind one refresh, saves rotated tokens and retries each failed request at most once. An unsuccessful refresh clears the local session. Logout attempts server-side refresh-token blacklisting and clears local state even if the request fails. A successful password change ends the local session and requires sign-in again.
+The Axios client attaches the bearer token, coordinates simultaneous 401 responses across tabs via `navigator.locks` behind one refresh, saves rotated tokens, and retries each failed request at most once. An unsuccessful refresh clears the local session and redirects to `/login?reason=session-expired`. Logout attempts server-side refresh-token blacklisting and clears local state even if the request fails. A successful password change ends the local session and requires sign-in again.
 
-Same-origin JavaScript can read localStorage tokens; they are not HttpOnly cookies. Protect the site from injected scripts and serve production traffic over HTTPS. Logging out blacklists the refresh token but does not immediately revoke every issued access token. Password-bound token invalidation is enforced by the backend.
+Same-origin JavaScript can read Web Storage tokens (`sessionStorage` or `localStorage`); they are not HttpOnly cookies. Protect the site from injected scripts and serve production traffic over HTTPS. Logging out blacklists the refresh token but does not immediately revoke every issued access token. Password-bound token invalidation and the 12-hour non-sliding session ceiling are enforced by the backend.
 
 Preferences are local: `theme`, `language` and `preferred_currency`. Persian/RTL and English/LTR interface copy covers pages, dialogs, invoice print layouts, status labels and common client errors. English amounts use Latin digits and English dates use the Gregorian calendar; Persian dates remain Jalali. Shop-entered names/notes and unknown custom server validation messages retain their original language.
 
