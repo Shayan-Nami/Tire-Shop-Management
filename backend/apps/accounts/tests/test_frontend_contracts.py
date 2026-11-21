@@ -45,7 +45,6 @@ def test_api_responses_match_frontend_types(
     service = Service.objects.create(service_name='Contract service', price='100.00')
     supplier = Supplier.objects.create(supplier_name='Contract supplier', phone_number='02188776655')
 
-    # --- Auth & User contracts ---
     contract_user = User.objects.create_user(
         username='contract_auth_user',
         password='StrongContractPass123!',
@@ -123,7 +122,6 @@ def test_api_responses_match_frontend_types(
     assert patched_user_resp.status_code == 200, patched_user_resp.data
     fixtures.append({'type': 'User', 'data': patched_user_resp.json()})
 
-    # --- Catalog adjust-stock contract ---
     adjust_resp = auth_client_manager.post(f'/api/v1/catalog/tires/{tire.pk}/adjust-stock/', {
         'counted_quantity': 11,
         'reason': 'انبارگردانی قرارداد',
@@ -135,7 +133,6 @@ def test_api_responses_match_frontend_types(
     assert adjust_data['difference'] == 1
     assert adjust_data['current_stock'] == 11
 
-    # --- Standard 400 error envelope (duplicate vehicle license plate) ---
     dup_vehicle = auth_client_manager.post('/api/v1/crm/vehicles/', {
         'customer': customer.pk,
         'license_plate': vehicle.license_plate,
@@ -147,7 +144,6 @@ def test_api_responses_match_frontend_types(
     assert dup_vehicle_data['status_code'] == 400
     assert 'license_plate' in dup_vehicle_data['errors']
 
-    # --- SalesInvoice (PAID), PurchaseInvoice, PaymentVoucher, ReceiptVoucher, SalesReturn, Refunds ---
     invoice = auth_client_manager.post('/api/v1/invoices/sales/', {
         'customer': customer.pk,
         'vehicle': vehicle.pk,
@@ -161,7 +157,6 @@ def test_api_responses_match_frontend_types(
     invoice_data = invoice.json()
     fixtures.append({'type': 'SalesInvoice', 'data': invoice_data})
 
-    # DRAFT invoice -> confirm -> cancel lifecycle + vehicle=None nullable fields
     draft_invoice_resp = auth_client_manager.post('/api/v1/invoices/sales/', {
         'customer': nullable_customer.pk,
         'vehicle': None,
@@ -201,7 +196,6 @@ def test_api_responses_match_frontend_types(
     assert cancel_sales_data['invoice']['status'] == 'CANCELLED'
     fixtures.append({'type': 'SalesInvoice', 'data': cancel_sales_data['invoice']})
 
-    # Unpaid confirmed sales invoice -> ReceiptVoucher create & cancel
     unpaid_sales_resp = auth_client_manager.post('/api/v1/invoices/sales/', {
         'customer': customer.pk,
         'vehicle': None,
@@ -232,7 +226,6 @@ def test_api_responses_match_frontend_types(
     assert cancelled_receipt_data['is_cancelled'] is True
     fixtures.append({'type': 'ReceiptVoucher', 'data': cancelled_receipt_data})
 
-    # PurchaseInvoice create, PaymentVoucher create & cancel, separate PurchaseInvoice cancel
     purchase = auth_client_manager.post('/api/v1/invoices/purchases/', {
         'supplier': supplier.pk,
         'tire_items': [{'tire': tire.pk, 'quantity': 2, 'unit_cost': '600.00'}],
@@ -278,7 +271,6 @@ def test_api_responses_match_frontend_types(
     assert purchase_cancel_data['invoice']['status'] == 'CANCELLED'
     fixtures.append({'type': 'PurchaseInvoice', 'data': purchase_cancel_data['invoice']})
 
-    # SalesReturn + CustomerRefundVoucher auto-create, cancel, and manual POST
     sales_return = auth_client_manager.post('/api/v1/invoices/returns/', {
         'sales_invoice': invoice_data['sales_invoice_id'],
         'reason': 'Contract return',
@@ -315,7 +307,6 @@ def test_api_responses_match_frontend_types(
     manual_refund_data = manual_refund_resp.json()
     fixtures.append({'type': 'CustomerRefundVoucher', 'data': manual_refund_data})
 
-    # Nullable created_by / user rows serialize created_by_name=None / user_name=''
     SalesInvoice.objects.filter(pk=draft_data['sales_invoice_id']).update(created_by=None)
     PurchaseInvoice.objects.filter(pk=p_cancel_id).update(created_by=None)
     SalesReturn.objects.filter(pk=return_data['sales_return_id']).update(created_by=None)
@@ -343,7 +334,6 @@ def test_api_responses_match_frontend_types(
         assert detail_payload.get(nullable_field) is None, (url, detail_payload)
         fixtures.append({'type': contract, 'data': detail_payload})
 
-    # --- Role-masked payloads (TECHNICIAN & WAREHOUSE) ---
     tech_invoice_resp = auth_client_technician.post('/api/v1/invoices/sales/', {
         'customer': customer.pk,
         'vehicle': None,
@@ -392,7 +382,6 @@ def test_api_responses_match_frontend_types(
             assert 'unit_cost' not in tire_item
     fixtures.append({'type': 'PaginatedResponse<SalesInvoice>', 'data': wh_sales_payload})
 
-    # --- Manager list & analytics GET endpoints ---
     endpoints = {
         '/auth/profile/': 'User',
         '/auth/users/': 'PaginatedResponse<User>',
