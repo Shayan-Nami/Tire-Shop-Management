@@ -4,6 +4,7 @@ import {
   PaymentVoucher,
   CustomerRefundVoucher,
   PaginatedResponse,
+  PaymentMethod,
 } from '../types';
 
 export const financeApi = {
@@ -20,7 +21,7 @@ export const financeApi = {
   createReceipt: async (data: {
     sales_invoice: number;
     amount: number | string;
-    payment_method: 'CASH' | 'POS' | 'CARD_TO_CARD' | 'CHEQUE';
+    payment_method: PaymentMethod;
     reference_number?: string;
     notes?: string;
   }): Promise<ReceiptVoucher> => {
@@ -46,7 +47,7 @@ export const financeApi = {
   createPayment: async (data: {
     purchase_invoice: number;
     amount: number | string;
-    payment_method: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
+    payment_method: PaymentMethod;
     reference_number?: string;
     notes?: string;
   }): Promise<PaymentVoucher> => {
@@ -74,6 +75,7 @@ export const financeApi = {
     sales_return?: number;
     amount: number | string;
     payment_method?: string;
+    reference_number?: string;
     notes?: string;
   }): Promise<CustomerRefundVoucher> => {
     const response = await apiClient.post<CustomerRefundVoucher>('/treasury/customer-refunds/', data);

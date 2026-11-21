@@ -113,7 +113,11 @@ export const ServicesPage: React.FC = () => {
     if (!confirm(t("آیا از حذف این خدمت فنی اطمینان دارید؟"))) return;
     try {
       await servicesApi.deleteService(id);
-      void fetchServices();
+      if (services.length === 1 && currentPage > 1) {
+        setCurrentPage((page) => Math.max(1, page - 1));
+      } else {
+        void fetchServices();
+      }
     } catch (err: unknown) {
       alert(parseApiError(err, t("امکان حذف این خدمت به دلیل استفاده در فاکتورهای صادرشده وجود ندارد."), language));
     }
@@ -280,6 +284,7 @@ export const ServicesPage: React.FC = () => {
                   type="number"
                   required
                   min={0}
+                  step="any"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder={t("مثلاً: 1500000")}

@@ -1,9 +1,10 @@
 import { useLanguage } from '../../context/LanguageContext';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, SlidersHorizontal, AlertCircle } from 'lucide-react';
 import { Tire } from '../../types';
 import { catalogApi } from '../../api/catalog';
 import { parseApiError } from '../../utils/errorParser';
+import { Modal } from '../ui/Modal';
 
 interface StockAdjustmentModalProps {
   tire: Tire | null;
@@ -20,19 +21,33 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
   const [countedQty, setCountedQty] = useState<number>(tire?.stock_quantity ?? 0);
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const submitBusy = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tire) {
+      setCountedQty(tire.stock_quantity);
+      setReason('');
+      setErrorMessage(null);
+    }
+  }, [tire]);
 
   if (!tire) return null;
 
   const diff = countedQty - tire.stock_quantity;
+  const handleClose = () => {
+    if (!submitting) onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitBusy.current) return;
     if (!reason.trim()) {
       setErrorMessage(t("ثبت دلیل یا شرح انبارگردانی الزامی است."));
       return;
     }
 
+    submitBusy.current = true;
     setSubmitting(true);
     setErrorMessage(null);
     try {
@@ -45,12 +60,13 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
     } catch (err: unknown) {
       setErrorMessage(parseApiError(err, t("خطا در ثبت اصلاحیه موجودی انبار"), language));
     } finally {
+      submitBusy.current = false;
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+    <Modal label={t("انبارگردانی و اصلاح موجودی تایر")} onClose={handleClose} busy={submitting}>
       <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
           <div className="flex items-center gap-2">
@@ -58,8 +74,11 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("انبارگردانی و اصلاح موجودی تایر")}</h2>
           </div>
           <button
-            onClick={onClose}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+            type="button"
+            onClick={handleClose}
+            disabled={submitting}
+            aria-label={t("بستن پنجره")}
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -122,19 +141,20 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={handleClose}
+              disabled={submitting}
+              className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
             >{t("انصراف")}</button>
             <button
               type="submit"
               disabled={submitting}
-              className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm transition-colors"
+              className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm transition-colors disabled:opacity-50"
             >
               {submitting ? t("در حال اصلاح...") : t("ثبت قطعی اصلاحیه")}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 };

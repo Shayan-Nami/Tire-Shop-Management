@@ -11,9 +11,12 @@ const virtualFile = fileURLToPath(new URL('./backendResponses.ts', import.meta.u
 const names = [...new Set(fixtures.flatMap((fixture) => fixture.type.match(/[A-Za-z]\w*/g)))];
 names.push('PaginatedResponse');
 const source = `import type { ${[...new Set(names)].join(',')} } from '../src/types/index.ts';
-type ReadonlyJson<T> = T extends object ? { readonly [K in keyof T]: ReadonlyJson<T[K]> } : T;
-${fixtures.map((fixture, i) => `const actual${i} = ${JSON.stringify(fixture.data)} as const;
-const checked${i}: ReadonlyJson<${fixture.type}> = actual${i};`).join('\n')}`;
+type ReadonlyJson<T> = T extends (infer U)[]
+  ? readonly ReadonlyJson<U>[]
+  : T extends object
+    ? { readonly [K in keyof T]: ReadonlyJson<T[K]> }
+    : T;
+${fixtures.map((fixture, i) => `const checked${i}: ReadonlyJson<${fixture.type}> = ${JSON.stringify(fixture.data)};`).join('\n')}`;
 const options = {
   strict: true, noEmit: true, skipLibCheck: true,
   target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext,

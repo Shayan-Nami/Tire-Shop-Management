@@ -5,6 +5,7 @@ import {
   PackagePlus,
   Trash2,
   XCircle,
+  CreditCard,
 } from 'lucide-react';
 import { invoicesApi } from '../api/invoices';
 import { catalogApi } from '../api/catalog';
@@ -14,6 +15,8 @@ import { parseApiError } from '../utils/errorParser';
 import { formatCurrency, formatIsoToJalali } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 import { createRequestSequence, fetchAllPages } from '../utils/invoiceRequests';
+import { PaymentModal } from '../components/finance/PaymentModal';
+import { Modal } from '../components/ui/Modal';
 
 export const PurchaseInvoices: React.FC = () => {
   const { t, language } = useLanguage();
@@ -33,13 +36,21 @@ export const PurchaseInvoices: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | ''>('');
   const [purchaseItems, setPurchaseItems] = useState<
-    Array<{ tireId: number; tire: Tire; quantity: number; unitCost: number }>
+    Array<{ tireId: number; tire: Tire; quantity: number; quantityInput: string; unitCost: number }>
   >([]);
   const [selectorsLoading, setSelectorsLoading] = useState(true);
   const [selectorsErrorCause, setSelectorsErrorCause] = useState<{ error: unknown } | null>(null);
+  const [selectorsRetryToken, setSelectorsRetryToken] = useState<number>(0);
+  const [paymentInvoice, setPaymentInvoice] = useState<PurchaseInvoice | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const submitBusy = useRef(false);
   const purchaseRequests = useRef(createRequestSequence());
+
+  const retrySelectors = () => {
+    setSelectorsErrorCause(null);
+    setSelectorsLoading(true);
+    setSelectorsRetryToken((v) => v + 1);
+  };
 
   const fetchPurchases = () => {
     purchaseRequests.current.invalidate();
@@ -101,6 +112,8 @@ export const PurchaseInvoices: React.FC = () => {
     let active = true;
     const isActive = () => active;
     const loadSelectors = async () => {
+      setSelectorsLoading(true);
+      setSelectorsErrorCause(null);
       try {
         const [allSuppliers, allTires] = await Promise.all([
           fetchAllPages((page) => suppliersApi.getSuppliers({ page, page_size: 100 }), isActive),
@@ -119,7 +132,7 @@ export const PurchaseInvoices: React.FC = () => {
     };
     void loadSelectors();
     return () => { active = false; };
-  }, []);
+  }, [selectorsRetryToken]);
 
   const loadError = loadErrorCause
     ? parseApiError(loadErrorCause.error, t("خطا در دریافت فاکتورهای خرید"), language)
@@ -139,9 +152,11 @@ export const PurchaseInvoices: React.FC = () => {
     const existing = purchaseItems.find((item) => item.tireId === tireId);
     if (existing) {
       setPurchaseItems(
-        purchaseItems.map((item) =>
-          item.tireId === tireId ? { ...item, quantity: item.quantity + 1 } : item
-        )
+        purchaseItems.map((item) => {
+          if (item.tireId !== tireId) return item;
+          const nextQty = item.quantity + 1;
+          return { ...item, quantity: nextQty, quantityInput: String(nextQty) };
+        })
       );
     } else {
       setPurchaseItems([
@@ -150,21 +165,50 @@ export const PurchaseInvoices: React.FC = () => {
           tireId: tire.tire_id,
           tire,
           quantity: 4,
+          quantityInput: '4',
           unitCost: parseFloat(String(tire.purchase_price || tire.sale_price)) || 0,
         },
       ]);
     }
   };
 
-  const handleUpdateItemQty = (tireId: number, qty: number) => {
-    if (qty <= 0) {
-      setPurchaseItems(purchaseItems.filter((item) => item.tireId !== tireId));
+  const handleUpdateItemQty = (tireId: number, rawValue: string) => {
+    const trimmed = rawValue.trim();
+    if (trimmed === '') {
+      setPurchaseItems(
+        purchaseItems.map((item) =>
+          item.tireId === tireId ? { ...item, quantity: 0, quantityInput: '' } : item
+        )
+      );
       return;
     }
+
+    const parsed = parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+
+    const nextQty = parsed < 0 ? 0 : parsed;
+    const nextInput = parsed < 0 ? '0' : rawValue;
     setPurchaseItems(
       purchaseItems.map((item) =>
-        item.tireId === tireId ? { ...item, quantity: qty } : item
+        item.tireId === tireId ? { ...item, quantity: nextQty, quantityInput: nextInput } : item
       )
+    );
+  };
+
+  const handleCommitItemQty = (tireId: number) => {
+    setPurchaseItems(
+      purchaseItems.map((item) => {
+        if (item.tireId !== tireId) return item;
+        const parsed = parseInt(item.quantityInput, 10);
+        const clamped = Number.isNaN(parsed) || parsed < 1 ? 1 : parsed;
+        return {
+          ...item,
+          quantity: clamped,
+          quantityInput: String(clamped),
+        };
+      })
     );
   };
 
@@ -189,6 +233,10 @@ export const PurchaseInvoices: React.FC = () => {
     }
     if (purchaseItems.length === 0) {
       alert(t("حداقل یک ردیف تایر جهت ورود به انبار انتخاب کنید."));
+      return;
+    }
+    if (purchaseItems.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1)) {
+      alert(t("تعداد همه اقلام خرید باید حداقل ۱ حلقه باشد."));
       return;
     }
 
@@ -259,7 +307,16 @@ export const PurchaseInvoices: React.FC = () => {
       </div>
 
       {selectorsError && (
-        <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{selectorsError}</p>
+        <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 flex items-center justify-between gap-2">
+          <span>{selectorsError}</span>
+          <button
+            type="button"
+            onClick={retrySelectors}
+            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold shrink-0"
+          >
+            {t("تلاش مجدد")}
+          </button>
+        </div>
       )}
       {selectorsLoading && (
         <p role="status" className="text-xs text-slate-500">{t("در حال دریافت فهرست کامل تأمین‌کنندگان و تایرها...")}</p>
@@ -321,7 +378,12 @@ export const PurchaseInvoices: React.FC = () => {
                     <td className="py-3 px-4 text-center tabular-nums font-bold">
                       {inv.tire_items ? inv.tire_items.reduce((s, i) => s + i.quantity, 0) : 0}{' '}{t("حلقه")}</td>
                     <td className="py-3 px-4 font-bold text-slate-900 dark:text-white tabular-nums">
-                      {formatCurrency(inv.total_amount, true, currencyUnit, language)}
+                      <div>{formatCurrency(inv.total_amount, true, currencyUnit, language)}</div>
+                      {inv.status === 'CONFIRMED' && inv.payment_status !== 'PAID' && inv.remaining_amount !== undefined && (
+                        <div className="text-[10px] font-medium text-rose-600 dark:text-rose-400 mt-0.5">
+                          {t("مانده:")} {formatCurrency(inv.remaining_amount, true, currencyUnit, language)}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span
@@ -349,17 +411,30 @@ export const PurchaseInvoices: React.FC = () => {
                     </td>
                     {user?.role === 'MANAGER' && (
                       <td className="py-3 px-4 text-center">
-                        {inv.status === 'CONFIRMED' && (
-                          <button
-                            type="button"
-                            onClick={() => handleCancelPurchase(inv)}
-                            title={t("لغو فاکتور خرید و کسر از انبار")}
-                            aria-label={t("لغو فاکتور خرید و کسر از انبار")}
-                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <div className="inline-flex items-center gap-1.5">
+                          {inv.status === 'CONFIRMED' && inv.payment_status !== 'PAID' && (
+                            <button
+                              type="button"
+                              onClick={() => setPaymentInvoice(inv)}
+                              title={t("ثبت پرداخت به تأمین‌کننده")}
+                              aria-label={t("ثبت پرداخت به تأمین‌کننده")}
+                              className="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 transition-colors"
+                            >
+                              <CreditCard className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {inv.status === 'CONFIRMED' && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelPurchase(inv)}
+                              title={t("لغو فاکتور خرید و کسر از انبار")}
+                              aria-label={t("لغو فاکتور خرید و کسر از انبار")}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -392,14 +467,19 @@ export const PurchaseInvoices: React.FC = () => {
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+        <Modal
+          label={t("ثبت ورود کالا و فاکتور خرید از تأمین‌کننده")}
+          onClose={() => { if (!submitting) closeCreateModal(); }}
+          busy={submitting}
+        >
           <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">{t("ثبت ورود کالا و فاکتور خرید از تأمین‌کننده")}</h2>
               <button
                 type="button"
-                onClick={closeCreateModal}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+                disabled={submitting}
+                onClick={() => { if (!submitting) closeCreateModal(); }}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 disabled:opacity-40 rounded-lg"
                 aria-label={t("بستن پنجره")}>
                 ×
               </button>
@@ -470,10 +550,12 @@ export const PurchaseInvoices: React.FC = () => {
                               <input
                                 type="number"
                                 min={1}
-                                value={item.quantity}
+                                aria-label={t("تعداد (حلقه)")}
+                                value={item.quantityInput}
                                 onChange={(e) =>
-                                  handleUpdateItemQty(item.tireId, parseInt(e.target.value) || 0)
+                                  handleUpdateItemQty(item.tireId, e.target.value)
                                 }
+                                onBlur={() => handleCommitItemQty(item.tireId)}
                                 className="ui-field w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center font-bold"
                               />
                             </td>
@@ -481,6 +563,8 @@ export const PurchaseInvoices: React.FC = () => {
                               <input
                                 type="number"
                                 min={0}
+                                step="any"
+                                aria-label={t("نرخ خرید واحد (ریال)")}
                                 value={item.unitCost}
                                 onChange={(e) =>
                                   handleUpdateItemCost(item.tireId, parseFloat(e.target.value) || 0)
@@ -519,8 +603,9 @@ export const PurchaseInvoices: React.FC = () => {
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={closeCreateModal}
-                  className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300"
+                  disabled={submitting}
+                  onClick={() => { if (!submitting) closeCreateModal(); }}
+                  className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >{t("انصراف")}</button>
                 <button
                   type="submit"
@@ -532,8 +617,14 @@ export const PurchaseInvoices: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
+      <PaymentModal
+        isOpen={Boolean(paymentInvoice)}
+        purchaseInvoice={paymentInvoice}
+        onClose={() => setPaymentInvoice(null)}
+        onSuccess={fetchPurchases}
+      />
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { RoleGuard } from './components/layout/RoleGuard';
 import { MainLayout } from './components/layout/MainLayout';
+import { ErrorBoundary } from './components/layout/ErrorBoundary';
 
 const Login = React.lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
 const Dashboard = React.lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
@@ -48,58 +49,60 @@ export const App: React.FC = () => {
     <LanguageProvider>
       <AuthProvider>
         <BrowserRouter>
-          <Suspense fallback={<PageLoadingFallback />}>
-            <Routes>
-              <Route path="/login" element={<Login />} />
+          <ErrorBoundary>
+            <Suspense fallback={<PageLoadingFallback />}>
+              <Routes>
+                <Route path="/login" element={<Login />} />
 
-              <Route element={<RoleGuard />}>
-                <Route element={<MainLayout />}>
-                  <Route path="/" element={<RootRedirect />} />
+                <Route element={<RoleGuard />}>
+                  <Route element={<MainLayout />}>
+                    <Route path="/" element={<RootRedirect />} />
 
-                  <Route element={<RoleGuard allowedRoles={['MANAGER']} />}>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/reports" element={<ReportsPage />} />
-                    <Route path="/treasury" element={<Treasury />} />
-                  </Route>
+                    <Route element={<RoleGuard allowedRoles={['MANAGER']} />}>
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/reports" element={<ReportsPage />} />
+                      <Route path="/treasury" element={<Treasury />} />
+                    </Route>
 
-                  <Route element={<RoleGuard allowedRoles={['MANAGER', 'TECHNICIAN']} />}>
-                    <Route path="/invoices/create" element={<CreateInvoice />} />
-                  </Route>
+                    <Route element={<RoleGuard allowedRoles={['MANAGER', 'TECHNICIAN']} />}>
+                      <Route path="/invoices/create" element={<CreateInvoice />} />
+                    </Route>
 
-                  <Route
-                    path="/invoices/sales"
-                    element={<SalesInvoices />}
-                  />
+                    <Route
+                      path="/invoices/sales"
+                      element={<SalesInvoices />}
+                    />
 
-                  <Route
-                    path="/catalog/tires"
-                    element={<TiresCatalog />}
-                  />
+                    <Route
+                      path="/catalog/tires"
+                      element={<TiresCatalog />}
+                    />
 
-                  <Route element={<RoleGuard allowedRoles={['MANAGER', 'WAREHOUSE']} />}>
-                    <Route path="/invoices/purchases" element={<PurchaseInvoices />} />
-                    <Route path="/suppliers" element={<SuppliersPage />} />
-                  </Route>
+                    <Route element={<RoleGuard allowedRoles={['MANAGER', 'WAREHOUSE']} />}>
+                      <Route path="/invoices/purchases" element={<PurchaseInvoices />} />
+                      <Route path="/suppliers" element={<SuppliersPage />} />
+                    </Route>
 
-                  <Route element={<RoleGuard allowedRoles={['MANAGER', 'WAREHOUSE']} />}>
-                    <Route path="/catalog/movements" element={<StockMovements />} />
-                  </Route>
+                    <Route element={<RoleGuard allowedRoles={['MANAGER', 'WAREHOUSE']} />}>
+                      <Route path="/catalog/movements" element={<StockMovements />} />
+                    </Route>
 
-                  <Route path="/customers" element={<Customers />} />
+                    <Route path="/customers" element={<Customers />} />
 
-                  <Route element={<RoleGuard allowedRoles={['MANAGER', 'TECHNICIAN']} />}>
-                    <Route path="/services" element={<ServicesPage />} />
-                  </Route>
+                    <Route element={<RoleGuard allowedRoles={['MANAGER', 'TECHNICIAN']} />}>
+                      <Route path="/services" element={<ServicesPage />} />
+                    </Route>
 
-                  <Route element={<RoleGuard allowedRoles={['MANAGER']} />}>
-                    <Route path="/users" element={<UsersPage />} />
+                    <Route element={<RoleGuard allowedRoles={['MANAGER']} />}>
+                      <Route path="/users" element={<UsersPage />} />
+                    </Route>
                   </Route>
                 </Route>
-              </Route>
 
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </BrowserRouter>
       </AuthProvider>
     </LanguageProvider>

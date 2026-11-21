@@ -12,16 +12,27 @@ function find(tree: any, predicate: (node: any) => boolean) {
   return node;
 }
 
-function setupBrowserGlobals(t: TestContext, initialStorage: Record<string, string> = {}) {
-  const values = new Map<string, string>(Object.entries(initialStorage));
-  const listeners = new Map<string, Set<(event: any) => void>>();
-  const storage = {
+function createStorageMock(values: Map<string, string>) {
+  return {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); },
     removeItem: (key: string) => { values.delete(key); },
   };
+}
+
+function setupBrowserGlobals(
+  t: TestContext,
+  initialLocalStorage: Record<string, string> = {},
+  initialSessionStorage: Record<string, string> = {},
+) {
+  const values = new Map<string, string>(Object.entries(initialLocalStorage));
+  const sessionValues = new Map<string, string>(Object.entries(initialSessionStorage));
+  const listeners = new Map<string, Set<(event: any) => void>>();
+  const docListeners = new Map<string, Set<(event: any) => void>>();
+  const storage = createStorageMock(values);
+  const sessionStorageMock = createStorageMock(sessionValues);
   const win = {
-    location: { href: '/', search: '' },
+    location: { href: '/', pathname: '/', search: '' },
     addEventListener(type: string, fn: (event: any) => void) {
       if (!listeners.has(type)) listeners.set(type, new Set());
       listeners.get(type)!.add(fn);
@@ -29,35 +40,99 @@ function setupBrowserGlobals(t: TestContext, initialStorage: Record<string, stri
     removeEventListener(type: string, fn: (event: any) => void) {
       listeners.get(type)?.delete(fn);
     },
+    dispatchEvent(type: string, event: any = {}) {
+      for (const fn of [...(listeners.get(type) ?? [])]) fn(event);
+    },
     dispatchStorage(event: { key: string | null; newValue?: string | null }) {
-      for (const fn of listeners.get('storage') ?? []) fn(event);
+      for (const fn of [...(listeners.get('storage') ?? [])]) fn(event);
     },
   };
-  const descriptors = ['localStorage', 'window'].map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
+  const doc = {
+    visibilityState: 'visible',
+    addEventListener(type: string, fn: (event: any) => void) {
+      if (!docListeners.has(type)) docListeners.set(type, new Set());
+      docListeners.get(type)!.add(fn);
+    },
+    removeEventListener(type: string, fn: (event: any) => void) {
+      docListeners.get(type)?.delete(fn);
+    },
+    dispatchVisibilityChange(visibilityState: 'visible' | 'hidden') {
+      doc.visibilityState = visibilityState;
+      for (const fn of [...(docListeners.get('visibilitychange') ?? [])]) fn({});
+    },
+  };
+  const descriptors = ['localStorage', 'sessionStorage', 'window', 'document'].map(
+    (name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const,
+  );
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: sessionStorageMock });
   Object.defineProperty(globalThis, 'window', { configurable: true, value: win });
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: doc });
   t.after(() => {
     for (const [name, descriptor] of descriptors) {
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
       else Reflect.deleteProperty(globalThis, name);
     }
   });
-  return { values, win };
+  return { values, sessionValues, win, doc, listeners, docListeners };
 }
 
-test('AuthContext syncs user and currency across tabs via storage events', async (t) => {
-  const { win } = setupBrowserGlobals(t, {
+function loadSessionBundle(env: Record<string, string> = {}) {
+  const cachedHeaders: Record<string, string> = {};
+  const authStorage = loadComponent('../src/utils/authStorage.ts', {}, env);
+  const sessionUtils = loadComponent('../src/utils/session.ts', {
+    '../api/client': { apiClient: { defaults: { headers: { common: cachedHeaders } } } },
+    './authStorage': authStorage,
+  }, env);
+  return { authStorage, sessionUtils: { ...authStorage, ...sessionUtils }, cachedHeaders };
+}
+
+test('authStorage validates idle timeout bounds, last_activity_at, and legacy localStorage cleanup', (t) => {
+  const { values } = setupBrowserGlobals(t, {
+    access_token: 'legacy-tok',
+    refresh_token: 'legacy-ref',
+    user_info: JSON.stringify({ id: 1, username: 'ali', role: 'MANAGER' }),
+    preferred_currency: 'rial',
+    language: 'en',
+  });
+  const { authStorage } = loadSessionBundle({ VITE_IDLE_TIMEOUT_MINUTES: '20' });
+
+  assert.equal(authStorage.parseIdleTimeoutMinutes(undefined), 15);
+  assert.equal(authStorage.parseIdleTimeoutMinutes(null), 15);
+  assert.equal(authStorage.parseIdleTimeoutMinutes(''), 15);
+  assert.equal(authStorage.parseIdleTimeoutMinutes('0'), 15);
+  assert.equal(authStorage.parseIdleTimeoutMinutes('-5'), 15);
+  assert.equal(authStorage.parseIdleTimeoutMinutes('NaN'), 15);
+  assert.equal(authStorage.parseIdleTimeoutMinutes('Infinity'), 15);
+  assert.equal(authStorage.parseIdleTimeoutMinutes('0.5'), 0.5);
+  assert.equal(authStorage.getIdleTimeoutMs(), 20 * 60_000);
+
+  assert.equal(authStorage.getAccessToken(), null);
+  assert.equal(values.get('access_token'), undefined);
+  assert.equal(values.get('refresh_token'), undefined);
+  assert.equal(values.get('user_info'), undefined);
+  assert.equal(values.get('preferred_currency'), 'rial');
+  assert.equal(values.get('language'), 'en');
+
+  assert.equal(authStorage.isIdleExpired(null, 1_000_000, 900_000), true);
+  assert.equal(authStorage.isIdleExpired(Number.NaN, 1_000_000, 900_000), true);
+  assert.equal(authStorage.isIdleExpired(100_000, 999_999, 900_000), false);
+  assert.equal(authStorage.isIdleExpired(100_000, 1_000_000, 900_000), true);
+});
+
+test('AuthContext syncs user and currency across tabs via storage events in persistent mode', async (t) => {
+  const { win, values } = setupBrowserGlobals(t, {
     access_token: 'tok-1',
     refresh_token: 'ref-1',
     user_info: JSON.stringify({ id: 1, username: 'ali', role: 'MANAGER' }),
     preferred_currency: 'toman',
+    auth_persistence: 'persistent',
+    last_activity_at: String(Date.now()),
   });
-  const { clearLocalSession } = loadComponent('../src/utils/session.ts', {
-    '../api/client': { apiClient: { defaults: { headers: { common: {} } } } },
-  });
+  const { sessionUtils } = loadSessionBundle();
   const h = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
-    '../api/auth': { authApi: { getCurrentUser: async () => ({ id: 1, username: 'ali', role: 'MANAGER' }) } },
-    '../utils/session': { clearLocalSession },
+    '../api/auth': { authApi: { getCurrentUser: async () => ({ id: 1, username: 'ali', role: 'MANAGER' }), logout: async () => {} } },
+    '../utils/session': sessionUtils,
   });
   t.after(() => h.unmount());
   await h.flush();
@@ -76,10 +151,211 @@ test('AuthContext syncs user and currency across tabs via storage events', async
   await h.flush();
   assert.equal(h.tree.props.value.currencyUnit, 'rial');
 
+  sessionUtils.clearAuthStorage();
+  assert.equal(values.get('preferred_currency'), 'toman');
   win.dispatchStorage({ key: 'access_token', newValue: null });
   await h.flush();
   assert.equal(h.tree.props.value.user, null);
   assert.equal(h.tree.props.value.isAuthenticated, false);
+});
+
+test('AuthContext defaults login to sessionStorage and isolates session mode from localStorage storage events', async (t) => {
+  const { values, sessionValues, win } = setupBrowserGlobals(t, { preferred_currency: 'toman' });
+  const { sessionUtils } = loadSessionBundle();
+  const h = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
+    '../api/auth': {
+      authApi: {
+        login: async () => ({
+          access: 'sess-access',
+          refresh: 'sess-refresh',
+          user: { id: 2, username: 'tech', role: 'TECHNICIAN' },
+        }),
+        getCurrentUser: async () => ({ id: 2, username: 'tech', role: 'TECHNICIAN' }),
+        logout: async () => {},
+      },
+    },
+    '../utils/session': sessionUtils,
+  });
+  t.after(() => h.unmount());
+  await h.flush();
+
+  await h.tree.props.value.login('tech', 'pass123');
+  await h.flush();
+
+  assert.equal(sessionValues.get('access_token'), 'sess-access');
+  assert.equal(sessionValues.get('refresh_token'), 'sess-refresh');
+  assert.ok(Number(sessionValues.get('last_activity_at')) > 0);
+  assert.equal(values.get('access_token'), undefined);
+  assert.equal(values.get('auth_persistence'), undefined);
+
+  win.dispatchStorage({
+    key: 'user_info',
+    newValue: JSON.stringify({ id: 9, username: 'other', role: 'MANAGER' }),
+  });
+  win.dispatchStorage({ key: null });
+  win.dispatchStorage({ key: 'preferred_currency', newValue: 'rial' });
+  await h.flush();
+
+  assert.equal(h.tree.props.value.isAuthenticated, true);
+  assert.equal(h.tree.props.value.user.username, 'tech');
+  assert.equal(h.tree.props.value.currencyUnit, 'rial');
+});
+
+test('AuthContext rememberMe=true persists session to localStorage with auth_persistence flag', async (t) => {
+  const { values, sessionValues } = setupBrowserGlobals(t);
+  const { sessionUtils } = loadSessionBundle();
+  const h = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
+    '../api/auth': {
+      authApi: {
+        login: async () => ({
+          access: 'pers-access',
+          refresh: 'pers-refresh',
+          user: { id: 1, username: 'boss', role: 'MANAGER' },
+        }),
+        getCurrentUser: async () => ({ id: 1, username: 'boss', role: 'MANAGER' }),
+        logout: async () => {},
+      },
+    },
+    '../utils/session': sessionUtils,
+  });
+  t.after(() => h.unmount());
+  await h.flush();
+
+  await h.tree.props.value.login('boss', 'pass123', true);
+  await h.flush();
+
+  assert.equal(values.get('auth_persistence'), 'persistent');
+  assert.equal(values.get('access_token'), 'pers-access');
+  assert.equal(values.get('refresh_token'), 'pers-refresh');
+  assert.ok(Number(values.get('last_activity_at')) > 0);
+  assert.equal(sessionValues.size, 0);
+});
+
+test('AuthContext initAuth rejects expired last_activity_at before calling getCurrentUser and redirects with idle-timeout', async (t) => {
+  const now = 1_700_000_000_000;
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now });
+  const { values, sessionValues, win } = setupBrowserGlobals(
+    t,
+    { preferred_currency: 'rial' },
+    {
+      access_token: 'stale-access',
+      refresh_token: 'stale-refresh',
+      user_info: JSON.stringify({ id: 1, username: 'ali', role: 'MANAGER' }),
+      last_activity_at: String(now - 16 * 60_000),
+    },
+  );
+  win.location.pathname = '/dashboard';
+  win.location.href = '/dashboard';
+
+  let getCurrentUserCalls = 0;
+  const { sessionUtils } = loadSessionBundle();
+  const h = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
+    '../api/auth': {
+      authApi: {
+        getCurrentUser: async () => { getCurrentUserCalls++; return { id: 1, username: 'ali', role: 'MANAGER' }; },
+        logout: async () => {},
+      },
+    },
+    '../utils/session': sessionUtils,
+  });
+  t.after(() => h.unmount());
+  await h.flush();
+
+  assert.equal(getCurrentUserCalls, 0);
+  assert.equal(h.tree.props.value.user, null);
+  assert.equal(h.tree.props.value.isAuthenticated, false);
+  assert.equal(h.tree.props.value.isLoading, false);
+  assert.equal(sessionValues.size, 0);
+  assert.equal(values.get('preferred_currency'), 'rial');
+  assert.equal(win.location.href, '/login?reason=idle-timeout');
+});
+
+test('AuthContext sleep-resilient idle monitor expires on wake activity without resetting last_activity_at', async (t) => {
+  const startNow = 1_700_000_000_000;
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: startNow });
+  const { sessionValues, win, doc } = setupBrowserGlobals(t, {}, {
+    access_token: 'sess-access',
+    refresh_token: 'sess-refresh',
+    user_info: JSON.stringify({ id: 1, username: 'ali', role: 'MANAGER' }),
+    last_activity_at: String(startNow),
+  });
+  win.location.pathname = '/dashboard';
+  win.location.href = '/dashboard';
+
+  const logoutCalls: string[] = [];
+  const { sessionUtils } = loadSessionBundle();
+  const h = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
+    '../api/auth': {
+      authApi: {
+        getCurrentUser: async () => ({ id: 1, username: 'ali', role: 'MANAGER' }),
+        logout: async (refresh: string) => { logoutCalls.push(refresh); },
+      },
+    },
+    '../utils/session': sessionUtils,
+  });
+  t.after(() => h.unmount());
+  await h.flush();
+
+  t.mock.timers.setTime(startNow + 20_000);
+  win.dispatchEvent('mousemove');
+  assert.equal(sessionValues.get('last_activity_at'), String(startNow + 20_000));
+
+  t.mock.timers.setTime(startNow + 25_000);
+  win.dispatchEvent('mousemove');
+  assert.equal(sessionValues.get('last_activity_at'), String(startNow + 20_000));
+
+  t.mock.timers.setTime(startNow + 20_000 + 16 * 60_000);
+  win.dispatchEvent('mousemove');
+  doc.dispatchVisibilityChange('visible');
+  assert.equal(sessionValues.get('last_activity_at'), String(startNow + 20_000));
+
+  await h.flush();
+  assert.deepEqual(logoutCalls, ['sess-refresh']);
+  assert.equal(sessionValues.size, 0);
+  assert.equal(h.tree.props.value.user, null);
+  assert.equal(win.location.href, '/login?reason=idle-timeout');
+});
+
+test('AuthContext idle monitor honors activity from another tab before expiring persistent session', async (t) => {
+  const startNow = 1_700_000_000_000;
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: startNow });
+  const { values, win } = setupBrowserGlobals(t, {
+    auth_persistence: 'persistent',
+    access_token: 'pers-access',
+    refresh_token: 'pers-refresh',
+    user_info: JSON.stringify({ id: 1, username: 'ali', role: 'MANAGER' }),
+    last_activity_at: String(startNow),
+  });
+  win.location.pathname = '/dashboard';
+  win.location.href = '/dashboard';
+
+  const logoutCalls: string[] = [];
+  const { sessionUtils } = loadSessionBundle({ VITE_IDLE_TIMEOUT_MINUTES: '1' });
+  const h = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
+    '../api/auth': {
+      authApi: {
+        getCurrentUser: async () => ({ id: 1, username: 'ali', role: 'MANAGER' }),
+        logout: async (refresh: string) => { logoutCalls.push(refresh); },
+      },
+    },
+    '../utils/session': sessionUtils,
+  });
+  t.after(() => h.unmount());
+  await h.flush();
+
+  t.mock.timers.tick(50_000);
+  values.set('last_activity_at', String(startNow + 50_000));
+  t.mock.timers.tick(20_000);
+  await h.flush();
+
+  assert.deepEqual(logoutCalls, []);
+  assert.equal(h.tree.props.value.isAuthenticated, true);
+
+  t.mock.timers.tick(50_000);
+  await h.flush();
+  assert.deepEqual(logoutCalls, ['pers-refresh']);
+  assert.equal(h.tree.props.value.isAuthenticated, false);
+  assert.equal(win.location.href, '/login?reason=idle-timeout');
 });
 
 test('Login waits for auth initialization before redirecting authenticated users', (t) => {
@@ -102,6 +378,56 @@ test('Login waits for auth initialization before redirecting authenticated users
   isLoading = false;
   h.render();
   assert.deepEqual(navigations, [{ to: '/', opts: { replace: true } }]);
+});
+
+test('Login Remember Me checkbox defaults to false, passes selection to login, and renders reason banners', async (t) => {
+  const { win } = setupBrowserGlobals(t);
+  const loginCalls: Array<{ username: string; password: string; rememberMe: boolean }> = [];
+  const mountLogin = () => mountComponent('../src/pages/Login.tsx', 'Login', {
+    '../context/AuthContext': {
+      useAuth: () => ({
+        login: async (username: string, password: string, rememberMe = false) => {
+          loginCalls.push({ username, password, rememberMe });
+        },
+        isAuthenticated: false,
+        isLoading: false,
+        user: null,
+      }),
+    },
+    '../utils/errorParser': { parseApiError },
+    'react-router-dom': { useNavigate: () => () => {} },
+  });
+
+  const h = mountLogin();
+  const checkbox = find(h.tree, (node) => node.type === 'input' && node.props.id === 'login-remember-me');
+  const label = find(h.tree, (node) => node.type === 'label' && node.props.htmlFor === 'login-remember-me');
+  assert.equal(checkbox.props.checked, false);
+  assert.match(text(label), /مرا به خاطر بسپار/);
+
+  find(h.tree, (node) => node.type === 'input' && node.props.id === 'login-username').props.onChange({ target: { value: 'ali' } });
+  find(h.tree, (node) => node.type === 'input' && node.props.id === 'login-password').props.onChange({ target: { value: 'secret123' } });
+  h.render();
+
+  await find(h.tree, (node) => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  await h.flush();
+  assert.deepEqual(loginCalls, [{ username: 'ali', password: 'secret123', rememberMe: false }]);
+
+  find(h.tree, (node) => node.type === 'input' && node.props.id === 'login-remember-me').props.onChange({ target: { checked: true } });
+  h.render();
+  await find(h.tree, (node) => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  await h.flush();
+  assert.deepEqual(loginCalls[1], { username: 'ali', password: 'secret123', rememberMe: true });
+  h.unmount();
+
+  win.location.search = '?reason=idle-timeout';
+  const idleLogin = mountLogin();
+  assert.match(text(find(idleLogin.tree, (node) => node.props?.role === 'status')), /عدم فعالیت پایان یافت/);
+  idleLogin.unmount();
+
+  win.location.search = '?reason=session-expired';
+  const expiredLogin = mountLogin();
+  t.after(() => expiredLogin.unmount());
+  assert.match(text(find(expiredLogin.tree, (node) => node.props?.role === 'status')), /اعتبار نشست شما به پایان رسیده است/);
 });
 
 test('ProfileModal cleans up auto-close timer on unmount and uses logical LTR padding for phone', async (t) => {
@@ -359,4 +685,154 @@ test('ReportsPage ignores stale tab responses when switching tabs quickly', asyn
   profitability.reject(new Error('stale tab failure'));
   await h.flush();
   assert.equal(nodes(h.tree, (node) => node.props?.role === 'alert').length, 0);
+});
+
+test('ServicesPage uses step="any" price input and decrements page directly after deleting sole item on page > 1', async (t) => {
+  const confirmDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'confirm');
+  Object.defineProperty(globalThis, 'confirm', { configurable: true, value: () => true });
+  t.after(() => {
+    if (confirmDescriptor) Object.defineProperty(globalThis, 'confirm', confirmDescriptor);
+    else Reflect.deleteProperty(globalThis, 'confirm');
+  });
+
+  const requestedPages: number[] = [];
+  const deletedIds: number[] = [];
+  const h = mountComponent('../src/pages/ServicesPage.tsx', 'ServicesPage', {
+    '../api/services': {
+      servicesApi: {
+        getServices: async (params: any) => {
+          requestedPages.push(params.page);
+          if (params.page === 2) {
+            return page([{ service_id: 99, service_name: 'Wheel Alignment', price: 250000 }], 2, 2);
+          }
+          return page([{ service_id: 1, service_name: 'Balancing', price: 150000 }], 1, 2);
+        },
+        deleteService: async (id: number) => {
+          deletedIds.push(id);
+        },
+      },
+    },
+    '../context/AuthContext': { useAuth: () => ({ user: { id: 1, role: 'MANAGER' }, currencyUnit: 'rial' }) },
+    '../utils/formatters': formatters,
+    '../utils/errorParser': { parseApiError },
+    '../utils/invoiceRequests': { createRequestSequence },
+  });
+  t.after(() => h.unmount());
+  await h.flush();
+
+  find(h.tree, (node) => node.type === 'button' && text(node).includes('تعریف خدمت')).props.onClick();
+  h.render();
+  assert.equal(find(h.tree, (node) => node.props?.id === 'service-price').props.step, 'any');
+  find(h.tree, (node) => node.type === 'button' && text(node) === 'انصراف').props.onClick();
+  h.render();
+
+  find(h.tree, (node) => node.type === 'button' && text(node) === 'بعدی').props.onClick();
+  h.render();
+  await h.flush();
+  assert.deepEqual(requestedPages, [1, 2]);
+
+  await find(h.tree, (node) => node.type === 'button' && node.props?.['aria-label'] === 'حذف خدمت').props.onClick();
+  h.render();
+  await h.flush();
+  assert.deepEqual(deletedIds, [99]);
+  assert.deepEqual(requestedPages, [1, 2, 1]);
+});
+
+test('SuppliersPage decrements page directly after deleting sole item on page > 1', async (t) => {
+  const confirmDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'confirm');
+  Object.defineProperty(globalThis, 'confirm', { configurable: true, value: () => true });
+  t.after(() => {
+    if (confirmDescriptor) Object.defineProperty(globalThis, 'confirm', confirmDescriptor);
+    else Reflect.deleteProperty(globalThis, 'confirm');
+  });
+
+  const requestedPages: number[] = [];
+  const deletedIds: number[] = [];
+  const h = mountComponent('../src/pages/SuppliersPage.tsx', 'SuppliersPage', {
+    '../api/suppliers': {
+      suppliersApi: {
+        getSuppliers: async (params: any) => {
+          requestedPages.push(params.page);
+          if (params.page === 2) {
+            return page([{ supplier_id: 55, supplier_name: 'Supplier Page 2' }], 2, 2);
+          }
+          return page([{ supplier_id: 1, supplier_name: 'Supplier Page 1' }], 1, 2);
+        },
+        deleteSupplier: async (id: number) => {
+          deletedIds.push(id);
+        },
+      },
+    },
+    '../context/AuthContext': { useAuth: () => ({ user: { id: 1, role: 'MANAGER' }, currencyUnit: 'rial' }) },
+    '../utils/errorParser': { parseApiError },
+    '../utils/invoiceRequests': { createRequestSequence },
+  });
+  t.after(() => h.unmount());
+  await h.flush();
+
+  find(h.tree, (node) => node.type === 'button' && text(node) === 'بعدی').props.onClick();
+  h.render();
+  await h.flush();
+  assert.deepEqual(requestedPages, [1, 2]);
+
+  await find(h.tree, (node) => node.type === 'button' && node.props?.['aria-label'] === 'حذف تأمین‌کننده').props.onClick();
+  h.render();
+  await h.flush();
+  assert.deepEqual(deletedIds, [55]);
+  assert.deepEqual(requestedPages, [1, 2, 1]);
+});
+
+test('StockMovements includes SALE_CANCEL filter option and badge', async (t) => {
+  const h = mountComponent('../src/pages/StockMovements.tsx', 'StockMovements', {
+    '../api/catalog': {
+      catalogApi: {
+        getStockMovements: async () => page([{
+          movement_id: 7,
+          tire_name: 'Barez P618',
+          brand_name: 'Barez',
+          movement_type: 'SALE_CANCEL',
+          movement_type_display: 'Canceled Sale',
+          quantity: 2,
+          balance_after: 10,
+          created_at: '2026-11-05T10:00:00Z',
+        }]),
+      },
+    },
+    '../context/AuthContext': { useAuth: () => ({ user: { id: 1, role: 'MANAGER' }, currencyUnit: 'rial' }) },
+    '../utils/formatters': formatters,
+    '../utils/errorParser': { parseApiError },
+    '../utils/invoiceRequests': { createRequestSequence },
+  });
+  t.after(() => h.unmount());
+  await h.flush();
+
+  assert.equal(nodes(h.tree, (node) => node.type === 'option' && node.props.value === 'SALE_CANCEL').length, 1);
+  assert.match(text(h.tree), /لغو فاکتور فروش/);
+});
+
+test('StockAdjustmentModal uses Modal dialog semantics and resets fields when tire prop changes', async (t) => {
+  const tireA = { tire_id: 1, tire_name: 'Tire A', brand_name: 'B1', size_name: 'S1', stock_quantity: 5 };
+  const tireB = { tire_id: 2, tire_name: 'Tire B', brand_name: 'B2', size_name: 'S2', stock_quantity: 12 };
+  const h = mountComponent('../src/components/catalog/StockAdjustmentModal.tsx', 'StockAdjustmentModal', {
+    '../../api/catalog': { catalogApi: { adjustStock: async () => ({}) } },
+    '../../utils/errorParser': { parseApiError },
+  }, { tire: tireA, onClose() {}, onSuccess() {} });
+  t.after(() => h.unmount());
+
+  assert.equal(nodes(h.tree, (node) => typeof node.type === 'function' && node.type.name === 'Modal').length, 1);
+  const closeBtn = find(h.tree, (node) => node.props?.['aria-label'] === 'بستن پنجره');
+  assert.equal(closeBtn.props.type, 'button');
+
+  find(h.tree, (node) => node.type === 'input' && node.props.type === 'number').props.onChange({ target: { value: '9' } });
+  find(h.tree, (node) => node.type === 'textarea').props.onChange({ target: { value: '   ' } });
+  h.render();
+  await find(h.tree, (node) => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  await h.flush();
+  assert.match(text(h.tree), /ثبت دلیل یا شرح انبارگردانی الزامی است/);
+
+  h.render({ tire: tireB, onClose() {}, onSuccess() {} });
+  await h.flush();
+  assert.equal(find(h.tree, (node) => node.type === 'input' && node.props.type === 'number').props.value, 12);
+  assert.equal(find(h.tree, (node) => node.type === 'textarea').props.value, '');
+  assert.ok(!text(h.tree).includes('ثبت دلیل یا شرح انبارگردانی الزامی است'));
 });

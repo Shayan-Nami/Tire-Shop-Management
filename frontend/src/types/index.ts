@@ -1,5 +1,7 @@
 export type UserRole = 'MANAGER' | 'WAREHOUSE' | 'TECHNICIAN';
 
+export type PaymentMethod = 'POS' | 'CASH' | 'CARD_TO_CARD' | 'BANK_TRANSFER' | 'CHEQUE';
+
 export interface User {
   id: number;
   username: string;
@@ -75,6 +77,7 @@ export interface StockMovement {
   balance_after: number;
   sales_invoice?: number | null;
   purchase_invoice?: number | null;
+  sales_return?: number | null;
   unit_cost?: string | number | null;
   user?: number | null;
   user_name?: string;
@@ -149,8 +152,8 @@ export interface SalesInvoice {
   customer_name: string;
   customer_phone: string | null;
   vehicle: number | null;
-  vehicle_plate?: string;
-  vehicle_model?: string;
+  vehicle_plate?: string | null;
+  vehicle_model?: string | null;
   status: 'DRAFT' | 'CONFIRMED' | 'CANCELLED';
   status_display?: string;
   payment_status: 'UNPAID' | 'PARTIAL' | 'PAID';
@@ -159,13 +162,15 @@ export interface SalesInvoice {
   remaining_amount?: string | number;
   discount_amount: string | number;
   discount_percent: string | number;
+  subtotal_amount?: string | number;
+  effective_discount_amount?: string | number;
   total_amount: string | number;
   returned_amount?: string | number;
   net_amount?: string | number;
   excess_amount?: string | number;
   notes?: string;
   created_by?: number | null;
-  created_by_name?: string;
+  created_by_name?: string | null;
   tire_items: SalesInvoiceTireItem[];
   service_items: SalesInvoiceServiceItem[];
 }
@@ -189,9 +194,11 @@ export interface PurchaseInvoice {
   status_display?: string;
   payment_status: 'UNPAID' | 'PARTIAL' | 'PAID';
   payment_status_display?: string;
+  paid_amount?: string | number;
+  remaining_amount?: string | number;
   total_amount: string | number;
   created_by?: number | null;
-  created_by_name?: string;
+  created_by_name?: string | null;
   tire_items: PurchaseInvoiceTireItem[];
 }
 
@@ -205,7 +212,7 @@ export interface SalesReturn {
   reason: string;
   total_refund_amount: string | number;
   created_by?: number | null;
-  created_by_name?: string;
+  created_by_name?: string | null;
   items: SalesReturnItem[];
 }
 
@@ -235,7 +242,7 @@ export interface ReceiptVoucher {
   cancellation_reason?: string;
   notes?: string;
   created_by?: number | null;
-  created_by_name?: string;
+  created_by_name?: string | null;
   cancelled_at?: string | null;
   cancelled_by?: number | null;
   cancelled_by_name?: string | null;
@@ -255,7 +262,7 @@ export interface PaymentVoucher {
   cancellation_reason?: string;
   notes?: string;
   created_by?: number | null;
-  created_by_name?: string;
+  created_by_name?: string | null;
   cancelled_at?: string | null;
   cancelled_by?: number | null;
   cancelled_by_name?: string | null;
@@ -276,7 +283,7 @@ export interface CustomerRefundVoucher {
   cancellation_reason?: string;
   notes?: string;
   created_by?: number | null;
-  created_by_name?: string;
+  created_by_name?: string | null;
   cancelled_at?: string | null;
   cancelled_by?: number | null;
   cancelled_by_name?: string | null;

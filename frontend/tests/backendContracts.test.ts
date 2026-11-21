@@ -10,3 +10,12 @@ test('backend contract verifier rejects a response missing required UI fields', 
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.match(result.stderr, /missing the following properties/);
 });
+
+test('backend contract verifier rejects responses with unexpected extra properties', () => {
+  const result = spawnSync(process.execPath, ['tests/checkBackendContracts.mjs'], {
+    cwd: new URL('..', import.meta.url), encoding: 'utf8',
+    input: JSON.stringify([{ type: 'Brand', data: { brand_id: 1, brand_name: 'Michelin', unexpected_extra: true } }]),
+  });
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stderr, /Object literal may only specify known properties|unexpected_extra/);
+});

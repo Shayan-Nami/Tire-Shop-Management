@@ -272,6 +272,8 @@ test('Treasury translates payment methods cleanly in English and Persian includi
       '../utils/formatters': formatters,
       '../context/AuthContext': { useAuth: () => ({ currencyUnit: 'rial', user: { id: 1, role: 'MANAGER' } }) },
       '../components/finance/CancelVoucherModal': { CancelVoucherModal: 'cancel-voucher-modal' },
+      '../components/finance/PaymentModal': { PaymentModal: 'payment-modal' },
+      '../components/finance/CustomerRefundModal': { CustomerRefundModal: 'customer-refund-modal' },
       '../utils/invoiceRequests': invoiceRequests,
       '../utils/errorParser': { parseApiError },
       '../utils/i18n': { translatePaymentMethod },
@@ -357,6 +359,8 @@ test('Treasury debounces page reset when searching from page 2 without firing an
     '../utils/formatters': formatters,
     '../context/AuthContext': { useAuth: () => ({ currencyUnit: 'rial', user: { id: 1, role: 'MANAGER' } }) },
     '../components/finance/CancelVoucherModal': { CancelVoucherModal: 'cancel-voucher-modal' },
+    '../components/finance/PaymentModal': { PaymentModal: 'payment-modal' },
+    '../components/finance/CustomerRefundModal': { CustomerRefundModal: 'customer-refund-modal' },
     '../utils/invoiceRequests': invoiceRequests,
     '../utils/errorParser': { parseApiError },
     '../utils/i18n': { translatePaymentMethod },
@@ -456,4 +460,53 @@ test('SalesReturnModal preserves unsaved return quantities and reason when langu
   assert.equal(returnFetches, 1, 'Language toggle must not re-fetch prior sales returns');
   assert.equal(find(h.tree, (node) => node.type === 'input' && node.props.type === 'number').props.value, 2);
   assert.equal(find(h.tree, (node) => node.type === 'textarea' && node.props.id === 'sales-return-reason').props.value, 'Wrong size');
+});
+
+test('InvoiceDetailModal A4 and 80mm views compute gross subtotal, effective percentage discount, and zero net_amount', async (t) => {
+  const invoice = {
+    sales_invoice_id: 77,
+    invoice_number: 'S-1405-00077',
+    invoice_date: '2026-11-02T12:00:00Z',
+    customer: 1,
+    customer_name: 'مشتری تخفیف',
+    customer_phone: '09120000001',
+    vehicle: 1,
+    vehicle_plate: '12ب345-ایران11',
+    status: 'CONFIRMED',
+    payment_status: 'PAID',
+    discount_amount: '0.00',
+    discount_percent: '10',
+    total_amount: '180000',
+    returned_amount: '180000',
+    net_amount: '0.00',
+    tire_items: [
+      { id: 1, tire: 1, tire_name: 'Tire 1', brand_name: 'Brand', size_name: '205/55R16', quantity: 2, unit_price: '100000', total_price: '200000' },
+    ],
+    service_items: [],
+  };
+
+  const h = mountComponent('../src/components/invoices/InvoiceDetailModal.tsx', 'InvoiceDetailModal', {
+    '../plates/IranianPlateBadge': { IranianPlateBadge: 'plate-badge' },
+    '../../utils/formatters': formatters,
+    '../../context/AuthContext': { useAuth: () => ({ currencyUnit: 'rial', user: { id: 1, role: 'MANAGER' } }) },
+    '../../api/invoices': { invoicesApi: {} },
+    '../../utils/errorParser': { parseApiError },
+  }, { invoice, onClose() {}, onUpdated() {} });
+  t.after(() => h.unmount());
+
+  const a4Text = text(h.tree);
+  assert.match(a4Text, /۲۰۰,۰۰۰ ریال/);
+  assert.match(a4Text, /تخفیف:\s*\(10%\)/);
+  assert.match(a4Text, /- ۲۰,۰۰۰ ریال/);
+  assert.match(a4Text, /مبلغ قابل پرداخت خالص:۰ ریال/);
+
+  const thermalBtn = find(h.tree, (node) => node.type === 'button' && text(node).includes('فیش ۸۰mm'));
+  thermalBtn.props.onClick();
+  await h.flush();
+
+  const thermalText = text(h.tree);
+  assert.match(thermalText, /جمع کل:۲۰۰,۰۰۰ ریال/);
+  assert.match(thermalText, /تخفیف:\s*\(10%\)/);
+  assert.match(thermalText, /- ۲۰,۰۰۰ ریال/);
+  assert.match(thermalText, /مبلغ قابل پرداخت:۰ ریال/);
 });

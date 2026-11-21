@@ -89,6 +89,13 @@ export const StockMovements: React.FC = () => {
             <span>{t("لغو فاکتور خرید")}</span>
           </span>
         );
+      case 'SALE_CANCEL':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <ArrowDownLeft className="w-3 h-3" />
+            <span>{t("لغو فاکتور فروش")}</span>
+          </span>
+        );
       case 'MANUAL_ADJUSTMENT':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400">
@@ -142,6 +149,7 @@ export const StockMovements: React.FC = () => {
             <option value="PURCHASE">{t("فاکتور خرید (ورود)")}</option>
             <option value="SALE">{t("فاکتور فروش (خروج)")}</option>
             <option value="SALE_RETURN">{t("مرجوعی فروش")}</option>
+            <option value="SALE_CANCEL">{t("لغو فاکتور فروش (بازگشت به انبار)")}</option>
             <option value="MANUAL_ADJUSTMENT">{t("انبارگردانی دستی")}</option>
             <option value="PURCHASE_CANCEL">{t("لغو فاکتور خرید")}</option>
             <option value="INITIAL_STOCK">{t("موجودی اولیه سیستم")}</option>

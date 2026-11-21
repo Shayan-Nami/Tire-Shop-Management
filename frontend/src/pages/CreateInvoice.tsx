@@ -35,6 +35,7 @@ interface SelectedServiceRow {
   serviceId: number;
   service: TechnicalService;
   quantity: number;
+  quantityInput: string;
   unitPrice: number;
 }
 
@@ -61,6 +62,8 @@ export const CreateInvoice: React.FC = () => {
   const [discountPercent, setDiscountPercent] = useState<string>('0');
   const [status, setStatus] = useState<'CONFIRMED' | 'DRAFT'>('CONFIRMED');
   const [paymentStatus, setPaymentStatus] = useState<'UNPAID' | 'PAID'>('PAID');
+  const [paymentMethod, setPaymentMethod] = useState<'POS' | 'CASH' | 'CARD_TO_CARD' | 'BANK_TRANSFER' | 'CHEQUE'>('POS');
+  const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
   const [showNewCustomerModal, setShowNewCustomerModal] = useState<boolean>(false);
@@ -327,9 +330,11 @@ export const CreateInvoice: React.FC = () => {
     const existing = serviceItems.find((item) => item.serviceId === serviceId);
     if (existing) {
       setServiceItems(
-        serviceItems.map((item) =>
-          item.serviceId === serviceId ? { ...item, quantity: item.quantity + 1 } : item
-        )
+        serviceItems.map((item) => {
+          if (item.serviceId !== serviceId) return item;
+          const nextQty = item.quantity + 1;
+          return { ...item, quantity: nextQty, quantityInput: String(nextQty) };
+        })
       );
     } else {
       setServiceItems([
@@ -338,21 +343,50 @@ export const CreateInvoice: React.FC = () => {
           serviceId: service.service_id,
           service,
           quantity: 1,
+          quantityInput: '1',
           unitPrice: parseFloat(String(service.price)) || 0,
         },
       ]);
     }
   };
 
-  const updateServiceItemQty = (serviceId: number, qty: number) => {
-    if (qty <= 0) {
-      removeServiceItem(serviceId);
+  const updateServiceItemQty = (serviceId: number, rawValue: string) => {
+    const trimmed = rawValue.trim();
+    if (trimmed === '') {
+      setServiceItems(
+        serviceItems.map((item) =>
+          item.serviceId === serviceId ? { ...item, quantity: 0, quantityInput: '' } : item
+        )
+      );
       return;
     }
+
+    const parsed = parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+
+    const nextQty = parsed < 0 ? 0 : parsed;
+    const nextInput = parsed < 0 ? '0' : rawValue;
     setServiceItems(
       serviceItems.map((item) =>
-        item.serviceId === serviceId ? { ...item, quantity: qty } : item
+        item.serviceId === serviceId ? { ...item, quantity: nextQty, quantityInput: nextInput } : item
       )
+    );
+  };
+
+  const commitServiceItemQty = (serviceId: number) => {
+    setServiceItems(
+      serviceItems.map((item) => {
+        if (item.serviceId !== serviceId) return item;
+        const parsed = parseInt(item.quantityInput, 10);
+        const clamped = Number.isNaN(parsed) || parsed < 1 ? 1 : parsed;
+        return {
+          ...item,
+          quantity: clamped,
+          quantityInput: String(clamped),
+        };
+      })
     );
   };
 
@@ -474,6 +508,10 @@ export const CreateInvoice: React.FC = () => {
       setErrorMessage(t("تعداد همه اقلام تایر باید حداقل ۱ حلقه باشد."));
       return;
     }
+    if (serviceItems.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1)) {
+      setErrorMessage(t("تعداد همه خدمات فنی باید حداقل ۱ باشد."));
+      return;
+    }
 
     const effectivePaymentStatus = status === 'DRAFT' ? 'UNPAID' : paymentStatus;
     submitBusy.current = true;
@@ -498,6 +536,12 @@ export const CreateInvoice: React.FC = () => {
         discount_percent: numDiscountPercent,
         status,
         payment_status: effectivePaymentStatus,
+        ...(effectivePaymentStatus === 'PAID'
+          ? {
+              payment_method: paymentMethod,
+              reference_number: referenceNumber.trim() || undefined,
+            }
+          : {}),
         notes: notes.trim() || undefined,
       });
 
@@ -724,7 +768,7 @@ export const CreateInvoice: React.FC = () => {
                               <input
                                 type="number"
                                 min={0}
-                                step={10000}
+                                step="any"
                                 value={item.unitPrice}
                                 onChange={(e) =>
                                   updateTireItemUnitPrice(
@@ -823,10 +867,10 @@ export const CreateInvoice: React.FC = () => {
                           <input
                             type="number"
                             min={1}
-                            value={item.quantity}
-                            onChange={(e) =>
-                              updateServiceItemQty(item.serviceId, parseInt(e.target.value) || 0)
-                            }
+                            aria-label={t("تعداد / چرخ")}
+                            value={item.quantityInput}
+                            onChange={(e) => updateServiceItemQty(item.serviceId, e.target.value)}
+                            onBlur={() => commitServiceItemQty(item.serviceId)}
                             className="ui-field w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-center font-bold text-xs"
                           />
                         </td>
@@ -836,7 +880,7 @@ export const CreateInvoice: React.FC = () => {
                               <input
                                 type="number"
                                 min={0}
-                                step={10000}
+                                step="any"
                                 value={item.unitPrice}
                                 onChange={(e) =>
                                   updateServiceItemUnitPrice(
@@ -1014,6 +1058,42 @@ export const CreateInvoice: React.FC = () => {
                 >{t("نسیه / تسویه بعداً")}</button>
               </div>
             </div>
+
+            {status !== 'DRAFT' && paymentStatus === 'PAID' && (
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2.5 text-xs">
+                <div className="space-y-1">
+                  <label htmlFor="invoice-payment-method" className="font-semibold text-slate-700 dark:text-slate-300 block">
+                    {t("روش پرداخت:")}
+                  </label>
+                  <select
+                    id="invoice-payment-method"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'POS' | 'CASH' | 'CARD_TO_CARD' | 'BANK_TRANSFER' | 'CHEQUE')}
+                    className="ui-field w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                  >
+                    <option value="POS">{t("کارتخوان بانکی (POS)")}</option>
+                    <option value="CASH">{t("وجه نقد (صندوق)")}</option>
+                    <option value="CARD_TO_CARD">{t("کارت به کارت")}</option>
+                    <option value="BANK_TRANSFER">{t("انتقال بانکی / حواله")}</option>
+                    <option value="CHEQUE">{t("چک صیادی بانکی")}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="invoice-reference-number" className="font-semibold text-slate-700 dark:text-slate-300 block">
+                    {t("شماره پیگیری / شماره ارجاع تراکنش:")}
+                  </label>
+                  <input
+                    id="invoice-reference-number"
+                    type="text"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    placeholder={t("مثلاً: 1234567890")}
+                    className="ui-field w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1.5 text-xs">
               <label className="font-semibold text-slate-700 dark:text-slate-300 block">{t("توضیحات فاکتور:")}</label>

@@ -319,6 +319,7 @@ test('sales list keeps the newest search response and ignores stale failures', a
   const { h } = setup(t, { invoices: { getSalesInvoices: ({ search }: any) => search ? latest.promise : old.promise } }, 'SalesInvoices');
   await h.flush();
   changeLabel(h, 'جستجوی فاکتور فروش', 'new');
+  t.mock.timers.tick(350);
   await h.flush();
   old.reject(new Error('obsolete invoice error'));
   await h.flush();
@@ -433,4 +434,88 @@ test('sales list failures show an alert and retry control', async (t) => {
   await h.flush();
   assert.equal(calls, 2);
   assert.equal(nodes(h.tree, (node) => node.props?.role === 'alert').length, 0);
+});
+
+test('sales list debounces search by 350ms and resets page without issuing premature requests', async (t) => {
+  const calls: Array<Record<string, unknown>> = [];
+  const { h } = setup(t, {
+    invoices: {
+      getSalesInvoices: async (params: Record<string, unknown>) => {
+        calls.push(params);
+        return page([{ sales_invoice_id: 1, invoice_number: 'S-1', status: 'CONFIRMED', net_amount: 0 }], Number(params.page ?? 1), 2);
+      },
+    },
+  }, 'SalesInvoices');
+  await h.flush();
+  button(h, 'بعدی').props.onClick();
+  await h.flush();
+  assert.equal(calls.length, 2);
+
+  changeLabel(h, 'جستجوی فاکتور فروش', 'a');
+  changeLabel(h, 'جستجوی فاکتور فروش', 'ali');
+  t.mock.timers.tick(349);
+  await h.flush();
+  assert.equal(calls.length, 2);
+
+  t.mock.timers.tick(1);
+  await h.flush();
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls[2], { search: 'ali', status: undefined, payment_status: undefined, page: 1 });
+});
+
+test('CreateInvoice sends payment_method and reference_number on immediate PAID settlement', async (t) => {
+  const { h, ready, saved } = setup(t);
+  await ready();
+  change(h, 'invoice-customer', '1');
+  await h.flush();
+  changeLabel(h, 'افزودن خدمت کارگاهی', '1');
+  change(h, 'invoice-payment-method', 'BANK_TRANSFER');
+  change(h, 'invoice-reference-number', 'TRX-8899');
+  await submit(h).props.onClick();
+  await h.flush();
+
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].status, 'CONFIRMED');
+  assert.equal(saved[0].payment_status, 'PAID');
+  assert.equal(saved[0].payment_method, 'BANK_TRANSFER');
+  assert.equal(saved[0].reference_number, 'TRX-8899');
+});
+
+test('CreateInvoice uses step="any" for unit prices and keeps empty service quantity draft until blur', async (t) => {
+  const { h, ready, saved } = setup(t);
+  await ready();
+  change(h, 'invoice-customer', '1');
+  await h.flush();
+
+  const tireSelect = find(h, (node) => node.type === 'select' &&
+    nodes(node, (opt) => opt.type === 'option' && text(opt).includes('Tire 1')).length > 0);
+  tireSelect.props.onChange({ target: { value: '1' } });
+  h.render();
+  changeLabel(h, 'افزودن خدمت کارگاهی', '1');
+
+  const tireRow = find(h, (node) => node.type === 'tr' && text(node).includes('Tire 1'));
+  const serviceRow = find(h, (node) => node.type === 'tr' && text(node).includes('Service 1'));
+  const tirePriceInput = nodes(tireRow, (node) => node.type === 'input' && node.props.type === 'number')[1];
+  const servicePriceInput = nodes(serviceRow, (node) => node.type === 'input' && node.props.type === 'number')[1];
+  assert.equal(tirePriceInput.props.step, 'any');
+  assert.equal(servicePriceInput.props.step, 'any');
+
+  const serviceQty = () => find(h, (node) => node.props?.['aria-label'] === 'تعداد / چرخ');
+  serviceQty().props.onChange({ target: { value: '' } });
+  h.render();
+  assert.equal(serviceQty().props.value, '');
+
+  await submit(h).props.onClick();
+  await h.flush();
+  assert.equal(saved.length, 0);
+  assert.match(text(h.tree), /تعداد همه خدمات فنی باید حداقل ۱ باشد\./);
+
+  serviceQty().props.onBlur();
+  h.render();
+  assert.equal(serviceQty().props.value, '1');
+
+  await submit(h).props.onClick();
+  await h.flush();
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0].service_items, [{ service: 1, quantity: 1, unit_price: 10 }]);
 });

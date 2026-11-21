@@ -1,8 +1,9 @@
 import { apiClient } from '../api/client';
+import { clearAuthStorage } from './authStorage';
+
+export * from './authStorage';
 
 export function clearLocalSession(): void {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user_info');
+  clearAuthStorage();
   delete apiClient.defaults.headers.common.Authorization;
 }

@@ -20,7 +20,7 @@ import { createRequestSequence } from '../utils/invoiceRequests';
 
 const parseMinStockAlert = (raw: string) => {
   const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed >= 1 ? parsed : 4;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 4;
 };
 
 export const TiresCatalog: React.FC = () => {
@@ -581,7 +581,7 @@ export const TiresCatalog: React.FC = () => {
                     type="number"
                     required
                     min={0}
-                    step={10000}
+                    step="any"
                     value={newSalePrice}
                     onChange={(e) => setNewSalePrice(e.target.value)}
                     placeholder={t("مثلاً: 25000000")}
@@ -599,7 +599,7 @@ export const TiresCatalog: React.FC = () => {
                     id="add-tire-purchase-price"
                     type="number"
                     min={0}
-                    step={10000}
+                    step="any"
                     value={newPurchasePrice}
                     onChange={(e) => setNewPurchasePrice(e.target.value)}
                     placeholder={t("اختیاری")}
@@ -617,7 +617,7 @@ export const TiresCatalog: React.FC = () => {
                 <input
                   id="add-tire-min-stock"
                   type="number"
-                  min={1}
+                  min={0}
                   value={newMinStock}
                   onChange={(e) => setNewMinStock(e.target.value)}
                   className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-center font-bold"
@@ -688,7 +688,7 @@ export const TiresCatalog: React.FC = () => {
                     type="number"
                     required
                     min={0}
-                    step={10000}
+                    step="any"
                     value={editSalePrice}
                     onChange={(e) => setEditSalePrice(e.target.value)}
                     className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-end font-bold tabular-nums"
@@ -719,7 +719,7 @@ export const TiresCatalog: React.FC = () => {
                 <input
                   id="edit-tire-min-stock"
                   type="number"
-                  min={1}
+                  min={0}
                   value={editMinStock}
                   onChange={(e) => setEditMinStock(e.target.value)}
                   className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-center font-bold"

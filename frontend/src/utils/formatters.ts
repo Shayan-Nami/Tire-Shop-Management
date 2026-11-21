@@ -6,6 +6,22 @@ export function toPersianDigits(num: string | number | null | undefined): string
   return str.replace(/\d/g, (x) => persianDigits[parseInt(x, 10)]);
 }
 
+export function truncateToTwoDecimals(raw: string | number | null | undefined): string {
+  if (raw === null || raw === undefined) return '0';
+  const rawStr = String(raw).trim();
+  if (!rawStr) return '0';
+  const numeric = parseFloat(rawStr);
+  if (!Number.isFinite(numeric) || numeric <= 0) return '0';
+  const plainDecimal = rawStr.match(/^(\d+)(?:\.(\d+))?$/);
+  if (plainDecimal) {
+    const intPart = String(Number(plainDecimal[1]));
+    const fracPart = (plainDecimal[2] || '').slice(0, 2).replace(/0+$/, '');
+    return fracPart ? `${intPart}.${fracPart}` : intPart;
+  }
+  const truncated = Math.floor(Number((numeric * 100).toFixed(6))) / 100;
+  return String(truncated);
+}
+
 export function formatCurrency(
   amount: number | string | null | undefined,
   showUnit: boolean = true,
@@ -69,7 +85,7 @@ export interface ParsedPlate {
   isValid: boolean;
 }
 
-export function parseIranianPlate(plateStr?: string): ParsedPlate {
+export function parseIranianPlate(plateStr?: string | null): ParsedPlate {
   const invalid: ParsedPlate = { part1: '', letter: '', part2: '', iranCode: '', isValid: false };
   if (!plateStr?.trim()) return invalid;
 

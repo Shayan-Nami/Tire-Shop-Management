@@ -26,6 +26,7 @@ export const SalesInvoices: React.FC = () => {
   const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -45,6 +46,17 @@ export const SalesInvoices: React.FC = () => {
   };
 
   useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === debouncedSearch) return;
+    const timer = setTimeout(() => {
+      invoiceRequests.current.invalidate();
+      setDebouncedSearch(trimmed);
+      setCurrentPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search, debouncedSearch]);
+
+  useEffect(() => {
     const requests = invoiceRequests.current;
     const request = requests.begin();
     const isCurrent = () => requests.isCurrent(request);
@@ -53,7 +65,7 @@ export const SalesInvoices: React.FC = () => {
       setLoadError(null);
       try {
         const data = await invoicesApi.getSalesInvoices({
-          search: search.trim() || undefined,
+          search: debouncedSearch || undefined,
           status: statusFilter || undefined,
           payment_status: paymentStatusFilter || undefined,
           page: currentPage,
@@ -74,7 +86,7 @@ export const SalesInvoices: React.FC = () => {
     };
     void loadInvoices();
     return () => requests.invalidate();
-  }, [search, statusFilter, paymentStatusFilter, currentPage, refreshVersion, t, language]);
+  }, [debouncedSearch, statusFilter, paymentStatusFilter, currentPage, refreshVersion, t, language]);
 
   return (
     <div className="page-stack" aria-busy={loading}>
@@ -101,11 +113,7 @@ export const SalesInvoices: React.FC = () => {
             type="text"
             aria-label={t("جستجوی فاکتور فروش")}
             value={search}
-            onChange={(e) => {
-              invoiceRequests.current.invalidate();
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder={t("جستجو در شماره فاکتور، نام، موبایل، پلاک...")}
             className="ui-field w-full pe-3 ps-9 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none"
           />
@@ -199,7 +207,7 @@ export const SalesInvoices: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4 font-black text-slate-900 dark:text-white tabular-nums">
-                      {formatCurrency(inv.net_amount || inv.total_amount, true, currencyUnit, language)}
+                      {formatCurrency(inv.net_amount ?? inv.total_amount, true, currencyUnit, language)}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span

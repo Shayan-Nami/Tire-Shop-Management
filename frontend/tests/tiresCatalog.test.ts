@@ -182,3 +182,46 @@ test('catalog search is debounced and shows recoverable alert when fetch fails',
   await h.flush();
   assert.equal(nodes(h.tree, (node) => node.props?.role === 'alert').length, 0);
 });
+
+test('catalog add and edit price inputs allow arbitrary precision with step="any"', async (t) => {
+  const { h } = await setup(t);
+
+  find(h.tree, (node) => node.type === 'button' && text(node) === 'تعریف تایر جدید').props.onClick();
+  h.render();
+  assert.equal(find(h.tree, (node) => node.props?.id === 'add-tire-sale-price').props.step, 'any');
+  assert.equal(find(h.tree, (node) => node.props?.id === 'add-tire-purchase-price').props.step, 'any');
+  find(h.tree, (node) => node.props?.['aria-label'] === 'بستن پنجره').props.onClick();
+  h.render();
+
+  find(h.tree, (node) => node.props?.title === 'ویرایش نرخ و مشخصات تایر').props.onClick();
+  h.render();
+  assert.equal(find(h.tree, (node) => node.props?.id === 'edit-tire-sale-price').props.step, 'any');
+});
+
+test('min_stock_alert allows 0 threshold on edit and add while keeping empty fallback at 4', async (t) => {
+  const { h, updates, creations } = await setup(t);
+
+  find(h.tree, (node) => node.props?.title === 'ویرایش نرخ و مشخصات تایر').props.onClick();
+  h.render();
+  const editThreshold = find(h.tree, (node) => node.props?.id === 'edit-tire-min-stock');
+  assert.equal(editThreshold.props.min, 0);
+  change(h, editThreshold, '0');
+  await find(h.tree, (node) => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  await h.flush();
+  assert.equal(updates[0].data.min_stock_alert, 0);
+
+  find(h.tree, (node) => node.type === 'button' && text(node) === 'تعریف تایر جدید').props.onClick();
+  h.render();
+  const addThreshold = find(h.tree, (node) => node.props?.id === 'add-tire-min-stock');
+  assert.equal(addThreshold.props.min, 0);
+  change(h, addThreshold, '0');
+  change(h, labeledField(h, 'نام کامل تایر (گل / مدل):'), 'Zero Alert Tire');
+  change(h, labeledField(h, 'قیمت فروش پایه (ریال):'), '140000');
+  const selectWithOption = (label: string) => find(h.tree, (node) => node.type === 'select' &&
+    nodes(node, (child) => child.type === 'option' && text(child) === label).length > 0);
+  change(h, selectWithOption('انتخاب برند...'), '2');
+  change(h, selectWithOption('انتخاب سایز...'), '3');
+  await find(h.tree, (node) => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  await h.flush();
+  assert.equal(creations[0].min_stock_alert, 0);
+});

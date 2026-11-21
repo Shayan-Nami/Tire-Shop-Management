@@ -42,6 +42,35 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
 
   if (!invoice) return null;
 
+  const tireItemsTotal = (invoice.tire_items ?? []).reduce(
+    (sum, item) => sum + (parseFloat(String(item.total_price)) || (item.quantity * (parseFloat(String(item.unit_price)) || 0))),
+    0,
+  );
+  const serviceItemsTotal = (invoice.service_items ?? []).reduce(
+    (sum, item) => sum + (parseFloat(String(item.total_price)) || (item.quantity * (parseFloat(String(item.unit_price)) || 0))),
+    0,
+  );
+  const computedItemSum = tireItemsTotal + serviceItemsTotal;
+  const totalAmount = parseFloat(String(invoice.total_amount)) || 0;
+  const discountAmount = parseFloat(String(invoice.discount_amount || 0)) || 0;
+  const discountPercent = parseFloat(String(invoice.discount_percent || 0)) || 0;
+
+  const grossSubtotal =
+    invoice.subtotal_amount !== undefined && invoice.subtotal_amount !== null
+      ? parseFloat(String(invoice.subtotal_amount)) || 0
+      : (invoice.tire_items?.length ?? 0) > 0 || (invoice.service_items?.length ?? 0) > 0
+      ? computedItemSum
+      : discountPercent > 0 && discountPercent < 100
+      ? Math.round((totalAmount / (1 - discountPercent / 100)) * 100) / 100
+      : totalAmount + discountAmount;
+
+  const effectiveDiscount =
+    invoice.effective_discount_amount !== undefined && invoice.effective_discount_amount !== null
+      ? parseFloat(String(invoice.effective_discount_amount)) || 0
+      : grossSubtotal > totalAmount
+      ? Math.max(0, Math.round((grossSubtotal - totalAmount) * 100) / 100)
+      : discountAmount;
+
   const handleConfirm = async () => {
     if (!confirm(t("آیا از تایید نهایی فاکتور و کسر اقلام از موجودی انبار اطمینان دارید؟"))) return;
     setLoadingAction(true);
@@ -306,15 +335,18 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>{t("جمع ناخالص فاکتور:")}</span>
                   <span className="font-bold tabular-nums">
-                    {formatCurrency(invoice.total_amount, true, currencyUnit, language)}
+                    {formatCurrency(grossSubtotal, true, currencyUnit, language)}
                   </span>
                 </div>
 
-                {(parseFloat(String(invoice.discount_amount)) > 0 || parseFloat(String(invoice.discount_percent)) > 0) && (
+                {(effectiveDiscount > 0 || discountPercent > 0) && (
                   <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                    <span>{t("تخفیف:")}</span>
+                    <span>
+                      {t("تخفیف:")}
+                      {discountPercent > 0 ? ` (${discountPercent}%)` : ''}
+                    </span>
                     <span className="font-bold tabular-nums">
-                      - {formatCurrency(invoice.discount_amount, true, currencyUnit, language)}
+                      - {formatCurrency(effectiveDiscount, true, currencyUnit, language)}
                     </span>
                   </div>
                 )}
@@ -331,7 +363,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between text-sm font-extrabold text-slate-900 dark:text-white">
                   <span>{t("مبلغ قابل پرداخت خالص:")}</span>
                   <span className="text-brand-600 dark:text-brand-400 tabular-nums">
-                    {formatCurrency(invoice.net_amount || invoice.total_amount, true, currencyUnit, language)}
+                    {formatCurrency(invoice.net_amount ?? invoice.total_amount, true, currencyUnit, language)}
                   </span>
                 </div>
               </div>
@@ -429,12 +461,15 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               <div className="space-y-1.5 text-[11px] pb-2 border-b border-dashed border-slate-300 dark:border-slate-700">
                 <div className="flex justify-between text-slate-500">
                   <span>{t("جمع کل:")}</span>
-                  <span className="tabular-nums">{formatCurrency(invoice.total_amount, true, currencyUnit, language)}</span>
+                  <span className="tabular-nums">{formatCurrency(grossSubtotal, true, currencyUnit, language)}</span>
                 </div>
-                {parseFloat(String(invoice.discount_amount || 0)) > 0 && (
+                {(effectiveDiscount > 0 || discountPercent > 0) && (
                   <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                    <span>{t("تخفیف:")}</span>
-                    <span className="tabular-nums">- {formatCurrency(invoice.discount_amount, true, currencyUnit, language)}</span>
+                    <span>
+                      {t("تخفیف:")}
+                      {discountPercent > 0 ? ` (${discountPercent}%)` : ''}
+                    </span>
+                    <span className="tabular-nums">- {formatCurrency(effectiveDiscount, true, currencyUnit, language)}</span>
                   </div>
                 )}
                 {parseFloat(String(invoice.returned_amount || 0)) > 0 && (
@@ -446,7 +481,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 <div className="flex justify-between text-sm font-black pt-1 border-t border-slate-200 dark:border-slate-800">
                   <span>{t("مبلغ قابل پرداخت:")}</span>
                   <span className="text-brand-600 dark:text-brand-400 tabular-nums">
-                    {formatCurrency(invoice.net_amount || invoice.total_amount, true, currencyUnit, language)}
+                    {formatCurrency(invoice.net_amount ?? invoice.total_amount, true, currencyUnit, language)}
                   </span>
                 </div>
                 <div className="flex justify-between text-[10px] text-slate-500 pt-0.5">

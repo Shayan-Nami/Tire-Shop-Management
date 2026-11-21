@@ -1,11 +1,13 @@
 import { useLanguage } from '../../context/LanguageContext';
 import React, { useEffect, useRef, useState } from 'react';
 import { X, RotateCcw, AlertTriangle } from 'lucide-react';
-import { SalesInvoice } from '../../types';
+import { SalesInvoice, PaymentMethod } from '../../types';
 import { invoicesApi } from '../../api/invoices';
 import { formatCurrency } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { parseApiError } from '../../utils/errorParser';
+import { PAYMENT_METHOD_OPTIONS } from '../../utils/i18n';
+import { Modal } from '../ui/Modal';
 
 interface SalesReturnModalProps {
   invoice: SalesInvoice | null;
@@ -26,6 +28,9 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const [returnsErrorCause, setReturnsErrorCause] = useState<{ error: unknown } | null>(null);
   const [returnsRetryToken, setReturnsRetryToken] = useState<number>(0);
   const [reason, setReason] = useState<string>('');
+  const [autoRefund, setAutoRefund] = useState<boolean>(true);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('POS');
+  const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const submitBusy = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -35,6 +40,9 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   useEffect(() => {
     setReturnItems({});
     setReason('');
+    setAutoRefund(true);
+    setPaymentMethod('POS');
+    setReferenceNumber('');
     setErrorMessage(null);
     setReturnedByItem({});
     setReturnsErrorCause(null);
@@ -138,13 +146,25 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
       return;
     }
 
+    if (!reason.trim()) {
+      setErrorMessage(t("ثبت علت مرجوعی کالا الزامی است."));
+      return;
+    }
+
     submitBusy.current = true;
     setSubmitting(true);
     try {
       await invoicesApi.createSalesReturn({
         sales_invoice: invoice.sales_invoice_id,
         items: itemsToReturn,
-        reason: reason.trim() || t("مرجوعی توسط مشتری با توافق فروشگاه"),
+        reason: reason.trim(),
+        auto_refund: autoRefund,
+        ...(autoRefund
+          ? {
+              payment_method: paymentMethod,
+              reference_number: referenceNumber.trim() || undefined,
+            }
+          : {}),
       });
       onSuccess();
       onClose();
@@ -156,8 +176,16 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
     }
   };
 
+  const handleClose = () => {
+    if (!submitting) onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+    <Modal
+      label={`${t("ثبت سند مرجوعی فروش (فاکتور")} ${invoice.invoice_number})`}
+      onClose={handleClose}
+      busy={submitting}
+    >
       <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-xl w-full overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
           <div className="flex items-center gap-2">
@@ -167,9 +195,10 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
+            disabled={submitting}
             aria-label={t("بستن")}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -256,11 +285,59 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
             />
           </div>
 
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+            <label htmlFor="sales-return-auto-refund" className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-300">
+              <input
+                id="sales-return-auto-refund"
+                type="checkbox"
+                checked={autoRefund}
+                onChange={(e) => setAutoRefund(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span>{t("ثبت خودکار سند استرداد وجه به مشتری")}</span>
+            </label>
+
+            {autoRefund && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label htmlFor="sales-return-payment-method" className="text-xs font-bold text-slate-600 dark:text-slate-400 block">
+                    {t("روش استرداد وجه:")}
+                  </label>
+                  <select
+                    id="sales-return-payment-method"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                    className="ui-field w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 outline-none"
+                  >
+                    {PAYMENT_METHOD_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{t(option.labelKey)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="sales-return-reference" className="text-xs font-bold text-slate-600 dark:text-slate-400 block">
+                    {t("شماره پیگیری / شماره ارجاع تراکنش:")}
+                  </label>
+                  <input
+                    id="sales-return-reference"
+                    type="text"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    placeholder={t("مثلاً: 1234567890")}
+                    className="ui-field w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={handleClose}
+              disabled={submitting}
+              className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
             >{t("انصراف")}</button>
             <button
               type="submit"
@@ -272,6 +349,6 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 };

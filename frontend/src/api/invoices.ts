@@ -30,6 +30,9 @@ export interface CreateSalesReturnPayload {
   items: Array<{ sales_invoice_tire_item_id: number; quantity: number }>;
   reason: string;
   return_date?: string;
+  auto_refund?: boolean;
+  payment_method?: string;
+  reference_number?: string;
 }
 
 export const invoicesApi = {
@@ -40,6 +43,7 @@ export const invoicesApi = {
     start_date?: string;
     end_date?: string;
     page?: number;
+    page_size?: number;
   }): Promise<PaginatedResponse<SalesInvoice>> => {
     const response = await apiClient.get<PaginatedResponse<SalesInvoice>>('/invoices/sales/', { params });
     return response.data;
@@ -70,6 +74,7 @@ export const invoicesApi = {
     status?: string;
     payment_status?: string;
     page?: number;
+    page_size?: number;
   }): Promise<PaginatedResponse<PurchaseInvoice>> => {
     const response = await apiClient.get<PaginatedResponse<PurchaseInvoice>>('/invoices/purchases/', { params });
     return response.data;

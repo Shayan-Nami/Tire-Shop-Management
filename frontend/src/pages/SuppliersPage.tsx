@@ -112,7 +112,11 @@ export const SuppliersPage: React.FC = () => {
     if (!confirm(t("آیا از حذف این تأمین‌کننده اطمینان دارید؟"))) return;
     try {
       await suppliersApi.deleteSupplier(id);
-      void fetchSuppliers();
+      if (suppliers.length === 1 && currentPage > 1) {
+        setCurrentPage((page) => Math.max(1, page - 1));
+      } else {
+        void fetchSuppliers();
+      }
     } catch (err: unknown) {
       alert(parseApiError(err, t("امکان حذف تأمین‌کننده به دلیل وجود فاکتورهای خرید ثبت‌شده وجود ندارد."), language));
     }

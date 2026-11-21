@@ -12,6 +12,8 @@ import { ReceiptVoucher, PaymentVoucher, CustomerRefundVoucher } from '../types'
 import { formatCurrency, formatIsoToJalali } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 import { CancelVoucherModal } from '../components/finance/CancelVoucherModal';
+import { PaymentModal } from '../components/finance/PaymentModal';
+import { CustomerRefundModal } from '../components/finance/CustomerRefundModal';
 import { createRequestSequence } from '../utils/invoiceRequests';
 import { parseApiError } from '../utils/errorParser';
 import { translatePaymentMethod } from '../utils/i18n';
@@ -39,6 +41,8 @@ export const Treasury: React.FC = () => {
     type: 'receipt' | 'payment' | 'refund';
     title: string;
   } | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState<boolean>(false);
+  const [refundModalOpen, setRefundModalOpen] = useState<boolean>(false);
 
   const treasuryRequests = useRef(createRequestSequence());
 
@@ -135,6 +139,27 @@ export const Treasury: React.FC = () => {
           <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">{t("خزانه‌داری و مدیریت اسناد مالی")}</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("دفتر دریافت وجوه نقد/کارتخوان از مشتریان، پرداخت به تأمین‌کنندگان و استرداد مازاد مرجوعی")}</p>
         </div>
+
+        {user?.role === 'MANAGER' && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPaymentModalOpen(true)}
+              className="action-primary inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+            >
+              <ArrowUpRight className="w-4 h-4" />
+              <span>{t("ثبت پرداخت به تأمین‌کننده")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRefundModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>{t("ثبت استرداد وجه مشتری")}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="tab-bar">
@@ -441,6 +466,28 @@ export const Treasury: React.FC = () => {
           setCancelTarget(null);
         }}
         onConfirm={handleConfirmCancel}
+      />
+
+      <PaymentModal
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        onSuccess={() => {
+          treasuryRequests.current.invalidate();
+          setActiveTab('payments');
+          setCurrentPage(1);
+          refreshData();
+        }}
+      />
+
+      <CustomerRefundModal
+        isOpen={refundModalOpen}
+        onClose={() => setRefundModalOpen(false)}
+        onSuccess={() => {
+          treasuryRequests.current.invalidate();
+          setActiveTab('refunds');
+          setCurrentPage(1);
+          refreshData();
+        }}
       />
     </div>
   );

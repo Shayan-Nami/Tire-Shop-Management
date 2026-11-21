@@ -1,6 +1,15 @@
 import { englishMessages } from './englishMessages.ts';
+import type { PaymentMethod } from '../types/index.ts';
 export type Language = 'fa' | 'en';
 export type Direction = 'rtl' | 'ltr';
+
+export const PAYMENT_METHOD_OPTIONS: ReadonlyArray<{ value: PaymentMethod; labelKey: string }> = [
+  { value: 'POS', labelKey: 'کارتخوان بانکی (POS)' },
+  { value: 'CASH', labelKey: 'وجه نقد (صندوق)' },
+  { value: 'CARD_TO_CARD', labelKey: 'کارت به کارت' },
+  { value: 'BANK_TRANSFER', labelKey: 'انتقال بانکی / حواله' },
+  { value: 'CHEQUE', labelKey: 'چک صیادی بانکی' },
+];
 
 export const translations: Record<string, { fa: string; en: string }> = {
   appTitle: { fa: 'سامانه فروشگاه و انبار لاستیک', en: 'Tire Shop & Inventory System' },

@@ -68,7 +68,8 @@ export const ReportsPage: React.FC = () => {
 
   const handleDateFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loadReport();
+    if (loading) return;
+    void loadReport();
   };
 
   return (
@@ -234,7 +235,7 @@ export const ReportsPage: React.FC = () => {
         </div>
       )}
 
-      {!error && activeTab === 'by_date' && (
+      {activeTab === 'by_date' && (
         <div className="space-y-4">
           <form
             onSubmit={handleDateFilterSubmit}
@@ -268,11 +269,12 @@ export const ReportsPage: React.FC = () => {
 
             <button
               type="submit"
-              className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-xs shadow-sm"
+              disabled={loading}
+              className="action-primary px-5 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-xl font-semibold text-xs shadow-sm"
             >{t("محاسبه گزارش فروش")}</button>
           </form>
 
-          {dateSalesResult && (
+          {!error && dateSalesResult && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-5 surface-panel">
                 <span className="text-xs text-slate-500">{t("تعداد فاکتورهای تاییدشده در بازه:")}</span>

@@ -60,7 +60,7 @@ export const catalogApi = {
   adjustStock: async (
     tireId: number,
     data: { counted_quantity: number; reason: string }
-  ): Promise<{ message: string; difference: number; current_stock: number }> => {
+  ): Promise<{ message: string; movement_id: number; difference: number; current_stock: number }> => {
     const response = await apiClient.post(`/catalog/tires/${tireId}/adjust-stock/`, data);
     return response.data;
   },

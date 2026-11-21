@@ -3,7 +3,7 @@ import React from 'react';
 import { parseIranianPlate } from '../../utils/formatters';
 
 interface IranianPlateBadgeProps {
-  plateString?: string;
+  plateString?: string | null;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }

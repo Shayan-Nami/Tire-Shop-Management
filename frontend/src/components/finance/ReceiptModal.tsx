@@ -2,10 +2,12 @@ import { useLanguage } from '../../context/LanguageContext';
 import React, { useRef, useState } from 'react';
 import { X, Coins } from 'lucide-react';
 import { financeApi } from '../../api/finance';
-import { SalesInvoice } from '../../types';
-import { formatCurrency } from '../../utils/formatters';
+import { SalesInvoice, PaymentMethod } from '../../types';
+import { formatCurrency, truncateToTwoDecimals } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { parseApiError } from '../../utils/errorParser';
+import { PAYMENT_METHOD_OPTIONS } from '../../utils/i18n';
+import { Modal } from '../ui/Modal';
 
 interface ReceiptModalProps {
   invoice: SalesInvoice | null;
@@ -20,18 +22,8 @@ function getDefaultReceiptAmount(invoice: SalesInvoice | null): string {
     invoice.remaining_amount !== null &&
     String(invoice.remaining_amount).trim() !== ''
       ? invoice.remaining_amount
-      : invoice.net_amount || invoice.total_amount || 0;
-  const rawStr = String(raw).trim();
-  const numeric = parseFloat(rawStr);
-  if (!Number.isFinite(numeric) || numeric <= 0) return '0';
-  const plainDecimal = rawStr.match(/^(\d+)(?:\.(\d+))?$/);
-  if (plainDecimal) {
-    const intPart = String(Number(plainDecimal[1]));
-    const fracPart = (plainDecimal[2] || '').slice(0, 2).replace(/0+$/, '');
-    return fracPart ? `${intPart}.${fracPart}` : intPart;
-  }
-  const truncated = Math.floor(Number((numeric * 100).toFixed(6))) / 100;
-  return String(truncated);
+      : invoice.net_amount ?? invoice.total_amount ?? 0;
+  return truncateToTwoDecimals(raw);
 }
 
 export const ReceiptModal: React.FC<ReceiptModalProps> = ({
@@ -43,7 +35,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const { currencyUnit } = useAuth();
 
   const [amount, setAmount] = useState<string>(() => getDefaultReceiptAmount(invoice));
-  const [paymentMethod, setPaymentMethod] = useState<'POS' | 'CASH' | 'CARD_TO_CARD' | 'CHEQUE'>('POS');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('POS');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -92,8 +84,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     }
   };
 
+  const handleClose = () => {
+    if (!submitting) onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+    <Modal label={t("ثبت سند دریافت وجه از مشتری")} onClose={handleClose} busy={submitting}>
       <div className="bg-white dark:bg-slate-900 modal-card rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
           <div className="flex items-center gap-2">
@@ -102,9 +98,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
+            disabled={submitting}
             aria-label={t("بستن")}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -116,7 +113,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             </p>
             <p className="text-slate-500">{t("مشتری:")}<bdi dir="auto">{invoice.customer_name}</bdi> ({invoice.customer_phone})
             </p>
-            <p className="text-slate-700 dark:text-slate-300">{t("مبلغ خالص فاکتور:")}<span className="font-bold text-brand-600">{formatCurrency(invoice.net_amount || invoice.total_amount, true, currencyUnit, language)}</span>
+            <p className="text-slate-700 dark:text-slate-300">{t("مبلغ خالص فاکتور:")}<span className="font-bold text-brand-600">{formatCurrency(invoice.net_amount ?? invoice.total_amount, true, currencyUnit, language)}</span>
             </p>
             {invoice.remaining_amount !== undefined && invoice.remaining_amount !== null && (
               <p className="text-slate-700 dark:text-slate-300">{t("مانده بدهی فاکتور:")}<span className="font-bold text-rose-600 dark:text-rose-400">{formatCurrency(invoice.remaining_amount, true, currencyUnit, language)}</span>
@@ -151,13 +148,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             <select
               id="receipt-method"
               value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as 'POS' | 'CASH' | 'CARD_TO_CARD' | 'CHEQUE')}
+              onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
               className="ui-field w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
             >
-              <option value="POS">{t("کارتخوان بانکی (POS)")}</option>
-              <option value="CASH">{t("وجه نقد (صندوق)")}</option>
-              <option value="CARD_TO_CARD">{t("کارت‌به‌کارت / حواله پایا")}</option>
-              <option value="CHEQUE">{t("چک صیادی بانکی")}</option>
+              {PAYMENT_METHOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{t(option.labelKey)}</option>
+              ))}
             </select>
           </div>
 
@@ -188,19 +184,20 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={handleClose}
+              disabled={submitting}
+              className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
             >{t("انصراف")}</button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-sm transition-colors"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-sm transition-colors disabled:opacity-50"
             >
               {submitting ? t("در حال ثبت...") : t("ثبت سند دریافت")}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 };

@@ -13,18 +13,28 @@ function find(h: Harness, predicate: (node: any) => boolean) {
 
 function browserSession(t: TestContext) {
   const values = new Map([
-    ['access_token', 'old-access'], ['refresh_token', 'old-refresh'],
+    ['access_token', 'old-access'],
+    ['refresh_token', 'old-refresh'],
     ['user_info', JSON.stringify({ id: 1, username: 'manager', role: 'MANAGER' })],
     ['preferred_currency', 'toman'],
+    ['auth_persistence', 'persistent'],
+    ['last_activity_at', String(Date.now())],
   ]);
+  const sessionValues = new Map<string, string>();
   const storage = {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); },
     removeItem: (key: string) => { values.delete(key); },
   };
+  const sessionStorageMock = {
+    getItem: (key: string) => sessionValues.get(key) ?? null,
+    setItem: (key: string, value: string) => { sessionValues.set(key, value); },
+    removeItem: (key: string) => { sessionValues.delete(key); },
+  };
   const location = { href: '/dashboard', search: '' };
-  const descriptors = ['localStorage', 'window'].map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
+  const descriptors = ['localStorage', 'sessionStorage', 'window'].map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: sessionStorageMock });
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { location } });
   t.after(() => {
     for (const [name, descriptor] of descriptors) {
@@ -38,8 +48,10 @@ function browserSession(t: TestContext) {
 async function setup(t: TestContext, changePassword: (payload: any) => Promise<unknown>, logout?: (token: string) => Promise<void>) {
   const browser = browserSession(t);
   const cachedHeaders: Record<string, string> = { Authorization: 'Bearer old-access' };
-  const { clearLocalSession } = loadComponent('../src/utils/session.ts', {
+  const authStorage = loadComponent('../src/utils/authStorage.ts', {});
+  const sessionUtils = loadComponent('../src/utils/session.ts', {
     '../api/client': { apiClient: { defaults: { headers: { common: cachedHeaders } } } },
+    './authStorage': authStorage,
   });
   const logoutTokens: string[] = [];
   const user = JSON.parse(browser.storage.getItem('user_info')!);
@@ -50,7 +62,7 @@ async function setup(t: TestContext, changePassword: (payload: any) => Promise<u
   };
   const provider = mountComponent('../src/context/AuthContext.tsx', 'AuthProvider', {
     '../api/auth': { authApi },
-    '../utils/session': { clearLocalSession },
+    '../utils/session': { ...authStorage, ...sessionUtils },
   });
   await provider.flush();
   let closed = 0;
@@ -76,7 +88,9 @@ function fillPasswords(h: Harness, nextPassword = 'new-password-123') {
 const send = (h: Harness) => find(h, (node) => node.type === 'form').props.onSubmit({ preventDefault() {} });
 
 function assertSessionCleared(session: Awaited<ReturnType<typeof setup>>, destination: string) {
-  for (const key of ['access_token', 'refresh_token', 'user_info']) assert.equal(session.storage.getItem(key), null);
+  for (const key of ['access_token', 'refresh_token', 'user_info', 'last_activity_at', 'auth_persistence']) {
+    assert.equal(session.storage.getItem(key), null);
+  }
   assert.equal(session.storage.getItem('preferred_currency'), 'toman');
   assert.equal(session.cachedHeaders.Authorization, undefined);
   assert.equal(session.provider.tree.props.value.user, null);
